@@ -186,24 +186,7 @@ static func _minaret(lm: LandmarkMesh, base: Vector3, h: float) -> void:
 ## and the low wings along the front ending in two-storey pavilions with
 ## balustrades.
 static func hua_lamphong(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	K.mats(lm, "render", "#E9CF7A", "#F1E7CF", "sheet_metal", "#C79A3C")
-	K.shed(lm, "Roof", "Steel", "Glass", Vector3(0, 0, 0), Vector3.FORWARD, 44.0, 120.0, 12.0, 14.0, 10.0, 0.2, 1)
-	lm.box("Walls", Vector3(0, 6.0, 1.0), Vector3(46.0, 12.0, 4.0))
-	for s in [-1.0, 1.0]:
-		lm.box("Walls", Vector3(s * 22.3, 6.0, -60.0), Vector3(1.0, 12.0, 120.0))
-		K.arch_row(lm, "Trim", "Glass", Vector3(s * 22.85, 0, -2.0), Vector3(s * 22.85, 0, -118.0), Vector3(s, 0, 0),
-			3.0, 14, 3.0, 6.0, 1)
-	K.lunette(lm, "Trim", "Glass", Vector3(0, 12.0, 1.1), Vector3.BACK, 44.0, 14.0, 12, 9)
-	K.clock(lm, "Dial", "Trim", Vector3(0, 19.0, 1.6), Vector3.BACK, 2.0)
-	K.arch_row(lm, "Trim", "Glass", Vector3(-18, 0, 3.05), Vector3(18, 0, 3.05), Vector3.BACK, 0.6, 5, 4.0, 9.0, 1)
-	LandmarkFhUtil.columns(lm, "Trim", Vector3(-20, 0, 5.5), Vector3(20, 0, 5.5), 10, 7.0, 0.45)
-	lm.box("Trim", Vector3(0, 7.4, 5.0), Vector3(42.0, 0.8, 3.0))
-	for s in [-1.0, 1.0]:
-		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 44.0, -3.0, 42.0, 18.0, 0.0, 9.0, "flat", 0.0, 4.2, 5.0, true)
-		K.block(lm, "Walls", "Trim", "Glass", "Roof", s * 71.0, -2.0, 12.0, 20.0, 0.0, 13.0, "flat", 0.0, 4.0, 5.5, true)
-		LandmarkFhUtil.merlons(lm, "Trim", Vector3(s * 65.0, 13.0, 8.0), Vector3(s * 77.0, 13.0, 8.0), 0.8, 0.3, 1.0, 0.3)
-	lm.commit(model)
+	LandmarkBkHuaLamphong.build(model)
 
 ## Taipei Main Station (1989): the pale grey palace-style block with
 ## banded glazing between its columns, the broad lower eave band of

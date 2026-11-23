@@ -176,7 +176,7 @@ func _setup(d: LocationData, g: GroundTruth, m: SettlementMap) -> void:
 				_detailed_ids[id] = true
 		var r := Vector2(float(bd.get("x", 0.0)), float(bd.get("z", 0.0))).length()
 		if r >= 700.0 and str(bd.get("height_source", "")) in ["tag_height", "levels"] \
-				and not ChimneyBuilder.accepts(bd):  # a stack is not the street's height
+				and not ChimneyBuilder.accepts(bd) and not StupaBuilder.accepts(bd):  # a stack is not the street's height
 			hs.append(float(bd.get("height", 0.0)))
 	if hs.size() >= 8:
 		hs.sort()
@@ -252,10 +252,18 @@ func _towers() -> void:
 			_tower_cells[smap.cell_of(c.x, c.y) if smap != null else Vector2i(-9, -9)] = true
 			towers += 1
 			continue
+		if StupaBuilder.accepts(t):
+			StupaBuilder.append_far(batch, _key(c.x, c.y), t, base + 2.0)
+			_tower_cells[smap.cell_of(c.x, c.y) if smap != null else Vector2i(-9, -9)] = true
+			towers += 1
+			continue
 		var kind := str(t.get("kind", "yes"))
 		var mat: Material = _dfs[int(_at(c.x, c.y) * 4.0) % _dfs.size()] \
 			if kind in ["apartments", "residential", "dormitory", "hotel"] else _glass
 		var tower_effective: Dictionary = t.duplicate()
+		var tid := str(t.get("osm_id", ""))
+		if BuildingHeights.HEIGHT_FIX_M.has(tid):
+			tower_effective["height"] = float(BuildingHeights.HEIGHT_FIX_M[tid])
 		NycCrownMaterials.apply(t, t, tower_effective)
 		mat = _tower_material(tower_effective, mat, c)
 		BuildingBuilder._batch = batch

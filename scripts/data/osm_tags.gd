@@ -9,6 +9,8 @@ extends RefCounted
 ## true position. This is what makes landmarks work for any place the
 ## user can pick, not just the curated registry in LocationData.
 static func archetype_for(tags: Dictionary) -> String:
+	if is_stupa(tags):
+		return ""
 	var b := str(tags.get("building", ""))
 	var mm := str(tags.get("man_made", ""))
 	if str(tags.get("attraction", "")) == "big_wheel":
@@ -54,6 +56,11 @@ static func _station_building(tags: Dictionary) -> bool:
 static func is_chimney(tags: Dictionary) -> bool:
 	return str(tags.get("man_made", "")) == "chimney" or str(tags.get("building", "")) == "chimney"
 
+## A mapped Buddhist chedi / stupa / prang (man_made=stupa or building=stupa):
+## drawn as a bell chedi or prang (StupaBuilder), never as a windowed box.
+static func is_stupa(tags: Dictionary) -> bool:
+	return str(tags.get("man_made", "")) == "stupa" or str(tags.get("building", "")) == "stupa"
+
 ## A statue mapped as a building (historic=statue, memorial=statue, or
 ## tourism=artwork with artwork_type=statue): its `statue` form
 ## ("equestrian", ...) or "figure"; "" for anything else. StatueBuilder
@@ -96,7 +103,7 @@ static func wiki_tag(tags: Dictionary) -> String:
 ## rows and forest polygons.
 static func tree_tags(tags: Dictionary) -> Dictionary:
 	var out := {}
-	for k in ["genus", "species", "leaf_type", "leaf_cycle"]:
+	for k in ["genus", "species", "leaf_type", "leaf_cycle", "denotation"]:
 		var v := str(tags.get(k, "")).strip_edges().to_lower()
 		if v != "":
 			out[k] = v
@@ -470,6 +477,8 @@ static func _building_entry(tags: Dictionary, pts: PackedVector2Array,
 	}
 	if is_chimney(tags):
 		entry["chimney"] = true
+	if is_stupa(tags):
+		entry["stupa"] = true
 	var statue := statue_kind(tags)
 	if statue != "":
 		entry["statue"] = statue
@@ -754,6 +763,10 @@ static func _waterway_entry(tags: Dictionary, pts: PackedVector2Array,
 		forced_class: String = "") -> Dictionary:
 	var wc := forced_class if forced_class != "" \
 		else str(tags.get("waterway", "stream"))
+	# USACE NTAD imports tag open-bay dredged shipping routes (Atlantic Intracoastal
+	# Waterway, Government/Dodge Island Cut) as waterway=canal + deep_draft.
+	if wc == "canal" and (tags.has("deep_draft") or tags.has("source:deep_draft")):
+		wc = "fairway"
 	var width_m := waterway_class_width(wc)
 	var w := _tag_metres(tags.get("width", ""), 0.5, 500.0)
 	if not is_nan(w):

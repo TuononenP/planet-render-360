@@ -30,9 +30,24 @@ const CN_TILE := ["#e8e0d0", "#e0d0c0", "#d8c8b8", "#e8d8d0", "#c8c8c0", "#d8d0b
 ## Beijing hutong grey brick, red lacquer doors; Soviet-era red and grey brick slabs.
 const HUTONG := ["#808080", "#8a8a88", "#707272", "#9a9890"]
 const SOVIET_BRICK := ["#9a5040", "#8a4a3a", "#7a7470", "#a86048"]
-## Bangkok shophouse paint (weathered) and condo whites.
+## Bangkok shophouse paint (weathered), Rattanakosin royal yellows/creams,
+## Ratchadamnoen streamline cream, temple whites/oranges, and Yaowarat neon.
 const SHOPHOUSE := ["#d8d0c0", "#c8c0b0", "#e0c8a0", "#c8d0c8", "#e8d8c0", "#b8b0a0"]
 const SHUTTER := ["#6a6e72", "#5a5e62", "#4a6a8a"]
+const RATTANAKOSIN_CREAM := ["#f2e6bc", "#eedba2", "#f5eed6", "#e6d8ad", "#dce4cc", "#f0e2b6"]
+const RATTANAKOSIN_CIVIC := ["#f0dc98", "#eed484", "#f4ead0", "#e8d292", "#f2e5b8"]
+const RATCHADAMNOEN_CREAM := ["#eee4cc", "#e8dcc0", "#f2ead6", "#e2d4b4"]
+const TEAK_SHUTTER := ["#2d4c3b", "#385a46", "#4e3829", "#5c4230"]
+const THAI_CLAY_ROOF := ["#b84e28", "#a64422", "#c4582c", "#8e3e24"]
+const CIVIC_ROOF_TILE := [["terracotta", ["#b84a27", "#c4542a"]], ["slate", ["#2f6c4e", "#357857"]]]
+const WAT_WALL := ["#f6f3ea", "#f0ece0", "#ebe4d2"]
+const WAT_ORANGE_ROOF := ["#cc4e20", "#d85a24", "#be451c"]
+const YAOWARAT_SIGNS := ["#d8221c", "#f0b818", "#188c42", "#e63e1c", "#f5e8c8"]
+const THAI_TIMBER := ["#6e4e34", "#7e5c3e", "#5a402c", "#8a6848"]
+const DISTRICT_ONLY_BANGKOK := ["bangkok_oldtown", "bangkok_ratchadamnoen",
+	"bangkok_khaosan", "bangkok_yaowarat", "bangkok_timber", "bangkok_mall", "bangkok_hotel_river"]
+const OLDTOWN_DISTRICTS_BANGKOK := ["bangkok_oldtown", "bangkok_civic", "bangkok_ratchadamnoen",
+	"bangkok_khaosan", "bangkok_shophouse", "bangkok_yaowarat", "bangkok_timber"]
 ## Mumbai: monsoon-stained white and cream RCC, Art Deco pastels, Kurla basalt and buff stone.
 const MUMBAI := ["#d8d4cc", "#c8c4b8", "#e0d8c8", "#b8b4a8", "#d8ccb4", "#c8c0a8"]
 const DECO := ["#efe6d2", "#e8d8b8", "#e8c8b0", "#d8e0d0", "#f2ede0"]
@@ -62,7 +77,11 @@ const BASE := {
 	"shanghai_walkup": "shanghai", "shanghai_tower": "shanghai",
 	"beijing": "east_asia", "beijing_hutong": "beijing", "beijing_brick": "beijing",
 	"beijing_tower": "beijing",
-	"bangkok": "southeast_asia", "bangkok_shophouse": "bangkok", "bangkok_tower": "bangkok",
+	"bangkok": "southeast_asia", "bangkok_oldtown": "bangkok", "bangkok_khaosan": "bangkok_oldtown",
+	"bangkok_civic": "bangkok", "bangkok_ratchadamnoen": "bangkok", "bangkok_shophouse": "bangkok",
+	"bangkok_yaowarat": "bangkok_shophouse", "bangkok_wat": "bangkok", "bangkok_timber": "bangkok",
+	"bangkok_mall": "bangkok", "bangkok_hotel_river": "bangkok", "bangkok_condo": "bangkok",
+	"bangkok_tower": "bangkok",
 	"siem_reap": "southeast_asia",
 	"mumbai": "south_asia", "mumbai_gothic": "mumbai", "mumbai_deco": "mumbai", "mumbai_tower": "mumbai",
 	"cairo": "middle_east", "cairo_khedival": "cairo", "cairo_islamic": "cairo", "cairo_tower": "cairo",
@@ -100,10 +119,20 @@ const ERAS := {
 		["siem_reap", ALL, 1000, 2100, [], 5.0, 0.0, 99.0],
 	],
 	"bangkok": [
-		["bangkok_shophouse", HAC, 1900, 2000, ["shophouse", "sino_portuguese", "colonial"],
-			5.0, 0.0, 99.0, [2, 5], true],
-		["bangkok", APT, 1990, 2100, ["condominium"], 3.0, 0.0, 99.0, [6, 60]],
-		["bangkok_tower", ["commercial", "civic"], 1980, 2100, [], 1.5, 0.0, 99.0, [8, 99]],
+		["bangkok_oldtown", HAC, 1850, 1955, ["sino_portuguese", "colonial", "neoclassicism"],
+			4.0, 0.0, 3.0, [2, 3], true],
+		["bangkok_civic", ACC, 1870, 1980, ["neoclassical", "palladian"], 2.0, 0.0, 4.0, [2, 5]],
+		["bangkok_ratchadamnoen", ACC, 1938, 1952, ["art_deco", "streamline_moderne"], 2.0, 0.0, 2.0, [4, 4]],
+		["bangkok_khaosan", HAC, 1930, 2005, [], 2.0, 0.0, 2.5, [2, 4]],
+		["bangkok_shophouse", HAC, 1950, 2005, ["shophouse"], 5.0, 0.0, 99.0, [2, 5]],
+		["bangkok_yaowarat", HAC, 1920, 2010, ["chinese_shophouse"], 3.0, 0.0, 4.0, [3, 6]],
+		["bangkok_timber", ["house", "commercial"], 1880, 1985, ["traditional", "vernacular", "wooden"],
+			2.0, 0.0, 99.0, [1, 2]],
+		["bangkok_mall", ["commercial", "civic"], 1985, 2100, [], 1.5, 0.0, 99.0, [4, 10]],
+		["bangkok_hotel_river", AC, 1975, 2100, [], 1.5, 0.0, 99.0, [10, 34]],
+		["bangkok", ALL, 1975, 2100, [], 3.0, 2.2, 99.0, [3, 8]],
+		["bangkok_condo", APT, 1990, 2100, ["condominium"], 2.5, 3.0, 99.0, [9, 55]],
+		["bangkok_tower", ["commercial", "civic"], 1985, 2100, [], 1.5, 2.5, 99.0, [10, 99]],
 	],
 	"mumbai": [
 		["mumbai_gothic", ALL, 1850, 1929, ["victorian_gothic", "gothic_revival", "indo_saracenic",
@@ -256,30 +285,219 @@ const REGIONS := {
 			"g": [["shop", 2], ["signage", 1]], "gc": ["#c8301a", "#1a5a9a", "#e8b820", "#2a7a3a"],
 			"rv": {"signage": 0.6, "awning": 0.5, "awning_colours": ["#2a4a6a", "#c8301a", "#e8b820"]}},
 	},
-	# Condominium towers (Sukhumvit, Silom): 20–50 storeys of white render
-	# and tinted glass with deep balconies.
+	# Bangkok general mid-rise fabric outside conservation & tower cores, plus
+	# the city-wide Thai wat religious hall profile (BK-3.4: steep orange-tile
+	# gabled roof, whitewashed walls, no East Asian pagoda tower).
 	"bangkok": {
+		"apartments": {"w": [["render", SHOPHOUSE], ["concrete", ["#e6e2d8", "#dad4c8"]]],
+			"p": [["balcony", 3], ["punched", 2]], "wn": "wide", "bay": 3.2, "fr": "#787a7c", "sp": 0.1,
+			"r": [["flat", 4], ["hipped", 1]], "pitch": 0.45, "rf": [["membrane", []], ["terracotta", THAI_CLAY_ROOF]],
+			"fh": 3.1, "st": [4, 8], "fix": true, "eq": 0.7, "g": [["shop", 2], ["none", 1]],
+			"rv": {"deep_balcony": 0.35, "signage": 0.25, "awning": 0.25,
+				"awning_colours": ["#2a526e", "#b83220", "#d8a420"]}},
+		"commercial": {"w": [["render", SHOPHOUSE], ["concrete", SHOPHOUSE]], "p": [["shophouse", 2], ["strip", 2]],
+			"wn": "wide", "bay": 3.8, "fr": "#6a6e72", "sh": SHUTTER, "sp": 0.2, "r": [["flat", 1]],
+			"rf": [["membrane", []]], "fh": 3.4, "st": [3, 6], "fix": true, "eq": 0.8,
+			"g": [["shop", 2], ["signage", 1]], "rv": {"signage": 0.45, "awning": 0.35,
+				"awning_colours": ["#2a4a6a", "#c8301a", "#e8b820"]}},
+		"house": {"w": [["render", RATTANAKOSIN_CREAM], ["wood", THAI_TIMBER]], "p": "punched",
+			"bay": 3.0, "fr": "#f4f0e6", "sh": TEAK_SHUTTER, "sp": 0.35, "r": [["hipped", 3], ["gabled", 3]],
+			"pitch": 0.7, "rf": [["terracotta", THAI_CLAY_ROOF], ["slate", ["#68727a", "#7a4a38"]]],
+			"fh": 3.0, "st": [2, 2], "fix": true, "ch": 0.0, "eq": 0.2, "ev": 0.85, "rv": {}},
+		"religious": {"w": [["render", WAT_WALL]], "p": "ornate", "wn": "casement", "bay": 3.4,
+			"fr": "#c89624", "sh": "#7a221c", "sp": 0.5, "r": [["gabled", 1]], "pitch": 1.35,
+			"rf": [["terracotta", WAT_ORANGE_ROOF]], "fh": 5.5, "st": [1, 2], "fix": true,
+			"ch": 0.0, "dm": 0.0, "eq": 0.0, "tw": "none", "g": [["stone", 1]], "ev": 1.15,
+			"rv": {"thai_wat": true, "string_course": true}},
+	},
+	"bangkok_wat": {
+		"religious": {"w": [["render", WAT_WALL]], "p": "ornate", "wn": "casement", "bay": 3.4,
+			"fr": "#c89624", "sh": "#7a221c", "sp": 0.5, "r": [["gabled", 1]], "pitch": 1.35,
+			"rf": [["terracotta", WAT_ORANGE_ROOF]], "fh": 5.5, "st": [1, 2], "fix": true,
+			"ch": 0.0, "dm": 0.0, "eq": 0.0, "tw": "none", "g": [["stone", 1]], "ev": 1.15,
+			"rv": {"thai_wat": true, "string_course": true}},
+	},
+	# Condominium towers (Sukhumvit, Silom, Rama IX): 20–45 storeys of white
+	# render and tinted glass with deep balconies.
+	"bangkok_condo": {
 		"apartments": {"w": [["render", ["#f0eee8", "#e8e4dc", "#e0dcd4"]], ["glass", []]],
 			"p": [["balcony", 3], ["curtain", 1]], "wn": "wide", "bay": 3.0, "fr": "#8a8c8e", "sp": 0.0,
 			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.0, "st": [20, 45], "fix": true,
 			"eq": 0.7, "g": [["none", 1], ["shop", 1]], "rv": {"deep_balcony": 0.5}},
 	},
+	# Rattanakosin historic shophouses (Sao Chingcha, Phraeng Phuthon, Bamrung
+	# Mueang): 2–3 storeys of royal yellow, cream and celadon render, dark
+	# green/teak louvred shutters, clay-tile hipped/gabled roofs and awnings.
+	"bangkok_oldtown": {
+		"commercial": {"w": [["render", RATTANAKOSIN_CREAM]], "p": [["shophouse", 3], ["ornate", 1]],
+			"wn": "french", "bay": 3.8, "fr": "#f4efe2", "sh": TEAK_SHUTTER, "sp": 0.7,
+			"r": [["hipped", 3], ["gabled", 3]], "pitch": 0.65, "rf": [["terracotta", THAI_CLAY_ROOF]],
+			"fh": 3.5, "st": [2, 3], "fix": true, "ch": 0.0, "eq": 0.1, "g": [["shop", 3], ["render", 1]],
+			"gc": ["#285840", "#8e2c22", "#3e2e22", "#1e4a68"], "ev": 0.75,
+			"rv": {"string_course": true, "awning": 0.55,
+				"awning_colours": ["#285840", "#982c22", "#c88e22", "#ece4d0"], "signage": 0.25}},
+		"apartments": {"w": [["render", RATTANAKOSIN_CREAM]], "p": [["shophouse", 3], ["punched", 2]],
+			"wn": "french", "bay": 3.8, "fr": "#f4efe2", "sh": TEAK_SHUTTER, "sp": 0.65,
+			"r": [["hipped", 3], ["gabled", 3]], "pitch": 0.65, "rf": [["terracotta", THAI_CLAY_ROOF]],
+			"fh": 3.4, "st": [2, 3], "fix": true, "ch": 0.0, "eq": 0.1, "g": [["shop", 3], ["render", 1]],
+			"gc": ["#285840", "#8e2c22", "#3e2e22"], "ev": 0.75,
+			"rv": {"string_course": true, "awning": 0.45,
+				"awning_colours": ["#285840", "#982c22", "#ece4d0"], "signage": 0.2}},
+		"house": {"w": [["render", RATTANAKOSIN_CREAM], ["wood", THAI_TIMBER]], "p": "punched",
+			"wn": "casement", "bay": 3.2, "fr": "#f4efe2", "sh": TEAK_SHUTTER, "sp": 0.6,
+			"r": [["hipped", 3], ["gabled", 3]], "pitch": 0.7, "rf": [["terracotta", THAI_CLAY_ROOF]],
+			"fh": 3.2, "st": [2, 2], "fix": true, "ch": 0.0, "eq": 0.05, "ev": 0.85,
+			"rv": {"string_course": true}},
+		"civic": {"w": [["render", RATTANAKOSIN_CIVIC]], "p": "ornate", "wn": "casement",
+			"bay": 3.8, "fr": "#f6f2e8", "sh": TEAK_SHUTTER, "sp": 0.45,
+			"r": [["hipped", 3], ["flat", 2]], "pitch": 0.65, "rf": CIVIC_ROOF_TILE,
+			"fh": 3.8, "st": [3, 4], "fix": true, "ch": 0.0, "eq": 0.15, "g": [["stone", 2], ["render", 1]],
+			"ev": 0.65, "rv": {"string_course": true, "quoins": true, "cornice": 0.6}},
+	},
+	# Banglamphu & Khao San Road: 2–4 storey Rattanakosin shophouses packed
+	# with guesthouse signboards, vertical banners and street awnings.
+	"bangkok_khaosan": {
+		"commercial": {"w": [["render", RATTANAKOSIN_CREAM + SHOPHOUSE]], "p": [["shophouse", 3], ["punched", 1]],
+			"wn": "french", "bay": 3.8, "fr": "#6a6862", "sh": TEAK_SHUTTER, "sp": 0.45,
+			"r": [["flat", 2], ["hipped", 2], ["gabled", 2]], "pitch": 0.55,
+			"rf": [["terracotta", THAI_CLAY_ROOF], ["membrane", []]], "fh": 3.4, "st": [2, 4],
+			"fix": true, "eq": 0.5, "g": [["signage", 3], ["shop", 2]],
+			"gc": ["#c8301a", "#1f6a4a", "#e8b020", "#1e5090"], "ev": 0.4,
+			"rv": {"signage": 0.85, "sign_stack": 0.55, "screens": 0.35, "awning": 0.65,
+				"awning_colours": ["#c8301a", "#1f6a4a", "#e8b020", "#1e5090"]}},
+		"apartments": {"w": [["render", RATTANAKOSIN_CREAM + SHOPHOUSE]], "p": [["shophouse", 2], ["punched", 2]],
+			"wn": "wide", "bay": 3.8, "fr": "#6a6862", "sh": TEAK_SHUTTER, "sp": 0.4,
+			"r": [["flat", 2], ["hipped", 2]], "pitch": 0.55,
+			"rf": [["terracotta", THAI_CLAY_ROOF], ["membrane", []]], "fh": 3.3, "st": [2, 4],
+			"fix": true, "eq": 0.5, "g": [["shop", 2], ["signage", 2]],
+			"rv": {"signage": 0.7, "sign_stack": 0.4, "awning": 0.5,
+				"awning_colours": ["#c8301a", "#1f6a4a", "#e8b020"]}},
+	},
+	# Royal Rattanakosin & Dusit ministries: warm yellow and cream neo-classical
+	# and late-modern civic blocks (including 4–5 storey Bangkok City Hall).
+	"bangkok_civic": {
+		"civic": {"w": [["render", RATTANAKOSIN_CIVIC], ["limestone", ["#efe6ce"]]],
+			"p": [["ornate", 3], ["punched", 2]], "wn": "casement", "bay": 3.8, "fr": "#f6f2e8",
+			"sh": TEAK_SHUTTER, "sp": 0.45, "r": [["hipped", 4], ["flat", 1]], "pitch": 0.7,
+			"rf": CIVIC_ROOF_TILE, "fh": 3.9, "st": [2, 4], "fix": true, "ch": 0.0, "eq": 0.1,
+			"g": [["stone", 2], ["render", 2]], "ev": 0.75,
+			"rv": {"string_course": true, "quoins": true, "cornice": 0.7}},
+		"commercial": {"w": [["render", RATTANAKOSIN_CIVIC]], "p": [["ornate", 2], ["shophouse", 2]],
+			"wn": "french", "bay": 3.8, "fr": "#f6f2e8", "sh": TEAK_SHUTTER, "sp": 0.55,
+			"r": [["hipped", 4], ["gabled", 1]], "pitch": 0.65, "rf": CIVIC_ROOF_TILE,
+			"fh": 3.6, "st": [2, 3], "fix": true, "ch": 0.0, "eq": 0.1,
+			"g": [["shop", 2], ["stone", 1]], "ev": 0.75,
+			"rv": {"string_course": true, "quoins": true, "awning": 0.3,
+				"awning_colours": ["#285840", "#8e2c22"]}},
+		"apartments": {"w": [["render", RATTANAKOSIN_CIVIC]], "p": [["ornate", 2], ["punched", 2]],
+			"wn": "casement", "bay": 3.6, "fr": "#f6f2e8", "sh": TEAK_SHUTTER, "sp": 0.5,
+			"r": [["hipped", 4], ["gabled", 1]], "pitch": 0.65, "rf": CIVIC_ROOF_TILE,
+			"fh": 3.5, "st": [2, 3], "fix": true, "ch": 0.0, "eq": 0.1,
+			"g": [["render", 2], ["shop", 1]], "ev": 0.75, "rv": {"string_course": true}},
+		"house": {"w": [["render", RATTANAKOSIN_CIVIC]], "p": "punched", "wn": "casement",
+			"bay": 3.2, "fr": "#f6f2e8", "sh": TEAK_SHUTTER, "sp": 0.5,
+			"r": [["hipped", 4], ["gabled", 1]], "pitch": 0.7, "rf": CIVIC_ROOF_TILE,
+			"fh": 3.3, "st": [2, 2], "fix": true, "ch": 0.0, "eq": 0.05, "ev": 0.8, "rv": {}},
+	},
+	# Ratchadamnoen Klang 1939–48 uniform streamline Art Deco avenue blocks:
+	# fixed 4 storeys of warm cream stucco, vertical mullions, flat roof behind parapet.
+	"bangkok_ratchadamnoen": {
+		"commercial": {"w": [["render", RATCHADAMNOEN_CREAM]], "p": [["strip", 2], ["punched", 2]],
+			"wn": "wide", "bay": 3.6, "fr": "#58524a", "sp": 0.0, "r": [["flat", 1]],
+			"rf": [["concrete", ["#cdc4b2", "#bfb6a4"]]], "fh": 3.7, "st": [4, 4], "fix": true,
+			"ch": 0.0, "eq": 0.15, "g": [["shop", 3], ["stone", 1]],
+			"gc": ["#7a2820", "#3a352f", "#9e7420"], "ev": 0.0,
+			"rv": {"string_course": true, "cornice": 0.85, "mullion": true, "awning": 0.25,
+				"awning_colours": ["#8a2a20", "#c89628"]}},
+		"apartments": {"w": [["render", RATCHADAMNOEN_CREAM]], "p": [["strip", 2], ["punched", 2]],
+			"wn": "wide", "bay": 3.6, "fr": "#58524a", "sp": 0.0, "r": [["flat", 1]],
+			"rf": [["concrete", ["#cdc4b2", "#bfb6a4"]]], "fh": 3.7, "st": [4, 4], "fix": true,
+			"ch": 0.0, "eq": 0.15, "g": [["shop", 3], ["stone", 1]],
+			"gc": ["#7a2820", "#3a352f"], "ev": 0.0,
+			"rv": {"string_course": true, "cornice": 0.85, "mullion": true}},
+		"civic": {"w": [["render", RATCHADAMNOEN_CREAM]], "p": [["strip", 2], ["ornate", 1]],
+			"wn": "wide", "bay": 3.8, "fr": "#58524a", "sp": 0.0, "r": [["flat", 1]],
+			"rf": [["concrete", ["#cdc4b2"]]], "fh": 3.8, "st": [4, 4], "fix": true,
+			"ch": 0.0, "eq": 0.1, "g": [["stone", 1]], "ev": 0.0,
+			"rv": {"string_course": true, "cornice": 0.9, "mullion": true}},
+	},
 	# Shophouse rows: three to five storeys of weathered painted concrete,
-	# roll-down shutters, signs, air-conditioners and window grilles.
+	# roll-down shutters, caged balconies, roof water tanks and vertical signs.
 	"bangkok_shophouse": {
-		"commercial": {"w": [["concrete", SHOPHOUSE], ["render", SHOPHOUSE]], "p": [["shophouse", 2], ["punched", 2]],
-			"wn": "wide", "bay": 4.0, "fr": "#6a6e72", "sh": SHUTTER, "sp": 0.2, "r": [["flat", 4], ["gabled", 1]],
+		"commercial": {"w": [["concrete", SHOPHOUSE], ["render", SHOPHOUSE]], "p": [["shophouse", 3], ["punched", 2]],
+			"wn": "wide", "bay": 4.0, "fr": "#6a6e72", "sh": SHUTTER, "sp": 0.25, "r": [["flat", 4], ["gabled", 1]],
 			"pitch": 0.4, "rf": [["membrane", []], ["slate", ["#8a3a2a", "#5a626b"]]], "fh": 3.3, "st": [3, 5],
 			"fix": true, "eq": 0.9, "g": [["signage", 2], ["shop", 2]],
 			"gc": ["#c8301a", "#1a5a9a", "#e8b820", "#2a7a3a"], "ev": 0.2,
-			"rv": {"signage": 0.7, "awning": 0.4, "awning_colours": ["#2a4a6a", "#c8301a", "#e8b820", "#e8e4da"]}},
-		"apartments": {"w": [["concrete", SHOPHOUSE]], "p": [["shophouse", 1], ["punched", 2]], "wn": "wide",
-			"bay": 4.0, "fr": "#6a6e72", "sh": SHUTTER, "sp": 0.2, "r": [["flat", 1]], "rf": [["membrane", []]],
-			"fh": 3.2, "st": [3, 5], "fix": true, "eq": 0.9, "g": [["shop", 2], ["signage", 1]],
-			"rv": {"signage": 0.4, "awning": 0.3, "awning_colours": ["#2a4a6a", "#c8301a"]}},
-		"house": {"w": [["concrete", SHOPHOUSE]], "p": "punched", "wn": "wide", "bay": 4.0, "fr": "#6a6e72",
-			"r": [["flat", 2], ["gabled", 1]], "pitch": 0.4, "rf": [["membrane", []], ["slate", ["#8a3a2a"]]],
-			"st": [2, 3], "fix": true, "eq": 0.8, "rv": {}},
+			"rv": {"signage": 0.75, "sign_stack": 0.35, "deep_balcony": 0.3, "awning": 0.45,
+				"awning_colours": ["#2a4a6a", "#c8301a", "#e8b820", "#e8e4da"]}},
+		"apartments": {"w": [["concrete", SHOPHOUSE], ["render", SHOPHOUSE]], "p": [["shophouse", 2], ["punched", 2]],
+			"wn": "wide", "bay": 4.0, "fr": "#6a6e72", "sh": SHUTTER, "sp": 0.2, "r": [["flat", 1]],
+			"rf": [["membrane", []]], "fh": 3.2, "st": [3, 5], "fix": true, "eq": 0.9,
+			"g": [["shop", 2], ["signage", 1]],
+			"rv": {"signage": 0.5, "sign_stack": 0.2, "deep_balcony": 0.35, "awning": 0.35,
+				"awning_colours": ["#2a4a6a", "#c8301a"]}},
+		"house": {"w": [["concrete", SHOPHOUSE], ["render", RATTANAKOSIN_CREAM]], "p": "punched", "wn": "wide",
+			"bay": 4.0, "fr": "#6a6e72", "r": [["flat", 2], ["gabled", 2]], "pitch": 0.45,
+			"rf": [["membrane", []], ["terracotta", THAI_CLAY_ROOF]], "st": [2, 3], "fix": true,
+			"eq": 0.7, "rv": {}},
+	},
+	# Yaowarat & Sampheng (Chinatown): gold-shop red/gold ground fronts and
+	# dense vertical red, gold and jade-green neon signboards on 3–6 storey rows.
+	"bangkok_yaowarat": {
+		"commercial": {"w": [["concrete", SHOPHOUSE], ["render", ["#e2d4b8", "#d8c8a8", "#e8dcc4"]]],
+			"p": [["shophouse", 3], ["strip", 1]], "wn": "wide", "bay": 3.8, "fr": "#7a241c",
+			"sh": "#2c5e3e", "sp": 0.2, "r": [["flat", 1]], "rf": [["membrane", []]],
+			"fh": 3.4, "st": [3, 6], "fix": true, "eq": 0.95, "g": [["signage", 4], ["shop", 1]],
+			"gc": YAOWARAT_SIGNS, "ev": 0.0,
+			"rv": {"signage": 0.95, "sign_stack": 0.85, "sign_bands": 0.45, "screens": 0.75,
+				"awning": 0.5, "awning_colours": ["#c82018", "#e8b018", "#187a3c"]}},
+		"apartments": {"w": [["concrete", SHOPHOUSE], ["render", ["#e2d4b8", "#d8c8a8"]]],
+			"p": [["shophouse", 2], ["punched", 2]], "wn": "wide", "bay": 3.8, "fr": "#6a6862",
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.3, "st": [3, 6], "fix": true,
+			"eq": 0.9, "g": [["signage", 3], ["shop", 1]], "gc": YAOWARAT_SIGNS, "ev": 0.0,
+			"rv": {"signage": 0.85, "sign_stack": 0.7, "sign_bands": 0.35, "screens": 0.5,
+				"awning": 0.4, "awning_colours": ["#c82018", "#e8b018"]}},
+	},
+	# Thonburi canal-side (Bangkok Noi, Bangkok Yai, Kudi Chin): 1–2 storey
+	# teak and painted timber houses under corrugated metal and clay-tile roofs.
+	"bangkok_timber": {
+		"house": {"w": [["wood", THAI_TIMBER], ["render", RATTANAKOSIN_CREAM]], "p": "clapboard",
+			"wn": "casement", "bay": 2.8, "fr": "#e8e2d4", "sh": TEAK_SHUTTER, "sp": 0.4,
+			"r": [["gabled", 4], ["hipped", 2]], "pitch": 0.7,
+			"rf": [["sheet_metal", ["#7a8086", "#6c4838", "#3e6478"]], ["terracotta", THAI_CLAY_ROOF]],
+			"fh": 2.9, "st": [1, 2], "fix": true, "ch": 0.0, "eq": 0.15, "ev": 0.95, "rv": {}},
+		"apartments": {"w": [["render", RATTANAKOSIN_CREAM], ["wood", THAI_TIMBER]],
+			"p": [["punched", 3], ["shophouse", 1]], "wn": "casement", "bay": 3.2, "fr": "#6a6862",
+			"r": [["gabled", 3], ["hipped", 2], ["flat", 1]], "pitch": 0.6,
+			"rf": [["sheet_metal", ["#7a8086", "#6c4838"]], ["terracotta", THAI_CLAY_ROOF]],
+			"fh": 3.0, "st": [2, 3], "fix": true, "eq": 0.25, "ev": 0.8, "rv": {}},
+		"commercial": {"w": [["render", RATTANAKOSIN_CREAM], ["wood", THAI_TIMBER]], "p": "shophouse",
+			"wn": "casement", "bay": 3.5, "fr": "#6a6862", "r": [["gabled", 3], ["flat", 1]],
+			"pitch": 0.6, "rf": [["sheet_metal", ["#7a8086", "#6c4838"]], ["terracotta", THAI_CLAY_ROOF]],
+			"fh": 3.1, "st": [2, 3], "fix": true, "eq": 0.3, "g": [["shop", 1]], "ev": 0.8,
+			"rv": {"awning": 0.4, "awning_colours": ["#285840", "#b83220"]}},
+	},
+	# Siam / Ratchaprasong shopping malls: wide 5–10 storey stone/metal podiums with LED screens.
+	"bangkok_mall": {
+		"commercial": {"w": [["concrete", ["#e8e4dc", "#d8d4cc"]], ["glass", []]],
+			"p": [["panel", 2], ["curtain", 2]], "wn": "wide", "bay": 4.2, "fr": "#4a4e54",
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 4.5, "st": [5, 10], "fix": true,
+			"eq": 0.9, "g": [["shop", 2], ["signage", 2]], "ev": 0.0,
+			"rv": {"screens": 0.85, "signage": 0.7, "sign_bands": 0.4}},
+		"civic": {"w": [["concrete", ["#e8e4dc"]], ["glass", []]], "p": "curtain", "r": [["flat", 1]],
+			"rf": [["membrane", []]], "fh": 4.4, "st": [4, 10], "fix": true, "rv": {"screens": 0.5}},
+	},
+	# Chao Phraya riverfront hotels (Bang Rak / Charoen Krung): warm cream concrete & glass slabs.
+	"bangkok_hotel_river": {
+		"apartments": {"w": [["render", ["#f2ece0", "#e8dfd0"]], ["glass", []]],
+			"p": [["balcony", 3], ["curtain", 1]], "wn": "wide", "bay": 3.4, "fr": "#7a7670",
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.3, "st": [10, 32], "fix": true,
+			"eq": 0.7, "g": [["stone", 2], ["shop", 1]], "rv": {"deep_balcony": 0.55}},
+		"commercial": {"w": [["render", ["#f2ece0", "#e8dfd0"]], ["glass", []]],
+			"p": [["strip", 2], ["curtain", 2]], "wn": "wide", "bay": 3.6, "fr": "#7a7670",
+			"r": [["flat", 1]], "rf": [["membrane", []]], "fh": 3.6, "st": [8, 28], "fix": true,
+			"eq": 0.7, "g": [["stone", 2], ["shop", 1]], "rv": {"deep_balcony": 0.3}},
 	},
 	"bangkok_tower": {
 		"commercial": {"w": [["glass", []]], "p": "curtain", "r": [["flat", 1]], "rf": [["membrane", []]],
@@ -440,4 +658,42 @@ const REGIONS := {
 			"g": [["shop", 1]], "rv": {"deep_balcony": 0.5, "oriel": 0.3}},
 	},
 }
+
+## Structural rules (BuildingEra._rules) for Bangkok (BK-3.2):
+##   - Tall mapped buildings (8+ levels) reach `bangkok_condo` / `bangkok_tower` / `bangkok_hotel_river`.
+##   - Inside Rattanakosin and inner historic circles, untagged/low buildings follow their
+##     district (`bangkok_ratchadamnoen` 4-storey Art Deco, `bangkok_civic` ministries & City Hall,
+##     `bangkok_oldtown` 2–3 storey yellow/cream shophouses, `bangkok_khaosan`, `bangkok_yaowarat`,
+##     `bangkok_timber`); large civic/office footprints in old town become `bangkok_civic`.
+static func bangkok_rule(kind: String, c: Dictionary) -> String:
+	var lv := int(c["lv"])
+	var area := float(c["area"])
+	var district := str(c["district"])
+	if lv >= 12:
+		if district == "bangkok_hotel_river":
+			return "bangkok_hotel_river"
+		return "bangkok_condo" if kind == "apartments" else "bangkok_tower"
+	if lv >= 8:
+		if district == "bangkok_hotel_river":
+			return "bangkok_hotel_river"
+		if district == "bangkok_mall" and kind != "apartments":
+			return "bangkok_mall"
+		return "bangkok_condo" if kind == "apartments" else "bangkok_tower"
+	if district == "bangkok_ratchadamnoen" and kind != "house":
+		return "bangkok_civic" if area >= 4500.0 and kind == "civic" else "bangkok_ratchadamnoen"
+	if district in ["bangkok_oldtown", "bangkok_civic"]:
+		if kind == "civic" or (area >= 1200.0 and kind != "house"):
+			return "bangkok_civic"
+		return district
+	if district in ["bangkok_khaosan", "bangkok_yaowarat", "bangkok_timber", "bangkok_shophouse"]:
+		return district
+	if district == "bangkok_mall" and kind in ["commercial", "civic"]:
+		return "bangkok_mall"
+	if district == "bangkok_hotel_river" and kind in ["apartments", "commercial"] and lv >= 6:
+		return "bangkok_hotel_river"
+	if kind == "house":
+		return "bangkok_oldtown" if bool(c["heritage"]) else "bangkok"
+	if lv >= 1 and lv <= 5:
+		return "bangkok_shophouse"
+	return "bangkok"
 

@@ -95,7 +95,7 @@ static func rows() -> Array:
 
 			"aliases": ["phra phutthayotfa bridge", "saphan phut", "สะพานพุทธ", "สะพานพุทธยอดฟ้า", "memorial bridge bangkok"],
 			"lat": 13.73945, "lon": 100.49773, "bearing": 18.8, "st": "truss", "spans": [78.0, 78.0, 78.0],
-			"width": 16.68, "clear": 8.7, "rise": 7.0, "material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"width": 16.68, "clear": 8.7, "rise": 7.0, "material": "steel", "steel_hex": "#286B52", "base": "water", "tier": 2, "conf": 2,
 			"src": "en Wikipedia (678 m incl approaches, main span 78 m, 1932, 7.3 m clearance), coordinate from " +
 				"Wikipedia/OSM, bearing ~100 deg estimated from the N-S river (OSM way 25706395 runs 18.6 deg " +
 				"along the approach, not across the river); side spans and width guessed; lift/bascule " +
@@ -109,10 +109,17 @@ static func rows() -> Array:
 				"25706395 (300 m, bearing 18.8) crosses the Chao Phraya (river node 13.73931,100.49766), " +
 				"centre placed on the river crossing; the old 100 deg bearing was wrong (river bends here, " +
 				"bridge runs N-S). Truss height estimated"},
+		{"id": "br_bangkok_pok_klao_bridge", "cc": "TH", "name": "Phra Pok Klao Bridge", "wiki": "Phra Pok Klao Bridge",
+			"aliases": ["pok klao bridge", "saphan phra pok klao", "chao phraya sky park", "สะพานพระปกเกล้า", "สวนลอยฟ้าเจ้าพระยา"],
+			"lat": 13.73921, "lon": 100.49865, "bearing": 18.8, "st": "girder", "spans": [65.0, 100.0, 65.0],
+			"width": 37.7, "clear": 11.0, "orn": 5.9, "material": "concrete", "base": "water", "tier": 2, "conf": 2,
+			"src": "JICA 2009 DRR inspection report (openjicareport.jica.go.jp 11988862_02.pdf Ap-186) & BMA Chao Phraya Sky Park (2020): " +
+				"3-span continuous prestressed concrete box girder 65+100+65 = 230 m parallel to Memorial Bridge (1984), " +
+				"twin road decks + central 8.4 m Chao Phraya Sky Park planted viaduct (overall width 37.7 m), OSM ways 836977240 / 824773646"},
 		{"id": "br_bangkok_pinklao_bridge", "cc": "TH", "name": "Phra Pinklao Bridge", "wiki": "Phra Pin-klao Bridge",
 			"aliases": ["pinklao bridge", "saphan pinklao", "สะพานพระปิ่นเกล้า"], "lat": 13.76188, "lon": 100.49108,
 			"bearing": 142.5, "st": "girder", "spans": [83.0, 110.0, 83.0], "width": 32.2, "clear": 13.5,
-			"material": "concrete", "base": "water", "tier": 3, "conf": 2,
+			"material": "concrete", "base": "water", "tier": 2, "conf": 2,
 			"src": "en Wikipedia (110 m main span, 658 m total, 11.5 m clearance), OSM way 616 m runs 142.7 deg " +
 				"incl. approaches, bearing 135 estimated; other span lengths and width guessed | verified: " +
 				"Wikipedia: main span 110 m, 658 m; no independent source for the other spans or width found " +

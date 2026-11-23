@@ -206,43 +206,7 @@ static func _prang(lm: LandmarkMesh, base: Vector3, hw: float, h: float) -> void
 ## band, has niches with Indra on Erawan on the four faces, the
 ## naphalai bud and the seven-pronged trident (vajra) on top.
 static func wat_arun(model: Node3D) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("White", LandmarkMaterials.pbr("render", "#EDE7D6", 3.0))
-	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#B98A58", 3.0))
-	lm.use("Teal", LandmarkMaterials.pbr("render", "#4E8C86", 3.0))
-	lm.use("Gold", LandmarkMaterials.gold())
-	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#3F3A33", 2.0))
-	for k in 3:
-		var hw := 36.0 - 6.0 * float(k)
-		var plan := U.redent(hw, 2.4, 3)
-		var y0 := 4.0 * float(k)
-		U.plan_frustum(lm, "White", Vector3.ZERO, plan, 1.0, 1.0, y0, y0 + 3.6)
-		U.plan_frustum(lm, "Teal", Vector3.ZERO, plan, 1.01, 1.01, y0 + 3.6, y0 + 4.0)
-		# Balustrade along the terrace edges (between the stairs).
-		for side in 4:
-			var b := Basis(Vector3.UP, PI * 0.5 * float(side))
-			for sx in [-1.0, 1.0]:
-				_parapet(lm, b * Vector3(sx * 3.0, y0 + 4.0, hw - 0.5), b * Vector3(sx * (hw - 8.0), y0 + 4.0, hw - 0.5))
-			_steep_stair(lm, b * Vector3(0, y0, hw + 1.6), b, 4.0, 3.6, 3.4)
-	# Mondops at the four cardinal points of the upper terrace.
-	for side in 4:
-		var b := Basis(Vector3.UP, PI * 0.5 * float(side))
-		_mondop(lm, b * Vector3(0, 12.0, 18.5), b)
-	for sx in [-1.0, 1.0]:
-		for sz in [-1.0, 1.0]:
-			_arun_prang(lm, Vector3(sx * 33.0, 4.0, sz * 33.0), 2.9, 28.0)
-	_arun_prang(lm, Vector3(0, 12.0, 0), 13.0, 49.0)
-	# Trident (Indra's vajra) on the central bud, to 70 m.
-	var ty := 61.5
-	lm.beam("Gold", Vector3(0, ty, 0), Vector3(0, 70.0, 0), 0.45, 0.45)
-	for k in 3:
-		var a := PI * float(k) / 3.0
-		var d := Vector3(cos(a), 0, sin(a))
-		for s in [-1.0, 1.0]:
-			lm.beam("Gold", Vector3(0, 63.0, 0) + d * s * 0.2, Vector3(0, 66.0, 0) + d * s * 1.5, 0.25, 0.25)
-			lm.beam("Gold", Vector3(0, 66.0, 0) + d * s * 1.5, Vector3(0, 68.4, 0) + d * s * 1.3, 0.25, 0.25)
-	lm.frustum("Gold", Vector3(0, 62.6, 0), 0.6, 0.6, 0.5, 8)
-	lm.commit(model)
+	LandmarkBkWatArun.build(model)
 
 ## Thai terrace parapet along a-b: a low wall with a moulded coping,
 ## porcelain-set panels between square posts every 2 m.

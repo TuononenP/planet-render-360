@@ -36,10 +36,14 @@ const FLEETS := {
 	"south_europe": {"kinds": ["hatch", "hatch", "hatch", "compact_suv", "sedan", "wagon", "van", "suv"],
 		"paint": [WHITE, WHITE, WHITE, WHITE, GREY, GREY, SILVER, SILVER, BLACK, RED, BLUE, BEIGE]},
 	"europe": {"kinds": ["hatch", "hatch", "wagon", "compact_suv", "compact_suv", "sedan", "suv", "van"]},
+	"thailand": {
+		"kinds": ["sedan", "sedan", "sedan", "pickup", "pickup", "compact_suv", "compact_suv", "van", "minivan", "tuk_tuk"],
+		"paint": [WHITE, WHITE, WHITE, WHITE, SILVER, SILVER, SILVER, GREY, GREY, BLACK, BLUE, RED],
+	},
 }
 const COUNTRY_FLEET := {
 	"US": "north_america", "CA": "north_america", "MX": "north_america", "AU": "north_america",
-	"JP": "japan",
+	"JP": "japan", "TH": "thailand",
 	"FI": "nordic", "SE": "nordic", "NO": "nordic", "DK": "nordic", "IS": "nordic", "EE": "nordic",
 	"PT": "south_europe", "ES": "south_europe", "IT": "south_europe", "GR": "south_europe",
 	"MT": "south_europe", "HR": "south_europe", "TR": "south_europe",
@@ -54,33 +58,45 @@ const REGION_FLEET := {
 	"madrid": "south_europe", "barcelona": "south_europe", "rome": "south_europe", "milan": "south_europe",
 	"florence": "south_europe", "athens": "south_europe", "london": "europe", "paris": "europe",
 	"berlin": "europe", "amsterdam": "europe", "vienna": "europe", "brussels": "europe",
-	"dublin": "europe", "edinburgh": "europe",
+	"dublin": "europe", "edinburgh": "europe", "miami": "north_america", "bangkok": "thailand",
 }
 const TAXI_SHARE := 0.05
 ## The share of slots a sports coupe takes (in bolder paint than the fleet's).
 const SPORTS_SHARE := 0.025
 const SPORTS_PAINT := [Color(0.5, 0.02, 0.02), Color(0.9, 0.62, 0.03), Color(0.02, 0.12, 0.45), WHITE, BLACK,
 	Color(0.7, 0.18, 0.02), Color(0.05, 0.3, 0.12), SILVER]
+const TUK_TUK_PAINT := [Color(0.03, 0.10, 0.44), Color(0.03, 0.10, 0.44), Color(0.03, 0.28, 0.14), Color(0.38, 0.04, 0.04)]
 ## kind, body colours, share of slots (default TAXI_SHARE).
 const TAXIS := {
 	"new_york": {"kind": "taxi", "paint": [TAXI_YELLOW], "share": 0.1},
+	"miami": {"kind": "taxi", "paint": [TAXI_YELLOW], "share": 0.04},
 	"london": {"kind": "cab_london", "paint": [BLACK, BLACK, BLACK, Color(0.12, 0.02, 0.03)]},
 	"edinburgh": {"kind": "cab_london", "paint": [BLACK]},
 	"lisbon": {"kind": "taxi_lisbon", "paint": [BLACK]},
 	"tokyo": {"kind": "taxi", "paint": [BLACK, BLACK, Color(0.02, 0.05, 0.12), Color(0.05, 0.12, 0.08)]},
+	"bangkok": {"kind": "taxi", "share": 0.12, "paint": [
+		Color(0.86, 0.08, 0.38),  # hot pink
+		Color(0.28, 0.72, 0.08),  # green-yellow livery
+		Color(0.04, 0.28, 0.72),  # bright blue
+		Color(0.88, 0.30, 0.04),  # orange
+		TAXI_YELLOW,              # yellow
+	]},
 }
 
-## The fleet at `data`'s place: {kinds, paint, taxi}.
+## The fleet at `data`'s place: {kinds, paint, taxi, sports_share}.
 static func profile(data: LocationData) -> Dictionary:
 	return profile_for(CityStyles.region_at(data.latitude, data.longitude), data.country)
 
 static func profile_for(region: String, country: String) -> Dictionary:
-	var name: String = COUNTRY_FLEET.get(country.to_upper(), REGION_FLEET.get(region, "default"))
+	var city := CityStyles.city_of_region(region)
+	var lookup := "bangkok" if region.begins_with("bangkok") else (city if city != "" else region)
+	var name: String = COUNTRY_FLEET.get(country.to_upper(), REGION_FLEET.get(lookup, "default"))
 	var fleet: Dictionary = FLEETS[name]
 	return {
 		"kinds": fleet["kinds"],
 		"paint": fleet.get("paint", PAINT),
-		"taxi": TAXIS.get(region, {"kind": "taxi", "paint": []}),
+		"taxi": TAXIS.get(lookup, {"kind": "taxi", "paint": []}),
+		"sports_share": 0.065 if lookup == "miami" else (0.008 if lookup == "bangkok" else SPORTS_SHARE),
 	}
 
 ## The car in the slot at `p`: [kind, colour, CarPaint finish]. The
@@ -91,7 +107,7 @@ static func pick(fleet: Dictionary, p: Vector2) -> Array:
 	var kinds: Array = fleet["kinds"]
 	var paints: Array = fleet["paint"]
 	var is_taxi := ParkedCars._hash(p.x, p.y, 9.1) < float(taxi.get("share", TAXI_SHARE))
-	var is_sports := not is_taxi and ParkedCars._hash(p.x, p.y, 10.7) < SPORTS_SHARE
+	var is_sports := not is_taxi and ParkedCars._hash(p.x, p.y, 10.7) < float(fleet.get("sports_share", SPORTS_SHARE))
 	var kind: String = taxi["kind"] if is_taxi else ("sports" if is_sports \
 		else kinds[int(ParkedCars._hash(p.x, p.y, 2.7) * kinds.size()) % kinds.size()])
 	var cab_paint: Array = taxi["paint"]
@@ -99,6 +115,8 @@ static func pick(fleet: Dictionary, p: Vector2) -> Array:
 		paints = cab_paint
 	elif is_sports:
 		paints = SPORTS_PAINT
+	elif kind == "tuk_tuk":
+		paints = TUK_TUK_PAINT
 	var colour: Color = paints[int(ParkedCars._hash(p.x, p.y, 4.9) * paints.size()) % paints.size()]
 	var solid_shade := colour.v > 0.8 or colour.v < 0.05
 	var share := 0.0 if is_taxi else (0.25 if solid_shade else 0.85)

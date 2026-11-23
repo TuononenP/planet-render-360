@@ -13,9 +13,12 @@ const MAX_DRAW_CALLS := 12
 ## one already standing this close carries the new span too.
 const TRACK_CLEAR_M := 2.6
 const POLE_MERGE_M := 9.0
+const MAX_POLE_STEP_M := 24
+const MAX_SPAN_M := 42.0
 const _CELL_M := 20.0
 
-static func plan(data: LocationData, ground: GroundTruth) -> Array:
+static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask = null,
+		marking_plan: RoadMarkings.Plan = null) -> Array:
 	if not RenderQuality.ultra_desktop(data.quality_preset):
 		return []
 	var m := WorldScale.metres_to_units()
@@ -37,6 +40,11 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 			lines.append([road, bool(road.get("trolley_wire", false)), hung])
 	var bridges := LandmarkSites.bridge_spans(data)
 	var tracks := _track_grid(lines, m)
+	var roads := _road_grid(data, m)
+	var crossings := StreetProps.crossing_grid(data, marking_plan, m)
+	var aprons := StreetProps.apron_grid(marking_plan, m)
+	var keepout := {"tracks": tracks, "roads": roads, "crossings": crossings, "aprons": aprons,
+		"ground": ground, "mask": mask}
 	var centres := _centre_grid(data, 35.0 * m)
 	var replaced := _replaced(data)
 	var rings := _ring_grid(data, 12.0 * m, replaced, false)
@@ -74,17 +82,18 @@ static func plan(data: LocationData, ground: GroundTruth) -> Array:
 		var half := maxf(4.0, float(way.get("width_m", 6.0)) * 0.5 + 1.0) * m
 		var supports: Array = []
 		for side in [-1.0, 1.0]:
-			var p: Vector2 = a + n * half * float(side)
-			var anchor := _anchor(p, data, rings, 12.0 * m)
-			var at: Vector2 = anchor[0]
-			if not anchor[1]:
-				at = _pole_spot(at, a, n * float(side), half, tracks, poles, m)
-				if _inside(at, data, models, 12.0 * m):
-					break
+			var out := n * float(side)
+			var p: Vector2 = a + out * half
+			var sup := _resolve_support(p, a, out, half, data, rings, models, keepout, poles, m)
+			var at: Vector2 = sup[0]
+			if at.x == INF:
+				break
 			var y := ground.height_at_world(at.x, at.y)
-			supports.append([Vector3(at.x, y + (CONTACT_M + 0.8) * m, at.y), bool(anchor[1]), y])
-		# A pole that would stand inside a landmark model drops the span.
+			supports.append([Vector3(at.x, y + (CONTACT_M + 0.8) * m, at.y), bool(sup[1]), y])
+		# A pole that cannot clear roads, crossings or buildings drops the span.
 		if supports.size() < 2:
+			continue
+		if (supports[0][0] as Vector3).distance_to(supports[1][0] as Vector3) > MAX_SPAN_M * m:
 			continue
 		spans.append({"a": a, "b": b, "supports": supports, "contact": bool(entry[1]),
 			"lamp": bool(entry[2]), "ya": ground.height_at_world(a.x, a.y) + CONTACT_M * m,
@@ -135,28 +144,81 @@ static func _on_track(p: Vector2, grid: Dictionary, m: float) -> bool:
 					return true
 	return false
 
-## A free-standing pole: shared with one already near and at least this
-## span's own reach (`half`) out from the line through `a` (never one in
-## its carriageway), else stepped outward (`out`) to the first spot off
-## every wired track's bed, then recorded in the `poles` cell buckets.
-static func _pole_spot(p: Vector2, a: Vector2, out: Vector2, half: float,
-		grid: Dictionary, poles: Dictionary, m: float) -> Vector2:
-	var shared := _near_pole(p, a, out, half, poles, m)
-	if shared.x != INF:
-		return shared
-	var at := p
-	for step in 13:
-		at = p + out * float(step) * m
-		if not _on_track(at, grid, m):
-			break
-	shared = _near_pole(at, a, out, half, poles, m)
-	if shared.x != INF:
-		return shared
-	var key := Vector2i(floori(at.x / (_CELL_M * m)), floori(at.y / (_CELL_M * m)))
-	if not poles.has(key):
-		poles[key] = []
-	(poles[key] as Array).append(at)
-	return at
+## Drivable road carriageways bucketed by cell so span poles never stand in traffic lanes.
+static func _road_grid(data: LocationData, m: float) -> Dictionary:
+	var grid := {}
+	var cell := _CELL_M * m
+	for raw in data.roads:
+		if not (raw is Dictionary) or not RoadMarkings._drivable(raw):
+			continue
+		var rd: Dictionary = raw
+		if bool(rd.get("tunnel", false)) or bool(rd.get("bridge", false)) or bool(rd.get("area", false)):
+			continue
+		var pts: PackedVector2Array = rd.get("points", PackedVector2Array())
+		var clear := (float(rd.get("width_m", 6.0)) * 0.5 + 0.65) * m
+		for i in pts.size() - 1:
+			var steps := ceili(pts[i].distance_to(pts[i + 1]) / (cell * 0.5))
+			var seen := {}
+			for k in steps + 1:
+				var q := pts[i].lerp(pts[i + 1], float(k) / float(maxi(steps, 1)))
+				var key := Vector2i(floori(q.x / cell), floori(q.y / cell))
+				if seen.has(key):
+					continue
+				seen[key] = true
+				if not grid.has(key):
+					grid[key] = []
+				(grid[key] as Array).append([pts[i], pts[i + 1], clear])
+	return grid
+
+static func _on_road(p: Vector2, grid: Dictionary, m: float) -> bool:
+	var cell := _CELL_M * m
+	var c := Vector2i(floori(p.x / cell), floori(p.y / cell))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for seg in grid.get(Vector2i(c.x + dx, c.y + dz), []):
+				if p.distance_to(Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])) < float(seg[2]):
+					return true
+	return false
+
+static func _pole_blocked(p: Vector2, keepout: Dictionary, data: LocationData,
+		rings: Dictionary, models: Dictionary, m: float) -> bool:
+	if _on_track(p, keepout["tracks"], m) or _on_road(p, keepout["roads"], m):
+		return true
+	if StreetProps.on_crossing(keepout["crossings"], p, m) or StreetProps._on_apron(keepout["aprons"], p, m):
+		return true
+	var ground: GroundTruth = keepout.get("ground")
+	if ground != null and (not ground.is_inside(p.x, p.y) or ground.water_at(p.x, p.y) > 0.0):
+		return true
+	var mask: VegetationMask = keepout.get("mask")
+	if mask != null and mask.blocked(p.x, p.y, VegetationMask.ROAD | VegetationMask.BUILDING | VegetationMask.WATER, 0.0):
+		return true
+	return _inside(p, data, models, 12.0 * m) or _inside(p, data, rings, 12.0 * m)
+
+## Resolves [position, is_wall_anchor] on one side of `a`, stepping outward
+## across parallel carriageways, tracks, aprons and crossings to a kerb or
+## building facade; returns [(INF, INF), false] when no clear support exists.
+static func _resolve_support(p: Vector2, a: Vector2, out: Vector2, half: float,
+		data: LocationData, rings: Dictionary, models: Dictionary, keepout: Dictionary,
+		poles: Dictionary, m: float) -> Array:
+	var anchor := _anchor(p, data, rings, 12.0 * m, a, out, half - 1.0 * m)
+	if bool(anchor[1]):
+		return anchor
+	for step in MAX_POLE_STEP_M + 1:
+		var at := p + out * float(step) * m
+		var shared := _near_pole(at, a, out, half, poles, m)
+		if shared.x != INF:
+			return [shared, false]
+		if step > 0:
+			var wall := _anchor(at, data, rings, 3.5 * m, a, out, half - 1.0 * m)
+			if bool(wall[1]):
+				return wall
+		if not _pole_blocked(at, keepout, data, rings, models, m):
+			var key := Vector2i(floori(at.x / (_CELL_M * m)), floori(at.y / (_CELL_M * m)))
+			if not poles.has(key):
+				poles[key] = []
+			(poles[key] as Array).append(at)
+			return [at, false]
+	return [Vector2(INF, INF), false]
 
 ## A recorded pole within POLE_MERGE_M of `p` standing `half` (less a
 ## metre) or more out along `out` from `a`; (INF, INF) when none.
@@ -236,24 +298,37 @@ static func _inside(p: Vector2, data: LocationData, grid: Dictionary, radius: fl
 			return true
 	return false
 
-## Facade attachment nearest to the nominal pole; no building means pole.
-static func _anchor(p: Vector2, data: LocationData, rings: Dictionary, radius: float) -> Array:
+## Facade attachment nearest to `p` on the outward side of `a`; no building means pole.
+static func _anchor(p: Vector2, data: LocationData, rings: Dictionary, radius: float,
+		a: Vector2 = Vector2.ZERO, out: Vector2 = Vector2.ZERO, min_proj: float = -INF) -> Array:
 	var best := radius
 	var at := p
 	var found := false
-	for i: int in rings.get(Vector2i(floori(p.x / radius), floori(p.y / radius)), []):
-		var b: Dictionary = data.buildings[i]
-		var ring: PackedVector2Array = b.get("footprint", PackedVector2Array())
-		for j in ring.size():
-			var q := Geometry2D.get_closest_point_to_segment(p, ring[j], ring[(j + 1) % ring.size()])
-			if p.distance_to(q) < best and float(b.get("height", 0.0)) >= CONTACT_M + 1.0:
-				best = p.distance_to(q)
-				at = q
-				found = true
+	var seen := {}
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for i: int in rings.get(Vector2i(floori(p.x / radius) + dx, floori(p.y / radius) + dz), []):
+				if seen.has(i):
+					continue
+				seen[i] = true
+				var b: Dictionary = data.buildings[i]
+				if float(b.get("height", 0.0)) < CONTACT_M + 1.0:
+					continue
+				var ring: PackedVector2Array = b.get("footprint", PackedVector2Array())
+				for j in ring.size():
+					var q := Geometry2D.get_closest_point_to_segment(p, ring[j], ring[(j + 1) % ring.size()])
+					if min_proj > -INF and (q - a).dot(out) < min_proj:
+						continue
+					var d := p.distance_to(q)
+					if d < best:
+						best = d
+						at = q
+						found = true
 	return [at, found]
 
-static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> Dictionary:
-	var spans := plan(data, ground)
+static func build(root: Node3D, data: LocationData, ground: GroundTruth,
+		mask: VegetationMask = null, marking_plan: RoadMarkings.Plan = null) -> Dictionary:
+	var spans := plan(data, ground, mask, marking_plan)
 	var chunks := {}
 	var poles := {}
 	var m := WorldScale.metres_to_units()

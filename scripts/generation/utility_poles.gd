@@ -14,7 +14,7 @@ extends RefCounted
 ## * Cables: 3–6 per street at slightly different heights, sagging from
 ##   pole to pole, plus a service drop to a wall within DROP_M from some
 ##   poles; desktop Ultra only, merged into at most four spatial chunks.
-const COUNTRIES := ["JP", "KR"]
+const COUNTRIES := ["JP", "KR", "TH"]
 const CLASSES := ["residential", "tertiary", "unclassified", "service", "living_street", "secondary"]
 const RADIUS_M := 600.0
 const SPACING_M := 30.0
@@ -144,9 +144,11 @@ static func _stations(road: Dictionary, ri: int, data: LocationData, ground: Gro
 	var half := float(road.get("width_m", OsmTags.road_class_width(cls))) * 0.5
 	var off := (half + KERB_OUT_M) * m
 	var side := 1.0 if _hash(pts[0].x, pts[0].y, 2.7) < 0.5 else -1.0
-	var cables := 3 + int(_hash(pts[0].x, pts[0].y, 5.1) * 3.999)
+	var is_th := data.country.to_upper() == "TH"
+	var cables := (5 + int(_hash(pts[0].x, pts[0].y, 5.1) * 1.999)) if is_th \
+		else (3 + int(_hash(pts[0].x, pts[0].y, 5.1) * 3.999))
 	var transformer_every := 3 + int(_hash(pts[0].x, pts[0].y, 8.3) * 1.999)
-	var step := SPACING_M * m
+	var step := (26.0 if is_th else SPACING_M) * m
 	var t := step * 0.5
 	# The nudge reaches 8 m and the kerb offset `off`: past this the spot is out.
 	var reach2 := pow(sqrt(r2) + 8.0 * m + off, 2.0)
@@ -189,6 +191,15 @@ static func _stations(road: Dictionary, ri: int, data: LocationData, ground: Gro
 
 static func _free(p: Vector2, ground: GroundTruth, junc: Dictionary, obstacles: Dictionary,
 		rings: Dictionary, data: LocationData, m: float, mask: VegetationMask = null) -> bool:
+	if data.country.to_upper() == "TH":
+		var ll := WorldScale.latlon_from_xz(p.x, p.y, data.latitude, data.longitude)
+		var reg := CityStyles.region_at(ll.x, ll.y)
+		# Cables are buried along Ratchadamnoen Klang and around the Grand Palace (`BK-9.5`).
+		if reg == "bangkok_ratchadamnoen":
+			return false
+		var gp_xz := WorldScale.xz_from_latlon(13.75013, 100.49168, data.latitude, data.longitude)
+		if p.distance_to(gp_xz) < 380.0 * m:
+			return false
 	if ParkedCars._near_junction(p, junc, JUNCTION_CUT_M * m) or ParkedCars.blocked(p, obstacles, m):
 		return false
 	if ground.water_at(p.x, p.y) > 0.0:
@@ -255,19 +266,24 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var m := WorldScale.metres_to_units()
 	var holder := Node3D.new()
 	holder.name = "UtilityPoles"
-	var parts := {"pole": [], "arm2": [], "transformer": [], "lamp": []}
+	var is_th := data.country.to_upper() == "TH"
+	var pole_key := "pole_th" if is_th else "pole"
+	var parts := {pole_key: [], "arm2": [], "transformer": [], "lamp": [], "coil_th": []}
 	for p: Dictionary in poles:
 		var toward: Vector2 = p["toward"]
 		var yaw := atan2(-toward.y, toward.x)
 		var pos: Vector3 = p["pos"]
 		var s := float(p["h"]) / MESH_H
 		var basis := Basis(Vector3.UP, yaw)
-		(parts["pole"] as Array).append(Transform3D(basis.scaled(Vector3(m, m * s, m)), pos))
+		(parts[pole_key] as Array).append(Transform3D(basis.scaled(Vector3(m, m * s, m)), pos))
 		if int(p["arms"]) >= 2:
 			(parts["arm2"] as Array).append(Transform3D(basis.scaled(Vector3(m, m * s, m)), pos))
 		if p["transformer"]:
 			(parts["transformer"] as Array).append(Transform3D(basis.scaled(Vector3.ONE * m),
 				pos + Vector3.UP * 0.72 * float(p["h"]) * m))
+		if is_th and RenderQuality.ultra_desktop(data.quality_preset) and _hash(pos.x, pos.z, 9.7) < 0.45:
+			(parts["coil_th"] as Array).append(Transform3D(basis.scaled(Vector3.ONE * m),
+				pos + Vector3.UP * 0.65 * float(p["h"]) * m))
 		if p["lamp"]:
 			(parts["lamp"] as Array).append(Transform3D(basis.scaled(Vector3.ONE * m), pos + Vector3.UP * 5.4 * m))
 	var calls := 0
@@ -287,7 +303,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		holder.add_child(mmi)
 		calls += mm.mesh.get_surface_count()
 	if RenderQuality.ultra_desktop(data.quality_preset):
-		var cable_stats := _build_cables(holder, plan_out, View360.spawn_xz(data), m)
+		var cable_stats := _build_cables(holder, plan_out, View360.spawn_xz(data), m, is_th)
 		calls += int(cable_stats["draw_calls"])
 		stats["cables"] = cable_stats["cables"]
 	root.add_child(holder)
@@ -298,7 +314,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 
 ## Every span's cables and the service drops as thin sagging tubes, one
 ## mesh per quadrant around the eye (at most four draw calls).
-static func _build_cables(holder: Node3D, plan_out: Dictionary, centre: Vector2, m: float) -> Dictionary:
+static func _build_cables(holder: Node3D, plan_out: Dictionary, centre: Vector2, m: float,
+		thick_bundle: bool = false) -> Dictionary:
 	var chunks := {}
 	var count := 0
 	var lines: Array = []
@@ -309,13 +326,14 @@ static func _build_cables(holder: Node3D, plan_out: Dictionary, centre: Vector2,
 		var drop: Array = p["drop"] if p["drop"] is Array else []
 		if not drop.is_empty():
 			lines.append([drop[0], drop[1], 0.3 * m])
+	var rad := (0.028 if thick_bundle else 0.016) * m
 	for line: Array in lines:
 		var a: Vector3 = line[0]
 		var b: Vector3 = line[1]
 		var key := Vector2i(1 if (a.x + b.x) * 0.5 >= centre.x else 0, 1 if (a.z + b.z) * 0.5 >= centre.y else 0)
 		if not chunks.has(key):
 			chunks[key] = TreeMeshLibrary.Buf.new()
-		_cable(chunks[key], sag(a, b, float(line[2]), 6), 0.016 * m)
+		_cable(chunks[key], sag(a, b, float(line[2]), 6), rad)
 		count += 1
 	for key in chunks:
 		var arr := (chunks[key] as TreeMeshLibrary.Buf).arrays()
@@ -357,6 +375,19 @@ static func _mesh(part: String) -> ArrayMesh:
 			# Telecom clamps on the street side.
 			for y: float in TELECOM_Y:
 				TreeMeshLibrary._tube(body, [Vector3(0.0, y, 0), Vector3(0.18, y, 0)], [0.03, 0.03], 4, 1.0, 1.0)
+		"pole_th":
+			# Thai MEA/PEA tapered square concrete pole (4-sided section) + heavy telecom brackets (`BK-9.5`).
+			TreeMeshLibrary._tube(body, [Vector3(0, -0.3, 0), Vector3(0, MESH_H, 0)], [0.19, 0.12], 4, 0.85, 1.0)
+			_arm(body, ARM1_Y, 0.95, [-0.6, 0.0, 0.6])
+			for y: float in TELECOM_Y:
+				TreeMeshLibrary._tube(body, [Vector3(0.0, y, 0), Vector3(0.28, y, 0)], [0.045, 0.045], 4, 1.0, 1.0)
+		"coil_th":
+			# Coiled black fibre-optic slack ring strapped to the street side of Thai poles (`BK-9.5`).
+			var ring_pts: Array = []
+			for ci in 9:
+				var ang := TAU * float(ci) / 8.0
+				ring_pts.append(Vector3(0.24, 0.35 + sin(ang) * 0.34, cos(ang) * 0.34))
+			_cable(body, ring_pts, 0.038)
 		"arm2":
 			_arm(body, ARM2_Y, 0.75, [-0.45, 0.45])
 		"transformer":
@@ -380,7 +411,7 @@ static func _mesh(part: String) -> ArrayMesh:
 		arr[Mesh.ARRAY_INDEX] = ParkedCars.front_faces(arr[Mesh.ARRAY_INDEX])
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		mesh.surface_set_material(mesh.get_surface_count() - 1,
-			_material("glass" if pair[1] == "glass" else ("metal" if pair[1] == "lamp" else "concrete")))
+			_material("glass" if pair[1] == "glass" else ("cable" if pair[1] == "coil_th" else ("metal" if pair[1] == "lamp" else "concrete"))))
 	_meshes[part] = mesh
 	return mesh
 

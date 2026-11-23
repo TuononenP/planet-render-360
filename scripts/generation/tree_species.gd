@@ -109,6 +109,80 @@ const SPECIES := {
 		"leader": 0.3, "branches": 6, "trunk_r": 0.3, "up": 0.45, "droop": 0.05,
 		"clusters": 56, "card": 2.6, "leaf": "broad", "bark": "furrowed",
 		"tint": "evergreen", "evergreen": true},
+	# South Florida / Miami subtropical coastal & avenue flora: straight grey
+	# Cuban royal palms with smooth green crownshafts, leaning coconut palms,
+	# round-crowned sabal palmettos, wide spreading live oaks and banyans with
+	# aerial prop trunks, scarlet-blooming royal poincianas, dune sea grapes
+	# and coastal mangroves on arching prop-root stilts.
+	"royal_palm": {"gen": "palm", "h": 20.0, "h_var": 0.2, "fronds": 16, "frond_len": 4.6,
+		"trunk_r": 0.28, "lean_k": 0.015, "crownshaft": 2.1, "leaf": "palm", "bark": "plane",
+		"tint": "palm", "evergreen": true},
+	"coconut_palm": {"gen": "palm", "h": 14.0, "h_var": 0.28, "fronds": 14, "frond_len": 4.8,
+		"trunk_r": 0.21, "lean_k": 0.22, "droop_k": 0.36, "leaf": "palm", "bark": "palm",
+		"tint": "palm", "evergreen": true},
+	"sabal_palm": {"gen": "palm", "h": 9.0, "h_var": 0.22, "fronds": 20, "frond_len": 2.4,
+		"trunk_r": 0.24, "lean_k": 0.04, "leaf": "palm", "bark": "furrowed",
+		"tint": "sugar_palm", "evergreen": true},
+	"live_oak": {"gen": "broad", "h": 12.0, "h_var": 0.22, "bole": 0.20, "crown_r": 0.56,
+		"leader": 0.22, "branches": 7, "trunk_r": 0.44, "up": 0.28, "droop": 0.12,
+		"clusters": 62, "card": 3.2, "leaf": "olive", "bark": "furrowed",
+		"tint": "evergreen", "evergreen": true},
+	"banyan": {"gen": "broad", "h": 16.0, "h_var": 0.25, "bole": 0.24, "crown_r": 0.58,
+		"leader": 0.25, "branches": 8, "trunk_r": 0.58, "up": 0.32, "droop": 0.15,
+		"clusters": 68, "card": 3.5, "aerial_roots": 6, "leaf": "broad", "bark": "plane",
+		"tint": "tropical", "evergreen": true},
+	"royal_poinciana": {"gen": "broad", "h": 11.0, "h_var": 0.2, "bole": 0.32, "crown_r": 0.58,
+		"leader": 0.18, "branches": 7, "trunk_r": 0.30, "up": 0.65, "droop": 0.05,
+		"clusters": 54, "card": 3.0, "leaf": "birch", "bark": "plane",
+		"tint": "poinciana", "evergreen": true, "flat_top": true},
+	"sea_grape": {"gen": "broad", "h": 4.2, "h_var": 0.25, "bole": 0.14, "crown_r": 0.55,
+		"leader": 0.25, "branches": 5, "trunk_r": 0.16, "up": 0.4, "droop": 0.05,
+		"clusters": 36, "card": 2.0, "leaf": "broad", "bark": "plane",
+		"tint": "tropical", "evergreen": true},
+	"mangrove": {"gen": "broad", "h": 5.2, "h_var": 0.25, "bole": 0.26, "crown_r": 0.50,
+		"leader": 0.3, "branches": 6, "trunk_r": 0.18, "up": 0.45, "droop": 0.08,
+		"clusters": 42, "card": 2.2, "aerial_roots": 7, "leaf": "olive", "bark": "furrowed",
+		"tint": "tropical", "evergreen": true},
+	# Southeast Asian & Bangkok urban/temple/canal trees (BK-8.1):
+	# rain tree (Samanea saman, wide flat umbrella), mahogany, Burmese rosewood (pradu),
+	# tamarind (Sanam Luang ring), golden shower (Cassia fistula, yellow in dry season),
+	# sacred bodhi fig, frangipani, areca palm, mango & banana (reuses royal_palm, banyan, coconut_palm).
+	"rain_tree": {"gen": "broad", "h": 15.5, "h_var": 0.22, "bole": 0.34, "crown_r": 0.62,
+		"leader": 0.18, "branches": 8, "trunk_r": 0.42, "up": 0.68, "droop": 0.05,
+		"clusters": 64, "card": 3.4, "leaf": "broad", "bark": "furrowed",
+		"tint": "tropical", "evergreen": true, "flat_top": true},
+	"mahogany": {"gen": "broad", "h": 16.0, "h_var": 0.20, "bole": 0.32, "crown_r": 0.36,
+		"leader": 0.65, "branches": 8, "trunk_r": 0.34, "up": 0.55, "droop": 0.05,
+		"clusters": 58, "card": 3.0, "leaf": "broad", "bark": "furrowed",
+		"tint": "tropical", "evergreen": true},
+	"pradu": {"gen": "broad", "h": 15.0, "h_var": 0.22, "bole": 0.30, "crown_r": 0.46,
+		"leader": 0.35, "branches": 7, "trunk_r": 0.34, "up": 0.45, "droop": 0.28,
+		"clusters": 60, "card": 3.1, "leaf": "broad", "bark": "furrowed",
+		"tint": "pradu", "evergreen": true},
+	"tamarind": {"gen": "broad", "h": 13.5, "h_var": 0.18, "bole": 0.28, "crown_r": 0.42,
+		"leader": 0.40, "branches": 8, "trunk_r": 0.36, "up": 0.48, "droop": 0.18,
+		"clusters": 62, "card": 2.4, "leaf": "birch", "bark": "furrowed",
+		"tint": "tamarind", "evergreen": true},
+	"golden_shower": {"gen": "broad", "h": 11.5, "h_var": 0.20, "bole": 0.30, "crown_r": 0.38,
+		"leader": 0.45, "branches": 7, "trunk_r": 0.24, "up": 0.50, "droop": 0.22,
+		"clusters": 52, "card": 2.5, "leaf": "birch", "bark": "plane",
+		"tint": "golden_shower", "evergreen": true},
+	"bodhi": {"gen": "broad", "h": 17.0, "h_var": 0.24, "bole": 0.24, "crown_r": 0.52,
+		"leader": 0.30, "branches": 8, "trunk_r": 0.48, "up": 0.42, "droop": 0.12,
+		"clusters": 64, "card": 3.2, "leaf": "broad", "bark": "plane",
+		"tint": "tropical", "evergreen": true},
+	"frangipani": {"gen": "broad", "h": 6.2, "h_var": 0.20, "bole": 0.32, "crown_r": 0.50,
+		"leader": 0.22, "branches": 5, "trunk_r": 0.18, "up": 0.58, "droop": 0.0,
+		"clusters": 36, "card": 2.0, "leaf": "broad", "bark": "plane",
+		"tint": "tropical", "evergreen": true, "flat_top": true},
+	"areca_palm": {"gen": "palm", "h": 8.5, "h_var": 0.22, "fronds": 14, "frond_len": 2.8,
+		"trunk_r": 0.15, "leaf": "palm", "bark": "palm", "tint": "tamarind", "evergreen": true},
+	"mango": {"gen": "broad", "h": 11.5, "h_var": 0.22, "bole": 0.25, "crown_r": 0.46,
+		"leader": 0.35, "branches": 7, "trunk_r": 0.30, "up": 0.45, "droop": 0.12,
+		"clusters": 54, "card": 2.8, "leaf": "broad", "bark": "furrowed",
+		"tint": "tropical", "evergreen": true},
+	"banana": {"gen": "palm", "h": 4.8, "h_var": 0.20, "fronds": 10, "frond_len": 2.4,
+		"trunk_r": 0.14, "leaf": "palm", "bark": "palm", "tint": "tamarind", "evergreen": true},
 }
 
 ## Season tints (sRGB), applied over the near-neutral leaf atlases:
@@ -129,6 +203,10 @@ const TINTS := {
 	"dipterocarp": [Color(0.38, 0.52, 0.22), Color(0.33, 0.48, 0.20), Color(0.40, 0.48, 0.22), Color(0.44, 0.46, 0.24)],
 	"silk_cotton": [Color(0.46, 0.60, 0.26), Color(0.40, 0.55, 0.24), Color(0.62, 0.56, 0.26), Color(0.3, 0.4, 0.22)],
 	"sugar_palm": [Color(0.36, 0.48, 0.26), Color(0.34, 0.46, 0.25), Color(0.38, 0.46, 0.26), Color(0.42, 0.46, 0.28)],
+	"pradu": [Color(0.36, 0.54, 0.22), Color(0.31, 0.49, 0.20), Color(0.34, 0.50, 0.21), Color(0.32, 0.47, 0.20)],
+	"tamarind": [Color(0.42, 0.60, 0.26), Color(0.37, 0.55, 0.23), Color(0.40, 0.56, 0.25), Color(0.38, 0.52, 0.24)],
+	"golden_shower": [Color(0.86, 0.72, 0.18), Color(0.38, 0.54, 0.22), Color(0.40, 0.54, 0.23), Color(0.78, 0.66, 0.20)],
+	"poinciana": [Color(0.56, 0.52, 0.24), Color(0.78, 0.28, 0.16), Color(0.36, 0.52, 0.22), Color(0.34, 0.48, 0.22)],
 	"evergreen": [Color(0.24, 0.38, 0.19), Color(0.21, 0.34, 0.17), Color(0.21, 0.34, 0.17), Color(0.20, 0.32, 0.17)],
 }
 
@@ -224,10 +302,31 @@ static func biome_for(lat: float, lon: float, altitude_m: float, country: String
 
 ## Weighted species mix for a biome + setting ("street" = OSM tree
 ## nodes/parks in a built-up place, "forest", "park", "rural").
+static func bangkok_mix(setting: String, denotation: String = "", district: String = "") -> Array:
+	if district == "bangkok_thonburi":
+		return [["tropical", 0.45], ["coconut_palm", 0.30], ["banyan", 0.15], ["palm", 0.10]]
+	if setting == "street" or denotation == "avenue":
+		return [["tropical", 0.55], ["live_oak", 0.25], ["royal_poinciana", 0.15], ["palm", 0.05]]
+	if setting == "park":
+		return [["tropical", 0.45], ["royal_poinciana", 0.20], ["banyan", 0.15], ["royal_palm", 0.20]]
+	return [["tropical", 0.50], ["banyan", 0.25], ["royal_poinciana", 0.15], ["palm", 0.10]]
+
 static func mix(biome: String, setting: String) -> Array:
 	match biome:
 		"tropical":
 			return [["palm", 0.45], ["tropical", 0.55]]
+		"miami":
+			if setting == "street":
+				return [["royal_palm", 0.34], ["coconut_palm", 0.16], ["sabal_palm", 0.14], ["live_oak", 0.16],
+					["royal_poinciana", 0.10], ["banyan", 0.06], ["sea_grape", 0.04]]
+			if setting == "shore":
+				return [["coconut_palm", 0.34], ["sea_grape", 0.24], ["sabal_palm", 0.18], ["mangrove", 0.16],
+					["royal_palm", 0.08]]
+			if setting == "forest":
+				return [["live_oak", 0.26], ["sabal_palm", 0.20], ["coconut_palm", 0.18], ["mangrove", 0.16],
+					["banyan", 0.12], ["royal_poinciana", 0.08]]
+			return [["royal_palm", 0.24], ["coconut_palm", 0.22], ["sabal_palm", 0.16], ["live_oak", 0.14],
+				["banyan", 0.12], ["royal_poinciana", 0.08], ["sea_grape", 0.04]]
 		"nyc_park":
 			# Central Park: American elms (the vase-shaped zelkova form, the
 			# same family) along the Mall and drives, oaks, London planes,
@@ -301,12 +400,19 @@ const GENUS := {
 	"pseudotsuga": "spruce", "larix": "spruce", "tsuga": "spruce",
 	"cupressus": "cypress", "juniperus": "cypress", "thuja": "cypress",
 	"hesperocyparis": "monterey_cypress", "eucalyptus": "eucalyptus", "corymbia": "eucalyptus",
-	"metrosideros": "metrosideros", "lophostemon": "metrosideros", "ficus": "metrosideros",
+	"metrosideros": "metrosideros", "lophostemon": "metrosideros", "ficus": "banyan",
 	"pittosporum": "metrosideros", "tristaniopsis": "metrosideros", "arbutus": "olive",
 	"taxus": "cypress", "sequoia": "spruce", "sequoiadendron": "spruce",
 	"cedrus": "stone_pine",
 	"phoenix": "palm", "washingtonia": "palm", "trachycarpus": "palm",
-	"cocos": "palm", "roystonea": "palm", "syagrus": "palm",
+	"cocos": "coconut_palm", "roystonea": "royal_palm", "sabal": "sabal_palm", "syagrus": "palm",
+	"delonix": "royal_poinciana", "coccoloba": "sea_grape",
+	"rhizophora": "mangrove", "avicennia": "mangrove", "laguncularia": "mangrove",
+	"conoarpus": "mangrove", "conocarpus": "mangrove",
+	"bursera": "tropical", "swietenia": "mahogany",
+	"samanea": "rain_tree", "albizia": "rain_tree", "pterocarpus": "pradu",
+	"tamarindus": "tamarind", "cassia": "golden_shower", "plumeria": "frangipani",
+	"mangifera": "mango", "musa": "banana", "dypsis": "areca_palm",
 }
 
 ## Boreal overrides of GENUS (Helsinki's register: Acer, Sorbus and the
@@ -321,9 +427,11 @@ const BOREAL_GENUS := {
 ## pines get their own model; an evergreen broadleaf in a dry-summer
 ## climate is the olive-like holm/live oak form.
 static func species_from_tags(tags: Dictionary, biome: String) -> String:
-	var genus := str(tags.get("genus", ""))
+	var genus := str(tags.get("genus", "")).to_lower()
 	if genus == "" and tags.has("species"):
-		genus = str(tags["species"]).get_slice(" ", 0)
+		genus = str(tags["species"]).get_slice(" ", 0).to_lower()
+	if genus == "quercus" and str(tags.get("species", "")).to_lower().contains("virginiana"):
+		return "live_oak"
 	if genus == "pinus" and str(tags.get("species", "")).contains("pinea"):
 		return "stone_pine"
 	if genus == "cupressus" and str(tags.get("species", "")).contains("macrocarpa"):
@@ -344,7 +452,7 @@ static func species_from_tags(tags: Dictionary, biome: String) -> String:
 
 static func conifer_for(biome: String) -> String:
 	match biome:
-		"mediterranean":
+		"mediterranean", "miami":
 			return "stone_pine"
 		"dry_coast", "arid":
 			return "cypress"

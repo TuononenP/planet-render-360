@@ -87,6 +87,7 @@ static func add(plan: Dictionary, data: LocationData, ground: GroundTruth,
 				if cover >= 0 and str(mask.green[cover]["class"]) != "grass":
 					continue
 				if _near_mapped_tree(buckets, Vector2(x, z)) \
+						or VegetationBuilder.in_sanam_luang(x, z, ctx, true) \
 						or not VegetationBuilder._site_ok(x, z, ground, mask,
 							VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER, 0.8, ctx) \
 						or (mask.surface != null and mask.surface.hard_at(x, z, 0.0, GroundSurface.NO_TREES)):

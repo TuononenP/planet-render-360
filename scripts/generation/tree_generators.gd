@@ -184,6 +184,55 @@ static func _gen_broad(s: Dictionary, lod: int, bare: bool, rng: RandomNumberGen
 				var lobe_lit := lerpf(0.78, 1.0, exp(-0.25 * dl * dl))
 				ao.append(clampf(lerpf(0.35, 1.0, depth) * lobe_lit * lerpf(0.85, 1.05, hgt) * value, 0.3, 1.0))
 			TreeMeshLibrary._card(leaf, corners, nrm, ao, [], tint)
+	# Aerial prop trunks (banyan) and arching prop-root stilts (mangrove).
+	var roots := int(s.get("aerial_roots", 0))
+	if roots > 0 and not mains.is_empty():
+		var nr := roots if lod == 0 else maxi(roots / 2, 1)
+		var r_min := tr * 2.2
+		var r_max := maxf(rx * 0.55, r_min + 0.25)
+		var stilt := h < 8.0
+		for ri: int in range(nr):
+			var bpath: Array = mains[ri % mains.size()]
+			var r_top: Vector3
+			var rad_dir: Vector2
+			if stilt and ri % 2 == 1:
+				var az_r := TAU * float(ri) / float(nr) + rng.randf_range(-0.28, 0.28)
+				rad_dir = Vector2(cos(az_r), sin(az_r))
+				var by := base_y * rng.randf_range(0.52, 0.95)
+				var bt := clampf((by + 0.4) / maxf(top_y + 0.4, 0.1), 0.0, 1.0)
+				var b_centre := Vector3(0.0, by, 0.0) + lean * bt * bt
+				r_top = b_centre + Vector3(rad_dir.x * tr * 0.72, 0.0, rad_dir.y * tr * 0.72)
+			else:
+				var bu := rng.randf_range(0.35, 0.58)
+				var seg_f := bu * float(bpath.size() - 1)
+				var seg_i := mini(int(seg_f), bpath.size() - 2)
+				r_top = (bpath[seg_i] as Vector3).lerp(bpath[seg_i + 1] as Vector3, seg_f - float(seg_i))
+				var hz := Vector2(r_top.x, r_top.z)
+				if hz.length() < 0.05:
+					var az_fb := TAU * float(ri) / float(nr)
+					rad_dir = Vector2(cos(az_fb), sin(az_fb))
+				else:
+					rad_dir = hz.normalized()
+			var top_hr := Vector2(r_top.x, r_top.z).length()
+			var foot_r := clampf(top_hr + (rng.randf_range(0.45, 0.95) if stilt else rng.randf_range(-0.15, 0.35)),
+				r_min, r_max)
+			var foot_ang := atan2(rad_dir.y, rad_dir.x) + rng.randf_range(-0.12, 0.12)
+			var r_foot := Vector3(cos(foot_ang) * foot_r, -0.35, sin(foot_ang) * foot_r)
+			var r_ctrl: Vector3
+			if stilt:
+				r_ctrl = Vector3(r_foot.x * 0.88, lerpf(r_foot.y, r_top.y, 0.72), r_foot.z * 0.88)
+			else:
+				var sway := Vector3(rng.randf_range(-0.14, 0.14), 0.0, rng.randf_range(-0.14, 0.14))
+				r_ctrl = r_top.lerp(r_foot, 0.52) + sway
+			var r_pts := TreeMeshLibrary._bezier(r_top, r_ctrl, r_foot, 4 if lod == 0 else 2)
+			var rad_top := tr * (0.24 if stilt else 0.15) * rng.randf_range(0.85, 1.15)
+			var rad_bot := tr * (0.32 if stilt else 0.24) * rng.randf_range(0.9, 1.15)
+			var r_radii: Array = []
+			for rk: int in range(r_pts.size()):
+				var rt := float(rk) / float(r_pts.size() - 1)
+				r_radii.append(lerpf(rad_top, rad_bot, rt))
+			TreeMeshLibrary._tube(bark, r_pts, r_radii, 5 if lod == 0 else 4,
+				0.62 if not bare else 0.8, 0.72)
 	return [bark, leaf]
 
 ## Distance along `dir` (unit) from `p` to the crown ellipsoid's
@@ -294,41 +343,71 @@ static func _gen_palm(s: Dictionary, lod: int, rng: RandomNumberGenerator) -> Ar
 	var leaf := TreeMeshLibrary.Buf.new()
 	var h: float = s["h"]
 	var tr: float = s["trunk_r"]
-	var lean := Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized() * h * 0.08
-	var top := Vector3(0, h, 0) + lean
-	var trunk := TreeMeshLibrary._bezier(Vector3(0, -0.4, 0), Vector3(0, h * 0.55, 0) + lean * 0.15, top, 8 if lod == 0 else 4)
+	var lean_k := float(s.get("lean_k", 0.08))
+	var crownshaft := clampf(float(s.get("crownshaft", 0.0)), 0.0, h * 0.35)
+	var droop_k := float(s.get("droop_k", 0.22))
+	var lean_dir := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0))
+	if lean_dir.length_squared() < 1e-4:
+		lean_dir = Vector3.RIGHT
+	lean_dir = lean_dir.normalized()
+	var lean := lean_dir * (h * lean_k)
+	var top := Vector3(0.0, h, 0.0) + lean
+	var bark_top := top - Vector3(0.0, crownshaft, 0.0)
+	var ctrl: Vector3
+	if lean_k >= 0.15:
+		var perp := Vector3(-lean_dir.z, 0.0, lean_dir.x)
+		ctrl = Vector3(0.0, bark_top.y * 0.38, 0.0) + lean * 0.78 + perp * (h * lean_k * 0.12)
+	else:
+		ctrl = Vector3(0.0, bark_top.y * 0.55, 0.0) + lean * 0.15
+	var sides := 9 if lod == 0 else 6
+	var trunk := TreeMeshLibrary._bezier(Vector3(0.0, -0.4, 0.0), ctrl, bark_top, 8 if lod == 0 else 4)
 	var radii: Array = []
-	for i in trunk.size():
+	for i: int in range(trunk.size()):
 		var t := float(i) / float(trunk.size() - 1)
 		radii.append(tr * lerpf(1.45, 0.82, pow(t, 0.4)))
-	TreeMeshLibrary._tube(bark, trunk, radii, 9 if lod == 0 else 6, 0.7, 0.9)
+	TreeMeshLibrary._tube(bark, trunk, radii, sides, 0.7, 0.9)
+	if crownshaft > 0.0:
+		var cs_v0 := bark.colors.size()
+		var cs_pts: Array = [
+			bark_top - Vector3(0.0, 0.05, 0.0),
+			bark_top.lerp(top, 0.16),
+			bark_top.lerp(top, 0.64),
+			top,
+		]
+		var cs_radii: Array = [tr * 0.82, tr * 0.96, tr * 0.90, tr * 0.74]
+		TreeMeshLibrary._tube(bark, cs_pts, cs_radii, sides, 0.82, 0.98)
+		for ci: int in range(cs_v0, bark.colors.size()):
+			var ao := bark.colors[ci].g
+			bark.colors[ci] = Color(ao * 0.46, ao * 0.88, ao * 0.36)
 	var fronds := int(s["fronds"]) - (0 if lod == 0 else 5)
+	var dead_n := 0 if crownshaft > 0.0 else (4 if lod == 0 else 0)
 	var segs := 6 if lod == 0 else 3
 	var flen: float = s["frond_len"]
-	for f in fronds + (4 if lod == 0 else 0):
+	var arch_k := 0.5 + maxf(droop_k - 0.22, 0.0) * 0.85
+	for f: int in range(fronds + dead_n):
 		var dead := f >= fronds
 		var az := float(f) * 2.39996 + rng.randf_range(-0.2, 0.2)
 		var el := rng.randf_range(-0.35, 0.85) if not dead else -1.25
 		var ln := flen * rng.randf_range(0.85, 1.1) * (0.7 if dead else 1.0)
-		var dh := Vector3(cos(az), 0, sin(az))
+		var dh := Vector3(cos(az), 0.0, sin(az))
 		var pts: Array = []
-		for k in segs + 1:
+		for k: int in range(segs + 1):
 			var u := float(k) / float(segs)
-			var p := top + dh * cos(el) * ln * u + Vector3(0, sin(el) * ln * u - 0.5 * ln * u * u, 0)
+			var p := top + dh * cos(el) * ln * u + Vector3(0.0, sin(el) * ln * u - arch_k * ln * u * u, 0.0)
 			pts.append(p)
 		var col := 1.0 if not dead else 0.62
 		var w := 2.3
-		for k in segs:
+		var droop_v := Vector3(0.0, -w * droop_k, 0.0)
+		for k: int in range(segs):
 			var a: Vector3 = pts[k]
 			var b: Vector3 = pts[k + 1]
 			var tng := (b - a).normalized()
 			var side := tng.cross(Vector3.UP).normalized()
-			var droop_v := Vector3(0, -w * 0.22, 0)
 			var ua := float(k) / float(segs)
 			var ub := float(k + 1) / float(segs)
 			var nup := (Vector3.UP * 0.8 + tng * 0.1).normalized()
-			for sd in [-1.0, 1.0]:
-				var sv: Vector3 = side * float(sd) * w * 0.5 + droop_v
+			for sd: float in [-1.0, 1.0]:
+				var sv: Vector3 = side * sd * w * 0.5 + droop_v
 				var v_edge: float = 0.0 if sd < 0.0 else 1.0
 				TreeMeshLibrary._card(leaf, [a, b, b + sv, a + sv], [nup, nup, nup, nup],
 					[col * 0.8, col * 0.8, col, col],

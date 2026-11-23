@@ -848,3 +848,35 @@ remains open for user sign-off**.
   - **High (`p2`):** cold **23.8 s** (≤ 45–75 s budget), cached **7.3 s**, save **0.15 s**, fly p95 **9.2 ms** / max **129.6 ms**, 2,511 mesh nodes, peak **3,265 MB**.
   - **Ultra (`p3`):** cold **23.6 s** (≤ 150 s cap), cached **7.2 s** (≤ 8 s budget), save **0.20 s**, fly p95 **15.9 ms** / max **186.3 ms**, 3,717 mesh nodes, peak **5,395 MB**.
   All headless Nordic suites and windowed `world_cache_test` / `screenshot_test` pass.
+
+### Bangkok rounds `bangkok-r0` → `bangkok-r1` → `bangkok-r2` (2026-11-23)
+
+Frames in `visual-plan/reviews/bangkok-r0-2026-11-23/` (baseline), `bangkok-r1-2026-11-23-2026-11-23/` (old-town fabric),
+`bangkok-r2-2026-11-23/` (City Hall plaza `13.75398, 100.50144`, `E1`–`E9`, golden/noon/night, Ultra), and
+`bangkok-r2-river-2026-11-23/` (streamed Chao Phraya river world `13.7455, 100.4905`, `E10`–`E12`, golden/night, Ultra),
+plus day/night 4-view studio & reference comparison pages for all 36 Bangkok landmarks, 4 river bridges, and 9 skyline
+towers in `visual-plan/captures/{bk_bk2,bk_bk2_night,bk_bk456,bk_bk456_night,bk_bk11,bk_bk11_night}/` (`BUILD_VERSION = 322`).
+Agent pre-rating: **recognisable** (approaching photographic on Ratchadamnoen, Bamrung Mueang, Sanam Luang, and Chao Phraya
+river panoramas); **the human "photographic" gate (AC-18) remains open for user sign-off**.
+
+- **Delivered:** 36 bespoke/upgraded Bangkok landmarks (`LandmarkRegistryThailandBangkok` + 4 upgraded existing heroes:
+  `grand_palace_bangkok`, `wat_pho`, `wat_arun`, `hua_lamphong`), 9 `BkTowerSpecs` skyline towers (`State Tower` gold dome,
+  `ICONSIAM` Magnolias, `Baiyoke II`, `Sathorn Unique`, etc.), 4 river bridges (bespoke `Rama VIII` 160 m inverted-Y pylon,
+  emerald `Memorial Bridge`, planted `Phra Pok Klao` Sky Park, `Phra Pinklao`) + generic `BangkokCanalBridges` for khlongs,
+  16 districts & 11 Bangkok style rows (`bangkok_oldtown`, `bangkok_civic`, `bangkok_ratchadamnoen`, `bangkok_wat`,
+  `bangkok_khaosan`, `bangkok_shophouse`, `bangkok_yaowarat`, `bangkok_timber`, `bangkok_mall`, `bangkok_hotel_river`,
+  `bangkok_condo`), `16/20 m` Rattanakosin height caps, 433 Thai tiered-roof temple halls (`building=temple`), 64 mapped
+  `man_made=stupa` chedis (`StupaBuilder`), silty olive-brown Chao Phraya & khlong water with masonry floodwalls, floating
+  pitched-roof piers, and Thai river vessels (`longtail`, `chao_phraya_express`, `cross_river_ferry`, `saen_saep_boat`,
+  `dinner_cruise`, `rice_barge`), `bangkok_mix` broadleaf street trees (`<= 4%` palms) & open Sanam Luang lawn with tamarind
+  ring, humid tropical sky/haze, Thai fleet (`TukTukModel`, 5 Bangkok taxi liveries, 5 BMTA/Thai Smile bus liveries,
+  square TH concrete utility poles with buried-cable exclusions on Ratchadamnoen & Grand Palace, `BangkokStreetLife`),
+  and night `FLOOD_META` + Yaowarat/Khao San neon (`docs/bangkok-landmark-sources.md`).
+- **Remaining tells:** plaza eye `E2` (`13.75398, 100.50144`) sits close to City Hall's west wall (open plaza centre is
+  `13.7536, 100.5011`); canal eyes `E5`/`E6` at `1.7 m` sit low near water/bridge decks; human photographic gate (AC-18)
+  pending user sign-off.
+- **Performance (`tools/build_bench.gd`, parallel, Apple M5 Ultra, Forward+):**
+  - **High (`bangkok_p2`):** ground **590 ms**, world **7.87 s** (`1,490` children; ≤ 45–75 s budget).
+  - **Ultra (`bangkok_p3`):** ground **587 ms**, world **9.31 s** (`2,771` children; ≤ 150 s cap).
+  All Bangkok, bridge, water, vegetation, vehicle, architecture, and host-policy headless suites, `tools/check_class_size.sh`
+  (max `996/1000`), and windowed `world_cache_test` / `screenshot_test` pass.

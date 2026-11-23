@@ -843,3 +843,33 @@ layer.
   Wikipedia, Stockholm's building ordinance for Hötorgsskraporna) and are marked unverified where no second source
   was found.
 - No Russian-operated host is contacted (`HostPolicy`).
+
+## Bangkok landmark measurements and reference photos (2026-11-23)
+
+- **Footprints, centroids, axis bearings, snapshot completeness:** Measured from the bundled OpenStreetMap snapshots
+  (`assets/osm_snapshots/capital_th_10375398_28050144_*.osmb`, including the uncapped 2026-11-23 `ring2500` re-cut) and
+  bounded Overpass `out geom` queries on `overpass.openstreetmap.fr` (ODbL, © OpenStreetMap contributors). Full site
+  measurements, distances, bearings and published architectural heights (Fine Arts Department of Thailand, BMA, CTBUH,
+  JICA 2009 Chao Phraya bridge inspection sheets, English and Thai Wikipedia) are recorded in
+  `docs/bangkok-landmark-sources.md`.
+- **Reference photos:** Wikimedia Commons (`commons.wikimedia.org`, `upload.wikimedia.org`), restricted to CC BY,
+  CC BY-SA, CC0 and public-domain photographs, fetched via `tools/bangkok_commons_refs.py` to
+  `visual-plan/refs/landmarks/<type>/` and `visual-plan/refs/bangkok/` with per-file attribution READMEs (JPEGs
+  gitignored, review-only).
+- No Russian-operated host is contacted (`HostPolicy`).
+
+## Miami landmark measurements and reference photos (2026-11-23)
+
+- **Bundled presets & OSM snapshots:** `miami` (`25.7743, -80.1855`) and `miami_beach` (`25.7810, -80.1300`) ship 14
+  `.osmb` layers (`assets/osm_snapshots/miami_*.osmb` and `miami_beach_*.osmb`: `detailed`, `ring1600`, uncapped
+  `ring2500`, `poi`, `far`, `transit`, `horizon`), packed from OpenStreetMap via `overpass.openstreetmap.fr` / OSM API
+  / Postpass (ODbL, © OpenStreetMap contributors), with hashes in `BundledOsm` and `horizon_manifest.json`.
+- **Footprints, centroids, axis bearings & heights:** Measured across 3,822 building envelopes in Centres A–F and
+  cross-checked against late-2026 (November 2026) completion status, CTBUH/Emporis/MDPL/FDOT/City of Miami Beach
+  records, and English Wikipedia in `docs/miami-landmark-sources.md` (51 bespoke landmarks, 114 `MiamiTowerSpecs`
+  skyline rows, 13 `BridgeSpecsNorthAmerica` rows, 37 `MiamiDecoFronts` rows, and 129 `MiamiNotable` rows).
+- **Reference photos:** Wikimedia Commons (`commons.wikimedia.org`, `upload.wikimedia.org`), restricted to CC BY,
+  CC BY-SA, CC0 and public-domain photographs, fetched via `tools/miami_commons_refs.py` to
+  `visual-plan/refs/miami/` (18 city views) and `visual-plan/refs/landmarks/<type>/` (56 landmark folders) with
+  per-file attribution READMEs (JPEGs gitignored, review-only).
+- No Russian-operated host is contacted (`HostPolicy`).

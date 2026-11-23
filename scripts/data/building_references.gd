@@ -15,6 +15,17 @@ const ROWS := {
 		"values": {"start_year": 1863, "roof_shape": "gabled",
 			"roof_height_m": 2.5, "roof_material": "metal", "roof_colour": "#484c48"},
 	},
+	"relation:2380281": {
+		"source": "https://commons.wikimedia.org/wiki/Category:Bangkok_City_Hall",
+		# Bangkok City Hall (Lan Khon Mueang, 1973): four main storeys plus a
+		# recessed fifth attic storey (~19.5 m) behind a flat parapet in cream
+		# stone/concrete around two inner courtyards.
+		"height_method": "storey_count", "height_uncertainty_m": 2.0,
+		"height_m": 19.5, "levels": 5.0,
+		"values": {"start_year": 1973, "roof_shape": "flat",
+			"roof_height_m": 0.0, "colour": "#e6e1d3", "material": "stone",
+			"roof_material": "concrete", "roof_colour": "#bab4a6"},
+	},
 }
 
 static func apply(buildings: Array) -> void:

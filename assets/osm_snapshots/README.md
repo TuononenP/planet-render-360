@@ -68,6 +68,14 @@ complete inside the ring. The parser applies no cap to bundled text, and the
 live query keeps `CAP_RING_HIGHWAYS` (800), so `RING_VERSION` stays 1 and no
 other preset changes. The `.osmb` file grew from 38,963 to 52,382 bytes.
 
+The Bangkok capital 2500 m ring (`capital_th_10375398_28050144_ring2500.osmb`)
+was re-cut on 2026-11-23 from `https://overpass.openstreetmap.fr/api/interpreter`
+using the same q1 ring statements with uncapped output (`out geom 5000` for
+highways, `out geom 1000` for waterways). The previous file had hit both live
+caps (800 highways, 150 waterways); the re-cut file holds all 820 major highway
+ways and all 158 waterway ways within 2,500 m (0 coastline ways), growing from
+45,239 to 46,015 compressed bytes (`80,504` payload bytes).
+
 The New York far-city, ring and POI layers and San Francisco ring and POI
 layers were generated from BBBike's 2026-10-31 [New York](https://download.bbbike.org/osm/bbbike/NewYork/)
 and [San Francisco](https://download.bbbike.org/osm/bbbike/SanFrancisco/) city

@@ -129,7 +129,7 @@ static func _kerb(cars: Array, pts: PackedVector2Array, off: float, centre: Vect
 			var back := q - fw * length * 0.4
 			# A road the map runs through a building's footprint (a plaza, an
 			# arcade) would park the car in the wall.
-			if _in_building(q, fw, length, CarSpecs.width_m(kind) * m2u, walls, m2u):
+			if _in_building(q, fw, length, _width_m(kind) * m2u, walls, m2u):
 				continue
 			var yf := ground.height_at_world(front.x, front.y)
 			var yb := ground.height_at_world(back.x, back.y)
@@ -158,10 +158,10 @@ static func _near_junction(p: Vector2, junc: Dictionary, cut: float) -> bool:
 	return false
 
 static func _width_m(kind: String) -> float:
-	return CarSpecs.width_m(kind)
+	return TukTukModel.WIDTH_M if kind == "tuk_tuk" else CarSpecs.width_m(kind)
 
 static func _length_m(kind: String) -> float:
-	return CarSpecs.length_m(kind)
+	return TukTukModel.LENGTH_M if kind == "tuk_tuk" else CarSpecs.length_m(kind)
 
 static func _hash(x: float, z: float, salt: float) -> float:
 	return fposmod(sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453, 1.0)
@@ -179,8 +179,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 	for group_key in cells:
 		var list: Array = cells[group_key]
 		var kind: String = list[0][2]
-		var detail := CarModel.mesh(kind)
-		var distant := CarModel.mesh(kind, true)
+		var detail := TukTukModel.mesh(false) if kind == "tuk_tuk" else CarModel.mesh(kind)
+		var distant := TukTukModel.mesh(true) if kind == "tuk_tuk" else CarModel.mesh(kind, true)
 		var near := _add_batch(holder, list, detail, str(group_key) + "_near", 0.0, DETAIL_M)
 		var far := _add_batch(holder, list, distant, str(group_key) + "_far", DETAIL_M, 0.0)
 		# Visibility ranges measure from the AABB centre; differing mesh
@@ -189,7 +189,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		near.custom_aabb = bounds
 		far.custom_aabb = bounds
 		_add_batch(holder, list, shadow_mesh(kind), str(group_key) + "_shadow", 0.0, 0.0)
-		var glass := CarModel.glass_shadow_mesh(kind)
+		var glass := null if kind == "tuk_tuk" else CarModel.glass_shadow_mesh(kind)
 		if glass != null:
 			_add_batch(holder, list, glass, str(group_key) + "_glass", 0.0, DETAIL_M)
 			(holder.get_child(holder.get_child_count() - 1) as GeometryInstance3D).cast_shadow = \

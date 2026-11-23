@@ -41,19 +41,53 @@ static func add(batch: BuildingDetail.Batch, ring: PackedVector2Array, c: Vector
 		return 0
 	var city := str(look.get("city", ""))
 	var region := str(look.get("region", ""))
+	var era := str(look.get("era", ""))
+	if city == "bangkok" and era in ["bangkok_oldtown", "bangkok_civic", "bangkok_ratchadamnoen", "bangkok_wat"]:
+		return 0
+	if city == "miami" and era in ["mi_med_revival", "mi_ranch", "mi_bungalow", "mi_mansion"]:
+		return 0
 	var placed := 0
 	if water_tower_allowed(look, wall_m) and area_m2 > 250.0 and _h(seed_v, 71) < 0.45:
 		placed += _water_tower(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
 	# A stair or lift overrun crowns nearly every multi-storey flat roof.
-	if area_m2 > 150.0 and _h(seed_v, 70) < 0.8:
+	if area_m2 > 150.0 and not (city == "miami" and era == "mi_deco") and _h(seed_v, 70) < 0.8:
 		placed += _overrun(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
-	if city in ASIA or region in ASIA_REGIONS:
+	if city == "bangkok":
+		placed += _condensers(batch, ring, c, u, v, lu, lv, top, basis, seed_v,
+			clampi(int(area_m2 / 260.0), 1, 4))
+		if era in ["bangkok_shophouse", "bangkok_yaowarat", "bangkok_khaosan"]:
+			placed += _tanks(batch, ring, c, u, v, lu, lv, top, basis, seed_v, 1 + int(_h(seed_v, 74) * 2.0))
+			placed += _dishes(batch, ring, c, u, v, lu, lv, top, basis, seed_v, int(_h(seed_v, 75) * 2.0))
+			if _h(seed_v, 76) < 0.45:
+				placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 83, top + 1.15 * _m(),
+					"box", Vector3(3.4, 2.3, 2.8), "steel")
+		if era == "bangkok_yaowarat" and _h(seed_v, 73) < 0.55:
+			placed += _sign_frame(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
+	elif city == "miami":
+		if era == "mi_deco":
+			# Keep South Beach Art Deco roofs light: 1–2 small AC condensers set well back from the parapet.
+			var n_deco := 1 + int(_h(seed_v, 110) * 2.0)
+			for i: int in range(n_deco):
+				placed += _piece(batch, ring, c, u, v, lu * 0.55, lv * 0.55, basis, seed_v,
+					100 + i * 3, top + 0.35 * _m(), "box", Vector3(0.9, 0.7, 0.45), "ac")
+			return placed
+		elif era in ["mi_condo_tower", "mi_condo_slab", "mi_office_glass"]:
+			placed += _condensers(batch, ring, c, u, v, lu, lv, top, basis, seed_v,
+				clampi(int(area_m2 / 260.0), 1, 4))
+			if area_m2 > 220.0:
+				var scr_mat := "tank_white" if _h(seed_v, 94) < 0.65 else "steel"
+				placed += _piece(batch, ring, c, u, v, lu, lv, basis, seed_v, 83, top + 1.25 * _m(),
+					"box", Vector3(lerpf(4.2, 7.5, _h(seed_v, 89)), 2.5, lerpf(3.2, 5.4, _h(seed_v, 91))), scr_mat)
+		else:
+			placed += _condensers(batch, ring, c, u, v, lu, lv, top, basis, seed_v,
+				clampi(int(area_m2 / 320.0), 1, 3))
+	elif city in ASIA or region in ASIA_REGIONS:
 		placed += _condensers(batch, ring, c, u, v, lu, lv, top, basis, seed_v,
 			clampi(int(area_m2 / 250.0), 1, 5))
 		if _h(seed_v, 73) < 0.35:
 			placed += _sign_frame(batch, ring, c, u, v, lu, lv, top, basis, seed_v)
 		# Seoul's villas and walk-ups keep a water tank on the green roof.
-		if str(look.get("era", "")) in ["seoul_villa", "seoul_shopping"] and _h(seed_v, 77) < 0.5:
+		if era in ["seoul_villa", "seoul_shopping"] and _h(seed_v, 77) < 0.5:
 			placed += _tanks(batch, ring, c, u, v, lu, lv, top, basis, seed_v, 1)
 	# Before the regional tanks: Israel is in the Middle East region.
 	elif city in SOLAR_HEATER_CITIES or country.to_upper() in SOLAR_HEATER_COUNTRIES:

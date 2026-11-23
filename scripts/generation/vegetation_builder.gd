@@ -139,7 +139,23 @@ static func _context(data: LocationData, ground: GroundTruth) -> Dictionary:
 		"sightline": _sightline(data),
 		"zone": HeritageZones.near(data.latitude, data.longitude, WorldScale.DETAILED_EXTENT_M),
 		"origin": Vector2(data.latitude, data.longitude),
+		"city": CityStyles.city_of_region(CityStyles.region_at(data.latitude, data.longitude)),
+		"sanam_luang": WorldScale.xz_from_latlon(13.75523, 100.49309, data.latitude, data.longitude),
 	}
+
+## Sanam Luang (`w23630232`, `302 × 589 m` oval royal field in Rattanakosin, `BK-5.1` & `BK-8.1`):
+## `inner_only = true` keeps the ceremonial central lawn open of synthetic/raster trees;
+## `inner_only = false` matches the perimeter ring of mapped tamarind trees.
+static func in_sanam_luang(x: float, z: float, ctx: Dictionary, inner_only: bool) -> bool:
+	if str(ctx.get("city", "")) != "bangkok":
+		return false
+	var m2u: float = ctx["m2u"]
+	var sl: Vector2 = ctx["sanam_luang"]
+	var rx := (108.0 if inner_only else 175.0) * m2u
+	var rz := (248.0 if inner_only else 320.0) * m2u
+	var dx := (x - sl.x) / rx
+	var dz := (z - sl.y) / rz
+	return dx * dx + dz * dz < 1.0
 
 ## In a heritage zone's forest the opening eye looks at its temple down a
 ## glade: [eye, site, half-width at the eye, at the site] (m), widening
@@ -212,10 +228,14 @@ static func _add(plan: Dictionary, x: float, z: float, ground: GroundTruth, sp: 
 ## noise) so forests form stands rather than salt-and-pepper; near the
 ## treeline conifers take over and shrink.
 static func _species_at(x: float, z: float, setting: String, ground: GroundTruth,
-		ctx: Dictionary, leaf_type: String = "") -> Array:
+		ctx: Dictionary, leaf_type: String = "", denotation: String = "") -> Array:
 	var noise: FastNoiseLite = ctx["noise"]
 	var u := clampf(0.5 + noise.get_noise_2d(x, z) * 0.9 + (_hash(x, z, 3.1) - 0.5) * 0.45, 0.0, 0.999)
 	var mix := TreeSpecies.mix_for_leaf(str(ctx["biome"]), setting, leaf_type)
+	if str(ctx.get("city", "")) == "bangkok":
+		var o: Vector2 = ctx["origin"]
+		var ll := WorldScale.latlon_from_xz(x, z, o.x, o.y)
+		mix = TreeSpecies.bangkok_mix(setting, denotation, CityStyles.region_at(ll.x, ll.y))
 	if bool(ctx.get("zone", false)):
 		var zone_mix := str(zone_rule(x, z, ctx).get("tree_mix", ""))
 		if zone_mix != "":
@@ -251,10 +271,13 @@ static func _plant_osm_trees(plan: Dictionary, data: LocationData, ground: Groun
 		if gid >= 0:
 			mask.green[gid]["real_trees"] = int(mask.green[gid]["real_trees"]) + 1
 		var setting := "street" if mask.built_fraction(x, z) > 0.04 else "park"
-		var pick := _species_at(x, z, setting, ground, ctx)
+		var denot := str(t.get("denotation", ""))
+		var pick := _species_at(x, z, setting, ground, ctx, "", denot)
 		# A mapped genus / leaf type names the tree itself (OSM tags).
 		var tagged := TreeSpecies.species_from_tags(t, str(ctx["biome"]))
 		var sp: String = tagged if tagged != "" else pick[0]
+		if in_sanam_luang(x, z, ctx, false):
+			sp = "tamarind"
 		# Street trees are pollarded/younger than open-grown ones.
 		var size: float = float(pick[1]) * (0.85 if setting == "street" else 1.0)
 		# A surveyed size (a city tree register) sets the scale itself.
@@ -362,7 +385,7 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 					p = (0.32 if grove > 0.25 else 0.025) if town else (0.2 if grove > 0.45 else 0.006)
 					p *= dens_scale
 					spread = 1.0
-			if _hash(x, z, 9.0) > p:
+			if _hash(x, z, 9.0) > p or in_sanam_luang(x, z, ctx, true):
 				continue
 			if not _site_ok(x, z, ground, mask, SYNTHETIC_BITS, 0.8, ctx):
 				continue

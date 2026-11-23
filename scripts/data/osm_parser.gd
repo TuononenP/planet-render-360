@@ -117,6 +117,10 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 						poi["wall_mounted"] = true
 					pois.append(poi)
 					break
+			if str(el_tags.get("emergency", "")) == "lifeguard" or str(el_tags.get("lifeguard", "")) == "tower":
+				var lp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
+				pois.append({"x": lp.x, "z": lp.y, "category": "emergency", "kind": "lifeguard",
+					"name": str(el_tags.get("name", ""))})
 			var node_arch := OsmTags.archetype_for(el_tags)
 			if node_arch != "":
 				var np := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
@@ -237,7 +241,12 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		# A platform is noted for StationTrains whatever else it is drawn as.
 		if OsmTags.rail_platform(el_tags):
 			rail_platforms.append({"points": poly})
-		if OsmApiFallback.names_building(el_tags):
+		if str(el_tags.get("emergency", "")) == "lifeguard" \
+				or str(el_tags.get("building", "")) == "lifeguard_tower" \
+				or str(el_tags.get("lifeguard", "")) == "tower":
+			pois.append({"x": (min_x + max_x) * 0.5, "z": (min_z + max_z) * 0.5,
+				"category": "emergency", "kind": "lifeguard", "name": str(el_tags.get("name", ""))})
+		elif OsmApiFallback.names_building(el_tags):
 			var entry := OsmTags._building_entry(el_tags, poly, aabb)
 			buildings.append(entry)
 			var arch := OsmTags.archetype_for(el_tags)
@@ -356,6 +365,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	BuildingReferences.apply(buildings)
 	HelsinkiNotable.apply(buildings)
 	TurkuNotable.apply(buildings)
+	MiamiNotable.apply(buildings)
 	SuomenlinnaSite.apply(buildings, barriers, c_lat, c_lon, landmarks)
 	_monument_landmarks(buildings, landmarks)
 	LandmarkFidelity.mark(buildings, landmarks)

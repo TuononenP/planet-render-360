@@ -17,6 +17,8 @@ static var _meshes := {}
 static var _materials := {}
 
 static func mesh(kind: String, far: bool = false) -> ArrayMesh:
+	if kind == "tuk_tuk":
+		return TukTukModel.mesh(far)
 	var id := kind + ("_far" if far else "")
 	if _meshes.has(id):
 		return _meshes[id]

@@ -132,13 +132,46 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: V
 		var at: Vector2 = boat["centre"]
 		print("HARBOUR-ROUTE %s %s at=(%.1f, %.1f)" % [boat["route"], boat["vessel"], at.x, at.y])
 		count += 1
+	# Commuter ferries, icebreakers and market boats of rows in view (Helsinki).
+	count += HarbourTraffic.build(root, data, ground, mask)
+	count += _bangkok_boats(root, data, ground, mask, driver, boat_id, m)
 	if not driver.boats.is_empty():
 		root.add_child(driver)
 	else:
 		driver.free()
-	# Commuter ferries, icebreakers and market boats of rows in view (Helsinki).
-	count += HarbourTraffic.build(root, data, ground, mask)
 	return count
+
+static func _bangkok_boats(root: Node3D, data: LocationData, ground: GroundTruth, mask: VegetationMask,
+		driver: RouteBoatDriver, next_id: int, m: float) -> int:
+	if CityStyles.city_of_region(CityStyles.region_at(data.latitude, data.longitude)) != "bangkok":
+		return 0
+	var eye := View360.spawn_xz(data)
+	var bridge_list := QuayMoorings.bridges(data, m)
+	var taken: Array = []
+	var added := 0
+	for row: Dictionary in BangkokVesselModels.ROUTES:
+		var pts := PackedVector2Array()
+		for pt in row["points"]:
+			pts.append(WorldScale.xz_from_latlon(float(pt[0]), float(pt[1]), data.latitude, data.longitude))
+		if not HarbourTraffic._any_inside(ground, pts):
+			continue
+		var total := MarinaBuilder._length(pts)
+		var length := float(row["length_m"])
+		var beam := float(row["beam_m"])
+		var model_name := str(row["model"])
+		for share in row["boats"]:
+			var site := _route_site(pts, total, float(share), length, beam, ground, mask, bridge_list, eye, taken, m)
+			if site.is_empty():
+				continue
+			taken.append({"centre": site["centre"]})
+			var lm := LandmarkMesh.new()
+			BangkokVesselModels.build(lm, model_name, {
+				"length": length, "beam": beam, "detail": true, "maps": true,
+				"flag": str(row.get("flag", "#E86A1E")),
+			})
+			_commit(root, lm, "BangkokBoat_", site["centre"], site["axis"], ground, length, beam, next_id + added)
+			added += 1
+	return added
 
 static func _commit(root: Node3D, lm: LandmarkMesh, prefix: String, p: Vector2, axis: Vector2,
 		ground: GroundTruth, length: float, beam: float, boat_id: int = -1) -> Array[MeshInstance3D]:

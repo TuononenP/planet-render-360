@@ -50,6 +50,13 @@ const BUS_PAINT := {
 	"turku": FOLI_YELLOW,
 	"stockholm": Color(0.5, 0.04, 0.04), "lisbon": Color(0.85, 0.62, 0.04), "berlin": Color(0.85, 0.66, 0.05),
 	"new_york": Color(0.78, 0.8, 0.84), "san_francisco": Color(0.72, 0.72, 0.7), "paris": Color(0.35, 0.62, 0.52),
+	"bangkok": [
+		Color(0.62, 0.08, 0.06),  # BMTA classic cream-red
+		Color(0.10, 0.34, 0.72),  # BMTA air-conditioned blue-white
+		Color(0.82, 0.28, 0.04),  # BMTA Euro-II orange
+		Color(0.86, 0.64, 0.05),  # yellow mini/private bus
+		Color(0.03, 0.14, 0.44),  # Thai Smile Bus dark-blue electric
+	],
 }
 const BUS_PALETTE := [Color(0.82, 0.82, 0.8), Color(0.5, 0.04, 0.04), Color(0.05, 0.2, 0.45),
 	Color(0.85, 0.64, 0.05), Color(0.08, 0.36, 0.2)]
@@ -204,7 +211,9 @@ static func plan_buses(data: LocationData, ground: GroundTruth, m2u: float, trai
 	var centre := View360.spawn_xz(data)
 	var left_traffic := RoadSurface.left_traffic(data)
 	var region := CityStyles.region_at(data.latitude, data.longitude)
-	var colour: Color = BUS_PAINT.get(region, BUS_PALETTE[absi(hash(data.country + region)) % BUS_PALETTE.size()])
+	var city := CityStyles.city_of_region(region)
+	var bus_key := "bangkok" if region.begins_with("bangkok") else (city if city != "" else region)
+	var paint_entry: Variant = BUS_PAINT.get(bus_key, BUS_PALETTE[absi(hash(data.country + bus_key)) % BUS_PALETTE.size()])
 	var length := CarSpecs.length_m("bus") * m2u
 	var spots: Array = []
 	for stop in data.bus_stops:
@@ -266,8 +275,11 @@ static func plan_buses(data: LocationData, ground: GroundTruth, m2u: float, trai
 		var yb := ground.height_at_world(back.x, back.y)
 		var forward := Vector3(fw.x * length * 0.8, yf - yb, fw.y * length * 0.8).normalized()
 		var up := forward.cross(Vector3.UP).normalized().cross(forward).normalized()
+		var colour: Color = paint_entry[int(_hash(p.x, p.y, 6.1) * float(paint_entry.size())) % paint_entry.size()] if paint_entry is Array else paint_entry
+		var bus_col: Color = (paint_entry as Array)[int(_hash(p.x, p.y, 6.1) * float((paint_entry as Array).size())) % (paint_entry as Array).size()] \
+			if paint_entry is Array else (paint_entry as Color)
 		buses.append([Vector3(c.x, (yf + yb) * 0.5 + 0.04 * m2u, c.y),
-			Basis(forward, up, forward.cross(up)).scaled(Vector3.ONE * m2u), "bus", colour, float(spot[1]),
+			Basis(forward, up, forward.cross(up)).scaled(Vector3.ONE * m2u), "bus", bus_col, float(spot[1]),
 			Color(0.0, 0.15 + 0.3 * _hash(p.x, p.y, 4.4), 0.0, 0.0), a, b])
 	return buses
 

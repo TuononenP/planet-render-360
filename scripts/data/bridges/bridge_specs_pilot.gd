@@ -191,7 +191,7 @@ static func rows() -> Array:
 			"aliases": ["saphan phra ram 9", "สะพานพระราม 9", "rama 9 bridge", "bhumibol bridge"], "lat": 13.6825,
 			"lon": 100.5177, "bearing": 37.2, "st": "stayed", "spans": [46.8, 57.6, 61.2, 450.0, 61.2, 57.6, 46.8],
 			"width": 33.0, "clear": 41.0, "tower": 128.0, "towers": [3, 4], "pylon": "single", "material": "steel",
-			"base": "water", "tier": 2, "conf": 1,
+			"steel_hex": "#E2B534", "base": "water", "tier": 2, "conf": 1,
 			"src": "en Wikipedia (450 m main, 781.2 m, 33 m wide, clearance 41 m, height 87 m), Structurae via " +
 				"search snippet (side spans 61.2+57.6+46.8), OSM bearing; tower = 41 m + 87 m assuming 87 m " +
 				"is above deck; single-plane cables | verified: en Wikipedia (450 m main, 781.2 m, 33 m, " +

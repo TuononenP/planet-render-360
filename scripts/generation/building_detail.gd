@@ -163,6 +163,12 @@ static func _mat(key: String) -> Material:
 			m = _flat(Color(0.40, 0.29, 0.19), 0.9)
 		"terracotta":
 			m = MaterialLibrary.pbr_material("terracotta", Color.WHITE, 1.0)
+		"thai_orange":
+			m = MaterialLibrary.pbr_material("terracotta", Color(0.84, 0.33, 0.14).srgb_to_linear(), 1.5)
+		"thai_green":
+			var tg := _flat(Color(0.16, 0.44, 0.30).srgb_to_linear(), 0.42)
+			tg.metallic = 0.08
+			m = tg
 		_:
 			m = _flat(Color(0.5, 0.5, 0.5), 0.9)
 	_mats[key] = m
@@ -179,7 +185,9 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 		ultra: bool = false, country: String = "", clutter: bool = false, deck: float = NAN,
 		holes: Array = []) -> void:
 	var religious := str(look["kind"]) == "religious" and str(look["tower"]) != ""
-	if not near and not religious:
+	var thai_wat := str(look["kind"]) == "religious" and str(look["tower"]) == "" \
+		and bool((look.get("relief", {}) as Dictionary).get("thai_wat", false))
+	if not near and not religious and not thai_wat:
 		return
 	var c := RingGeometry.interior_point(ring)
 	if not RingGeometry.point_in_ring(c, ring):
@@ -195,6 +203,8 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 	var basis := Basis(Vector3(u.x, 0, u.y), Vector3.UP, Vector3(v.x, 0, v.y))
 	if religious:
 		_tower(batch, ring, c, u, lu, lv, top, wall_h, basis, look, wall_mat, roof_mat)
+	elif thai_wat and shape == "gabled" and roof_h > 0.6 * m2u:
+		_thai_wat_roof(batch, c, u, v, lu, lv, top, roof_h, basis)
 	# A dome, onion or spire carries no stacks, dormers or roof terraces.
 	if near and shape not in RoofDomes.SHAPES:
 		var area_m2 := lu * lv * 4.0 / (m2u * m2u)
@@ -400,4 +410,38 @@ static func _tower(batch: Batch, ring: PackedVector2Array, c: Vector2,
 			var sh := wall_h + rise * 1.1
 			batch.add("pyramid", tx.call(base_y + sh * 0.5, side * 2.2, sh, side * 2.2), wall_mat)
 			batch.add("sphere", tx.call(base_y + sh + side * 0.25, side * 0.5, side * 0.5, side * 0.5), _mat("gold"))
+
+## Thai Buddhist wat hall roof garnish (BK-3.4): glazed green eave borders,
+## superposed upper orange roof tier, gilded gable boards, and upturned
+## golden chofa finials at both ridge ends (merged into the building's Detail).
+static func _thai_wat_roof(batch: Batch, c: Vector2, u: Vector2, v: Vector2,
+		lu: float, lv: float, top: float, roof_h: float, basis: Basis) -> void:
+	var m2u := WorldScale.metres_to_units()
+	var green := _mat("thai_green")
+	var orange := _mat("thai_orange")
+	var gold := _mat("gold")
+	# Green glazed eave border trim along both side eaves and end bargeboards
+	var trim_h := clampf(roof_h * 0.08, 0.16 * m2u, 0.34 * m2u)
+	for sv in [-1.0, 1.0]:
+		batch.add("box", _xf(basis, _at(c, u, v, 0.0, float(sv) * lv * 1.02, top + trim_h * 0.4),
+			Vector3(lu * 2.08, trim_h, 0.28 * m2u)), green)
+	# Superposed upper roof tier along the middle 74% of the ridge + green border
+	var tier_y := top + roof_h * 0.46
+	var tier_h := roof_h * 0.42
+	batch.add("box", _xf(basis, _at(c, u, v, 0.0, 0.0, tier_y),
+		Vector3(lu * 1.54, trim_h * 0.9, lv * 1.18)), green)
+	batch.add("pyramid", _xf(basis, _at(c, u, v, 0.0, 0.0, tier_y + tier_h * 0.5),
+		Vector3(lu * 1.48, tier_h, lv * 1.12)), orange)
+	# Gilded gable ornament (naban) + golden chofa horn finial at both ridge ends
+	var chofa_h := clampf(roof_h * 0.42, 0.9 * m2u, 2.4 * m2u)
+	var chofa_r := clampf(lv * 0.06, 0.14 * m2u, 0.36 * m2u)
+	for su in [-1.0, 1.0]:
+		var s := float(su)
+		batch.add("box", _xf(basis, _at(c, u, v, s * lu * 0.99, 0.0, top + roof_h * 0.38),
+			Vector3(0.16 * m2u, roof_h * 0.48, lv * 0.72)), gold)
+		var tilt := basis * Basis(Vector3.BACK, -s * 0.28)
+		batch.add("cone", _xf(tilt, _at(c, u, v, s * (lu * 1.02 + chofa_h * 0.12), 0.0,
+			top + roof_h + chofa_h * 0.42), Vector3(chofa_r * 2.0, chofa_h, chofa_r * 2.0)), gold)
+		batch.add("cone", _xf(tilt, _at(c, u, v, s * (lu * 0.74 + chofa_h * 0.08), 0.0,
+			tier_y + tier_h + chofa_h * 0.30), Vector3(chofa_r * 1.5, chofa_h * 0.72, chofa_r * 1.5)), gold)
 

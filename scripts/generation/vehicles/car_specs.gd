@@ -186,12 +186,16 @@ const KINDS := {
 static var _specs := {}
 
 static func has(kind: String) -> bool:
-	return KINDS.has(kind)
+	return kind == "tuk_tuk" or KINDS.has(kind)
 
 static func length_m(kind: String) -> float:
+	if kind == "tuk_tuk":
+		return TukTukModel.LENGTH_M
 	return float((KINDS.get(kind, {}) as Dictionary).get("len", BASE["len"]))
 
 static func width_m(kind: String) -> float:
+	if kind == "tuk_tuk":
+		return TukTukModel.WIDTH_M
 	return float((KINDS.get(kind, {}) as Dictionary).get("wid", BASE["wid"]))
 
 static func spec(kind: String) -> Dictionary:

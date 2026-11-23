@@ -42,6 +42,8 @@ static func grand_palace(model: Node3D) -> void:
 	lm.use("Blue", LandmarkMaterials.pbr("render", "#3E6EA8", 3.0))
 	lm.use("Pink", LandmarkMaterials.pbr("render", "#C9877F", 3.0))
 	lm.use("Glass", LandmarkMaterials.glass("#2E3A40"))
+	lm.use("Grass", LandmarkMaterials.pbr("grass", "#4B763A", 4.0))
+	lm.use("Slate", LandmarkMaterials.pbr("slate", "#48525C", 2.5))
 	var wk := Vector3(84, 0, -54)
 	var hx := 80.0
 	var hz := 77.5
@@ -53,14 +55,19 @@ static func grand_palace(model: Node3D) -> void:
 	lm.box("Stone", Vector3(71, 0.6, -68), Vector3(90, 1.2, 42))
 	lm.box("Stone", Vector3(71, 1.3, -68), Vector3(90.6, 0.2, 42.6))
 	for s in [-1.0, 1.0]:
-		U.posts(lm, "Stone", Vector3(27, 1.2, -68 + s * 20.6), Vector3(115, 1.2, -68 + s * 20.6), 30, 1.0, 0.3)
-		lm.box("Stone", Vector3(71, 2.25, -68 + s * 20.6), Vector3(88, 0.2, 0.4))
+		U.posts(lm, "Stone", Vector3(27, 1.2, -68 + s * 20.6), Vector3(115, 1.2, -68 + s * 20.6), 30, 1.0, 0.3, 0.0)
+		lm.box("Stone", Vector3(71, 2.25, -68 + s * 20.6), Vector3(88, 0.2, 0.4), Basis(), 0.0)
 	_si_rattana(lm, Vector3(44, 1.2, -68))
 	_mondop(lm, Vector3(68, 1.2, -68))
 	_pantheon(lm, Vector3(94, 1.2, -68))
-	# Phra Suwannachedi: the two gilded chedis (16 m) before the Pantheon.
+	# Phra Suwannachedi (`way:229771456`, `way:229771457`): two 16 m gilded chedis carried by demon & monkey caryatids.
 	for s in [-1.0, 1.0]:
-		K.redent_chedi(lm, "Gold", "Gold", "Gold", Vector3(112, 1.2, -68 + s * 10.0), 3.4, 16.0)
+		var sc := Vector3(112, 1.2, -68 + s * 10.0)
+		K.redent_chedi(lm, "Gold", "Gold", "Gold", sc, 3.4, 16.0)
+		for ci in 12:
+			var ca := TAU * float(ci) / 12.0
+			var c_key := "Green" if ci % 2 == 0 else "Pink"
+			lm.box(c_key, sc + Vector3(cos(ca) * 3.55, 0.9, sin(ca) * 3.55), Vector3(0.32, 1.3, 0.32), Basis(), 0.0)
 	# The ubosot of the Emerald Buddha: 48 columns, three doors each end, facing east.
 	var uc := Vector3(122, 0, -28)
 	K.thai_hall(lm, hall_keys("Blue"), uc, Basis(Vector3.UP, PI * 0.5), 14.0, 34.0, 10.0, 8, 3.0, 2, 1, 6.0, 1.8)
@@ -84,11 +91,14 @@ static func grand_palace(model: Node3D) -> void:
 	for i in 8:
 		var px := 171.0 if i >= 2 else 150.0
 		var pz := -126.0 + 17.0 * float(i)
-		K.redent_prang(lm, pk[i], "Dark", "Gold", Vector3(px, 0, pz), 2.0, 15.0, 5, true)
+		K.redent_prang(lm, pk[i], "Dark", "Gold", Vector3(px, 0, pz), 2.0, 15.0, 4, true)
 	# Chakri Maha Prasat (87 m long, facing north) and the Dusit hall to its west.
 	LandmarkMseChakri.chakri(lm, Vector3(-65, 0, 109), Basis(Vector3.UP, PI), PALACE_M)
 	LandmarkMseChakri.dusit(lm, Vector3(-148, 0, 94))
+	# Outer 1.9 km crenellated palace wall, 7 forts, 6 spired gates, Amarin/Borom Phiman, belfry & 12 yaksha.
+	LandmarkBkGrandPalaceWall.build_extensions(lm, hall_keys())
 	lm.commit(model)
+	LandmarkBkGrandPalaceWall.add_floodlights(model)
 
 ## Phra Rabiang, the Ramakien gallery: a roofed walk round the inside of
 ## the wall, open to the court on a row of square pillars.

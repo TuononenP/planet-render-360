@@ -35,7 +35,7 @@ const MAJOR := ["primary", "secondary", "trunk", "primary_link", "secondary_link
 const LANTERN_REGIONS := ["haussmann", "france", "central_europe", "west_europe_brick", "alpine"]
 const HERITAGE_COUNTRIES := ["GB", "IE", "IM", "JE", "GG"]
 const COBRA_COUNTRIES := ["US", "CA"]
-const UTILITY_COUNTRIES := ["JP", "KR", "TW"]
+const UTILITY_COUNTRIES := ["JP", "KR", "TW", "TH"]
 ## Linear colour of free-standing walls: grey-beige weathered masonry.
 const WALL_STONE := Color(0.26, 0.24, 0.21)
 ## A mapped wall this close to a low quay's upper wall (ShorelineModel
@@ -75,9 +75,10 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "barriers", t)
 	ShoreRailings.build(root, data, ground)
 	t = _lap(timings, "shore_railings", t)
-	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]))
+	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]), marking_plan)
 	t = _lap(timings, "furniture", t)
 	var plazas := PlazaLife.build(root, data, ground, mask, ctx)
+	plazas += BangkokStreetLife.build(root, data, ground, mask, float(ctx["m2u"]))
 	t = _lap(timings, "plazas", t)
 	if abort != null and abort.requested:
 		return {}

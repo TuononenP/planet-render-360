@@ -588,7 +588,7 @@ void fragment() {
 ## its Latin American kin; Norway and Finland). Unknown country: the
 ## Americas by longitude.
 const YELLOW_CENTRE := ["US", "CA", "MX", "GT", "BZ", "HN", "SV", "NI", "CR", "PA",
-	"CO", "VE", "EC", "PE", "BO", "CL", "AR", "UY", "PY", "BR", "PR", "NO", "FI"]
+	"CO", "VE", "EC", "PE", "BO", "CL", "AR", "UY", "PY", "BR", "PR", "NO", "FI", "TH"]
 ## Worn traffic yellow (linear albedo).
 const YELLOW := Color(0.62, 0.40, 0.05)
 

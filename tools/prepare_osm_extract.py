@@ -36,7 +36,9 @@ locations = {"new_york": (40.7060, -74.0040, "US", 40.70265, -73.99686),
              "tokyo": (35.6595, 139.7005, "JP", 35.6590, 139.7011),
              "dubai": (25.1925, 55.2741, "AE", 25.19787, 55.28278),
              "banff": (51.1720, -115.5640, "CA", 51.1676, -115.5596),
-             "big_sur": (36.3740, -121.9022, "US", 36.3735, -121.9012)}
+             "big_sur": (36.3740, -121.9022, "US", 36.3735, -121.9012),
+             "miami": (25.7743, -80.1855, "US", 25.77450, -80.17900),
+             "miami_beach": (25.7810, -80.1300, "US", 25.77980, -80.12960)}
 if args.point is not None:
     if not args.country or not re.fullmatch(r"[A-Z]{2}", args.country):
         parser.error("--point requires --country with an uppercase ISO 3166-1 alpha-2 code")

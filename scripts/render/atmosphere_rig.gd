@@ -511,7 +511,7 @@ func _apply() -> void:
 	var overcast := smoothstep(0.7, 1.0, cover)
 	var dim := float(look["sun_dim"])
 	var darken := float(look["cloud_darken"])
-	var s: Dictionary = SkyPalette.SEASON_SKY[season]
+	var s: Dictionary = SkyPalette.season_sky(season, latitude)
 	var sp := solar_at(hour)
 	solar_elevation = float(sp["elevation"])
 	solar_azimuth = float(sp["azimuth"])
@@ -549,7 +549,7 @@ func _apply() -> void:
 	var dusk := 1.0 - smoothstep(0.08, 0.5, -arc)
 	night_amount = smoothstep(0.12, 0.45, -arc)
 	twilight_amount = exp(-pow((arc + 0.05) / 0.12, 2.0))
-	var sky := SkyPalette.colors_at(key_h, season)
+	var sky := SkyPalette.colors_at(key_h, season, latitude)
 	var zenith: Color = sky["zenith"]
 	var horizon: Color = sky["horizon"]
 	var glow: Color = sky["glow"]

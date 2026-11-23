@@ -188,7 +188,7 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			% [radius_m, lat, lon, CAP_RELATIONS],
 		'way["barrier"](around:%d,%.6f,%.6f);out geom %d;'
 			% [radius_m, lat, lon, CAP_BARRIERS],
-		'way["man_made"~"^(tower|lighthouse|windmill|pier)$"](around:%d,%.6f,%.6f);out geom 150;'
+		'way["man_made"~"^(tower|lighthouse|windmill|pier|stupa)$"](around:%d,%.6f,%.6f);out geom 150;'
 			% [radius_m, lat, lon],
 		('(way["man_made"~"^(quay|embankment)$"](around:%d,%.6f,%.6f);'
 			+ 'way["barrier"="retaining_wall"](around:%d,%.6f,%.6f);'
@@ -196,7 +196,7 @@ static func build_query(lat: float, lon: float, radius_m: int = 1200) -> String:
 			% [radius_m, lat, lon, radius_m, lat, lon, radius_m, lat, lon, CAP_BARRIERS],
 		'node["natural"="tree"](around:%d,%.6f,%.6f);out %d;'
 			% [radius_m, lat, lon, CAP_TREE_NODES],
-		'node["man_made"~"^(tower|lighthouse|windmill)$"](around:%d,%.6f,%.6f);out 100;'
+		'node["man_made"~"^(tower|lighthouse|windmill|stupa)$"](around:%d,%.6f,%.6f);out 100;'
 			% [radius_m, lat, lon],
 		# The country the viewpoint stands in (ISO 3166-1 alpha-2), so the
 		# building style follows the real border, not a lat/lon box.

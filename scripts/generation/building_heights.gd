@@ -108,8 +108,14 @@ const LOW_RISE_STOREYS := 4.0
 ## Roof allowance over a heritage zone's storey cap.
 const ZONE_ROOF_M := 4.0
 
+## Known erroneous OSM `height` tags overridden by verified level counts (`BK-11`).
+const HEIGHT_FIX_M := {"way:402124521": 126.0}  # Sindhorn Residences: 36 lv, OSM mistakenly tagged height=314
+
 static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 		parent_res: Dictionary, look: Dictionary) -> Dictionary:
+	for oid in [str(m.get("osm_id", "")), str(b.get("osm_id", ""))]:
+		if HEIGHT_FIX_M.has(oid):
+			return {"total_m": float(HEIGHT_FIX_M[oid]), "source": "reference"}
 	var src := str(m.get("height_source", b.get("height_source", "")))
 	var levels := float(m.get("levels", b.get("levels", 0)))
 	# A part echoes its parent's source when it carries no tags of its
@@ -145,6 +151,17 @@ static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 	if b.has("zone_storeys"):
 		est["total_m"] = minf(float(est["total_m"]),
 			float(b["zone_storeys"]) * float(look["floor_h"]) + ZONE_ROOF_M)
+	# Rattanakosin conservation height ceilings (BK-3.3): untagged buildings
+	# stay at or under 16 m in inner Rattanakosin and 20 m in the outer old town
+	# (10 m in canal-side timber quarters), while mapped levels/heights win above.
+	if str(ctx.get("city", "")) == "bangkok":
+		var era := str(look.get("era", ""))
+		if era == "bangkok_timber":
+			est["total_m"] = minf(float(est["total_m"]), 10.0)
+		elif era in ["bangkok_civic", "bangkok_oldtown"]:
+			est["total_m"] = minf(float(est["total_m"]), 16.0)
+		elif era in ["bangkok_ratchadamnoen", "bangkok_khaosan", "bangkok_shophouse", "bangkok_yaowarat"]:
+			est["total_m"] = minf(float(est["total_m"]), 20.0)
 	return est
 
 ## Step 3 of the priority: the data-derived local estimate. The plan

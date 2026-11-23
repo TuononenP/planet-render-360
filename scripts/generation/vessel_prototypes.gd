@@ -52,6 +52,8 @@ static func geometry(model: String, length: float, beam: float, h: float, hull: 
 			CatamaranModel.build(lm, p)
 		"sail_yacht":
 			SailYachtModel.build(lm, p)
+		"longtail", "chao_phraya_express", "cross_river_ferry", "saen_saep_boat", "dinner_cruise", "rice_barge":
+			BangkokVesselModels.build(lm, model, p)
 		_:
 			PassengerVesselModel.build(lm, p)
 	return lm

@@ -7,14 +7,16 @@ extends RefCounted
 ## not glass stay as mapped. Sets finish fields only; era stays.
 
 const GULF := ["gulf", "arab", "dubai", "doha", "riyadh", "abu_dhabi", "mideast", "kuwait"]
-const ASIA := ["east_asia", "japan", "tokyo", "shanghai", "seoul", "hong_kong", "singapore", "se_asia", "beijing", "bangkok", "kuala"]
+const ASIA := ["east_asia", "japan", "tokyo", "shanghai", "seoul", "hong_kong", "singapore", "southeast_asia", "beijing", "bangkok", "kuala_lumpur"]
 const EUROPE := ["europe", "london", "paris", "nordic", "frankfurt", "haussmann", "mediterranean", "alpine", "berlin", "madrid", "stockholm", "helsinki", "turku"]
+const MIAMI := ["miami"]
 
 ## [glazing id, cumulative share] by region family.
 const PALETTES := {
 	"gulf": [["gold_reflective", 0.30], ["silver_reflective", 0.60], ["lowe_blue", 0.85], ["clear_fin", 1.0]],
 	"asia": [["lowe_blue", 0.35], ["green_glass", 0.60], ["clear_fin", 0.85], ["silver_reflective", 1.0]],
 	"europe": [["clear_fin", 0.50], ["lowe_blue", 0.80], ["intl_bronze", 1.0]],
+	"miami": [["lowe_blue", 0.35], ["green_glass", 0.55], ["silver_reflective", 0.75], ["clear_fin", 0.90], ["intl_bronze", 1.0]],
 }
 
 ## `look` for building `b`, with a tower finish when `b` is a modern tower.
@@ -60,4 +62,7 @@ static func _family(region: String, city: String) -> String:
 	for key in EUROPE:
 		if key in region or key in city:
 			return "europe"
+	for key in MIAMI:
+		if key in region or key in city:
+			return "miami"
 	return ""

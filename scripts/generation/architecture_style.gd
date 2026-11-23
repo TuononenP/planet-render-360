@@ -364,7 +364,7 @@ static func _pick_wall(walls: Array, seed_v: float, ms: float, in_city: bool) ->
 ## HsyRegister): a mapped finish takes the row's palette for that finish,
 ## not the colour the district rolled for another one (Jugend green-grey
 ## on a concrete office, pastel render on brick).
-const MAPPED_FINISH_CITIES := ["helsinki", "espoo", "turku"]
+const MAPPED_FINISH_CITIES := ["helsinki", "espoo", "turku", "bangkok", "miami"]
 ## A mapped finish's colours when the era row has none for it.
 const FINISH_PALETTES := {
 	"brick": ["#9a4a35", "#8e4636", "#a86048", "#7a4434"],
@@ -440,17 +440,17 @@ static func _tower(p: Dictionary, b: Dictionary) -> String:
 		"muslim":
 			return "minaret"
 		"buddhist":
-			return "pagoda"
+			return "" if regional == "none" or denomination == "theravada" else "pagoda"
 		"hindu", "sikh":
 			return "shikhara"
-		"jewish", "shinto":
+		"jewish", "shinto", "taoist":
 			return ""
 		"christian":
 			if denomination.contains("orthodox"):
 				return "onion"
-			if regional in ["minaret", "pagoda", "shikhara", ""]:
+			if regional in ["minaret", "pagoda", "shikhara", "none", ""]:
 				return "spire"
-	return regional
+	return "" if regional == "none" else regional
 
 ## Shared look for the distant-block materials (PRD §6 keeps those at 4
 ## walls + 2 roofs per place): the region's apartment fabric. Tints are

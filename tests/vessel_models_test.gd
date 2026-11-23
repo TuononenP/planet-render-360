@@ -15,7 +15,10 @@ func _init() -> void:
 			["restaurant_boat", 22.0, 6.0, 5.8, 10000, 320, ""],
 			["motor_yacht", 24.0, 0.0, 0.0, 12000, 391, "flybridge"], ["motor_yacht", 11.0, 0.0, 0.0, 10000, 333, "sport"],
 			["sail_yacht", 12.0, 0.0, 0.0, 12000, 481, ""], ["runabout", 7.0, 0.0, 0.0, 8000, 405, "runabout"],
-			["runabout", 7.0, 0.0, 0.0, 8000, 433, "console"], ["runabout", 7.0, 0.0, 0.0, 8000, 721, "rib"], ["catamaran", 12.0, 0.0, 0.0, 16000, 1500, ""]]:
+			["runabout", 7.0, 0.0, 0.0, 8000, 433, "console"], ["runabout", 7.0, 0.0, 0.0, 8000, 721, "rib"], ["catamaran", 12.0, 0.0, 0.0, 16000, 1500, ""],
+			["longtail", 11.5, 2.1, 2.4, 8000, 900, ""], ["chao_phraya_express", 26.0, 5.2, 4.8, 12000, 1200, ""],
+			["saen_saep_boat", 16.8, 3.1, 2.6, 8000, 900, ""], ["dinner_cruise", 36.0, 8.4, 7.0, 18000, 1600, ""],
+			["rice_barge", 21.0, 5.8, 3.8, 8000, 900, ""]]:
 		var near := VesselPrototypes.geometry(c[0], c[1], c[2], c[3], hull, true, true, 0.9, c[6])
 		var far := VesselPrototypes.geometry(c[0], c[1], c[2], c[3], hull, false, true, 0.9, c[6])
 		_check(near.triangle_count() > 200 and near.triangle_count() <= int(c[4]), "%s %s m: %d triangles outside budget" % [c[0], c[1], near.triangle_count()])

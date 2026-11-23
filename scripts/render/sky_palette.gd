@@ -40,6 +40,37 @@ const SEASON_SKY := [
 		"stars": 1.2, "milky": 0.45, "milky_tilt": 50.0, "milky_yaw": 160.0},
 ]
 
+## Humid-tropics monsoon sky character (`absf(lat) < 20.0`: Bangkok, Singapore,
+## Angkor, `BK-8.2`): warm smog-tinted haze & soft orange low sun in the dry
+## half of the year (winter/spring), towering vertical cumulus (`stretch < 1`)
+## and damp warm tropical haze in the wet monsoon months (summer/autumn).
+const TROPICAL_SKY := [
+	# Spring (Apr hot pre-monsoon): warm dry-season haze, soft orange-amber glow, building cumulus.
+	{"zenith": [Color(0.28, 0.48, 0.82), 0.14],
+		"horizon": [Color(0.88, 0.81, 0.70), 0.26], "glow": [Color(1.0, 0.58, 0.28), 0.36],
+		"haze": 1.42, "stretch": 0.95, "soft": 0.14,
+		"stars": 0.8, "milky": 0.65, "milky_tilt": 62.0, "milky_yaw": 35.0},
+	# Summer (Jul SW monsoon): humid tropical air, towering cumulus (`stretch: 0.78`), warm orange low sun.
+	{"zenith": [Color(0.25, 0.46, 0.80), 0.08],
+		"horizon": [Color(0.82, 0.83, 0.82), 0.18], "glow": [Color(1.0, 0.62, 0.34), 0.26],
+		"haze": 1.28, "stretch": 0.78, "soft": 0.09,
+		"stars": 0.8, "milky": 0.9, "milky_tilt": 74.0, "milky_yaw": 70.0},
+	# Autumn (Oct late monsoon): damp warm haze, tall convective cumulus, deep orange sunset.
+	{"zenith": [Color(0.24, 0.44, 0.77), 0.12],
+		"horizon": [Color(0.86, 0.80, 0.70), 0.25], "glow": [Color(1.0, 0.56, 0.26), 0.38],
+		"haze": 1.32, "stretch": 0.84, "soft": 0.11,
+		"stars": 0.85, "milky": 0.8, "milky_tilt": 68.0, "milky_yaw": 120.0},
+	# Winter (Jan cool dry season): warm dry-season smog/haze tint & soft orange low sun.
+	{"zenith": [Color(0.32, 0.52, 0.82), 0.16],
+		"horizon": [Color(0.87, 0.81, 0.72), 0.28], "glow": [Color(1.0, 0.60, 0.30), 0.34],
+		"haze": 1.36, "stretch": 1.12, "soft": 0.16,
+		"stars": 0.95, "milky": 0.6, "milky_tilt": 56.0, "milky_yaw": 155.0},
+]
+
+static func season_sky(season: int, lat: float = 48.8566) -> Dictionary:
+	var table: Array = TROPICAL_SKY if absf(lat) < 20.0 else SEASON_SKY
+	return table[clampi(season, 0, 3)]
+
 const ZENITH := [
 	[0.0, Color(0.02, 0.053, 0.12)], [5.0, Color(0.04, 0.095, 0.19)],
 	[6.5, Color(0.24, 0.38, 0.62)], [8.0, Color(0.30, 0.50, 0.78)],
@@ -66,8 +97,8 @@ const GLOW := [
 	[24.0, Color(0.08, 0.10, 0.18)]]
 
 ## Season-tinted zenith / horizon / glow at reference-day hour `key_h`.
-static func colors_at(key_h: float, season: int) -> Dictionary:
-	var s: Dictionary = SEASON_SKY[season]
+static func colors_at(key_h: float, season: int, lat: float = 48.8566) -> Dictionary:
+	var s: Dictionary = season_sky(season, lat)
 	return {
 		"zenith": tint(keyframed(key_h, ZENITH), s["zenith"][0], s["zenith"][1]),
 		"horizon": tint(keyframed(key_h, HORIZON), s["horizon"][0], s["horizon"][1]),

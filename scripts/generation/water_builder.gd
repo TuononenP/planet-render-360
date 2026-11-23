@@ -69,6 +69,13 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 		mat.set_shader_parameter("wave_amp", 0.55)
 		mat.set_shader_parameter("near_rough", 0.18)
 		mat.set_shader_parameter("spec", 0.20)
+	var inland := WaterSurface.inland_palette(data)
+	if not inland.is_empty():
+		mat.set_shader_parameter("deep_color", inland["deep"])
+		mat.set_shader_parameter("shallow_color", inland["shallow"])
+		mat.set_shader_parameter("near_rough", float(inland["near_rough"]))
+		mat.set_shader_parameter("spec", float(inland["spec"]))
+		mat.set_shader_parameter("wave_amp", float(inland["wave_amp"]))
 	var wl := ground.water_level_m
 	if ground.shoreline != null and ground.shoreline.ready:
 		mat.set_shader_parameter("swell_lift", 0.0)
@@ -82,6 +89,7 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 		ShoreBankMesh.build(root, ground.shoreline, abort, data)
 		StockholmQuay.build(root, ground.shoreline, data, abort)
 		StockholmLocks.build(root, ground.shoreline, data)
+		BangkokWaterfront.build(root, data, ground, abort)
 		_shore_aprons(root, data, ground, channels, abort)
 		return root
 	# Clip each water polygon once and reuse: _poly_levels and

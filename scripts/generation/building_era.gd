@@ -194,7 +194,7 @@ const CITY_ERAS := {
 
 static var ERAS: Dictionary = ArchitectureData._merged([CITY_ERAS, ArchitectureCitiesNorth.ERAS, ArchitectureCitiesFinland.ERAS,
 	ArchitectureCitiesSouth.ERAS, ArchitectureCitiesCentral.ERAS, ArchitectureCitiesWorld.ERAS,
-	ArchitectureCitiesNewWorld.ERAS, ArchitectureCitiesEastAsia.ERAS])
+	ArchitectureCitiesNewWorld.ERAS, ArchitectureCitiesEastAsia.ERAS, ArchitectureCitiesFlorida.ERAS])
 
 ## Sub-region key for one building (see the class doc). `ctx` is the
 ## build context (BuildingHeights._height_context): its `cores` give the
@@ -225,6 +225,33 @@ static func refine(region: String, kind: String, b: Dictionary, ctx: Dictionary,
 		var here := str(c["district"])
 		cands = cands.filter(func(e: Array) -> bool:
 			return not ArchitectureCitiesFinland.DISTRICT_ONLY.has(str(e[0])) or str(e[0]) == here)
+	if city == "bangkok":
+		var bkk_here := str(c["district"])
+		var old_bkk := ArchitectureCitiesWorld.OLDTOWN_DISTRICTS_BANGKOK.has(bkk_here) and int(c["lv"]) < 8
+		cands = cands.filter(func(e: Array) -> bool:
+			var ek := str(e[0])
+			if old_bkk and ek in ["bangkok_condo", "bangkok_tower", "bangkok_hotel_river"]:
+				return false
+			return not ArchitectureCitiesWorld.DISTRICT_ONLY_BANGKOK.has(ek) or ek == bkk_here)
+		if cands.is_empty():
+			return region
+	if city == "miami":
+		var mi_here := str(c["district"])
+		var mi_arch := str(c["arch"])
+		var is_garage := str(c["tag"]) in ["garage", "garages", "parking"]
+		cands = cands.filter(func(e: Array) -> bool:
+			var ek := str(e[0])
+			if is_garage:
+				return ek == "mi_garage"
+			if ek == "mi_garage":
+				return false
+			if mi_arch != "" and (e[4] as Array).has(mi_arch):
+				return true
+			if ek == "mi_warehouse" and kind == "industrial":
+				return true
+			return not ArchitectureCitiesFlorida.DISTRICT_ONLY_MIAMI.has(ek) or ek == mi_here)
+		if cands.is_empty():
+			return region
 	var arch := str(c["arch"])
 	if arch != "":
 		for e in cands:
@@ -588,6 +615,10 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 				return "singapore"
 		"seoul":
 			return ArchitectureCitiesEastAsia.seoul_rule(kind, c)
+		"bangkok":
+			return ArchitectureCitiesWorld.bangkok_rule(kind, c)
+		"miami":
+			return ArchitectureCitiesFlorida.miami_rule(kind, c)
 		"dubai":
 			if lv >= 20 or (kind == "commercial" and lv >= 12):
 				return "dubai_tower"

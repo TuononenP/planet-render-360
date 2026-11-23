@@ -97,9 +97,13 @@ static func plan(data: LocationData, ground: GroundTruth, smap: SettlementMap) -
 	var zs: PackedFloat64Array = hits["z"]
 	var rgb: PackedFloat32Array = hits["rgb"]
 	var widens: PackedFloat64Array = hits["widen"]
+	var m2u := WorldScale.metres_to_units()
+	var has_wmask := not data.far_water_mask.is_empty()
 	for k in xs.size():
 		var x := xs[k]
 		var z := zs[k]
+		if has_wmask and FarWaterMask.sample(data, x * m2u, z * m2u) > FarWaterMask.LAND:
+			continue
 		var px := Color(rgb[k * 3], rgb[k * 3 + 1], rgb[k * 3 + 2], 1.0)
 		var widen := widens[k]
 		var y := FarTerrainBuilder._blend_height(data, ground, surf, x, z) if far_ok \
@@ -203,6 +207,8 @@ static func _quantile(data: LocationData, bytes: Array, cells: Array, share: flo
 static func _vegetation_cells(data: LocationData, bytes: Array, smap: SettlementMap, reach: float) -> Array:
 	var out: Array = []
 	var r_in := FarCityBuilder.R_IN
+	var m2u := WorldScale.metres_to_units()
+	var has_wmask := not data.far_water_mask.is_empty()
 	for j in smap.n:
 		for i in smap.n:
 			var k := smap.index(i, j)
@@ -212,6 +218,8 @@ static func _vegetation_cells(data: LocationData, bytes: Array, smap: Settlement
 			var c := smap.centre(i, j)
 			var d := c.length()
 			if d < r_in or d > reach:
+				continue
+			if has_wmask and FarWaterMask.sample(data, c.x * m2u, c.y * m2u) > FarWaterMask.LAND:
 				continue
 			if blocked == 0:
 				var probe := SettlementMap.probe(data, bytes, c.x, c.y, SettlementMap.CELL_M)

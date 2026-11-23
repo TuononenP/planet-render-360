@@ -275,6 +275,9 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 		if ChimneyBuilder.build(root, b, ground, float(ctx.get("sea_y", -INF))):
 			placed += 1
 			continue
+		if StupaBuilder.build(root, b, ground, float(ctx.get("sea_y", -INF))):
+			placed += 1
+			continue
 		if StatueBuilder.build(root, b, ground, float(ctx.get("sea_y", -INF))):
 			continue
 		if placed >= cap and not bool(b.get("mapped_landmark", false)):
@@ -887,7 +890,7 @@ static func _prepare_roofs(ground: GroundTruth, ctx: Dictionary,
 ## A vessel, a chimney or a statue: drawn by its own builder, outside the
 ## masses, shared walls and roof forms.
 static func _solid_free(b: Dictionary) -> bool:
-	return ShipBuilder.accepts(b) or ChimneyBuilder.accepts(b) or StatueBuilder.accepts(b)
+	return ShipBuilder.accepts(b) or ChimneyBuilder.accepts(b) or StupaBuilder.accepts(b) or StatueBuilder.accepts(b)
 
 ## A mapped landmark candidate clears nothing: its own building is the model.
 static func _near_landmark_candidate(data: LocationData, x: float, z: float) -> bool:

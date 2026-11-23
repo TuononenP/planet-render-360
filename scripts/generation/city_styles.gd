@@ -422,9 +422,22 @@ const DISTRICTS := [
 	["beijing", "beijing_hutong", 39.9400, 116.3850, 0.8, 20.0],  # Shichahai
 	["beijing", "beijing_hutong", 39.8960, 116.3980, 0.6, 15.0],  # Qianmen
 	["beijing", "beijing_tower", 39.9100, 116.4580, 1.2, 25.0],  # CBD
+	["bangkok", "bangkok_civic", 13.7520, 100.4940, 0.70, 25.0],  # Rattanakosin inner: palace, Sanam Luang, ministries
+	["bangkok", "bangkok_oldtown", 13.7525, 100.5000, 0.55, 25.0],  # Sao Chingcha, Phraeng Phuthon, Bamrung Mueang
+	["bangkok", "bangkok_ratchadamnoen", 13.7567, 100.4982, 0.22, 30.0],  # Ratchadamnoen Klang west
+	["bangkok", "bangkok_ratchadamnoen", 13.7565, 100.5015, 0.24, 30.0],  # Ratchadamnoen Klang Democracy Monument
+	["bangkok", "bangkok_ratchadamnoen", 13.7559, 100.5042, 0.22, 30.0],  # Ratchadamnoen Klang east / Phan Fa
+	["bangkok", "bangkok_khaosan", 13.7600, 100.4975, 0.50, 25.0],  # Banglamphu, Khao San Road
+	["bangkok", "bangkok_shophouse", 13.7450, 100.5010, 0.55, 20.0],  # Wang Burapha, Pahurat, Saphan Lek
+	["bangkok", "bangkok_shophouse", 13.7570, 100.5100, 0.65, 20.0],  # Pom Prap, Nang Loeng
+	["bangkok", "bangkok_yaowarat", 13.7400, 100.5080, 1.00, 25.0],  # Yaowarat, Sampheng (Chinatown)
+	["bangkok", "bangkok_civic", 13.7730, 100.5120, 1.40, 20.0],  # Dusit royal & ministry quarter
+	["bangkok", "bangkok_timber", 13.7480, 100.4800, 1.60, 20.0],  # Thonburi canal-side & Kudi Chin
+	["bangkok", "bangkok_shophouse", 13.7380, 100.5165, 0.70, 18.0],  # Hua Lamphong, Talat Noi
+	["bangkok", "bangkok_hotel_river", 13.7260, 100.5140, 0.85, 18.0],  # Bang Rak / Charoen Krung riverfront
+	["bangkok", "bangkok_mall", 13.7460, 100.5340, 0.95, 20.0],  # Siam, Ratchaprasong, Pratunam
 	["bangkok", "bangkok_tower", 13.7240, 100.5290, 1.2, 20.0],  # Silom, Sathorn
 	["bangkok", "bangkok_tower", 13.7380, 100.5600, 1.5, 10.0],  # Sukhumvit
-	["bangkok", "bangkok_shophouse", 13.7400, 100.5080, 1.0, 10.0],  # Chinatown
 	["mumbai", "mumbai_gothic", 18.9320, 72.8340, 1.0, 20.0],    # Fort
 	["mumbai", "mumbai_deco", 18.9400, 72.8240, 0.8, 20.0],      # Marine Drive, the Oval
 	["mumbai", "mumbai_tower", 19.0000, 72.8300, 1.2, 15.0],     # Lower Parel
@@ -509,7 +522,7 @@ static func local_frame(region: String, lat: float, lon: float) -> Dictionary:
 
 ## Cities whose district circles also shape the far fabric
 ## (FarCityBuilder), so the city past the detailed extent keeps them.
-const FAR_DISTRICT_CITIES := ["stockholm", "turku", "helsinki"]
+const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki"]
 
 ## The far fabric's district circles for a viewpoint's region, in its
 ## local metre frame: [[era, Vector2 centre, radius_m], ...], the most
