@@ -68,6 +68,11 @@ static func shard(model: Node3D) -> void:
 	_shard_base(lm, base)
 	_shard_deck_and_spire(lm, base)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.HALO_META, [[Vector3(0.0, SHARD_H, 0.0), 3.2, Color(1.0, 0.12, 0.05)]])
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(35.0, 240.0, 0.0), Vector3(0.0, 295.0, 0.0), 50.0, 0.95, 95.0],
+		[Vector3(-35.0, 240.0, 0.0), Vector3(0.0, 295.0, 0.0), 50.0, 0.95, 95.0],
+	])
 
 ## Point on the plane through base point b and the spire tip, at height
 ## fraction t (0 foot, 1 tip).

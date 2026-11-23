@@ -112,6 +112,8 @@ const GLOW := {
 	# Supertalls ground spots cannot reach: their own façade LEDs.
 	"burj_khalifa": [Color(0.78, 0.86, 1.0), 0.14],
 	"one_wtc": [Color(0.82, 0.88, 1.0), 0.1],
+	"shard": [Color(0.84, 0.92, 1.0), 0.14],
+	"st_mary_axe": [Color(0.82, 0.90, 1.0), 0.12],
 	"miami_tower": [Color(0.18, 0.82, 0.98), 0.24],
 }
 

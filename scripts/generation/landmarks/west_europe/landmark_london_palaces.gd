@@ -32,12 +32,21 @@ static func buckingham(model: Node3D) -> void:
 	lm.use("Gilt", LandmarkMaterials.gold())
 	lm.use("Court", LandmarkMaterials.pbr("gravel", "#BBB3A1", 5.0))
 	lm.use("Iron", LandmarkMaterials.paint("#1E2124", 0.6, 0.4))
+	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#F2EFE6", 2.8))
+	lm.use("Water", LandmarkMaterials.pool_water("#386E78"))
 	_ranges(lm)
 	_east_front(lm)
 	_portico(lm)
 	_other_faces(lm)
 	_forecourt(lm)
+	_victoria_memorial(lm)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(84.0, 2.0, -32.0), Vector3(60.0, 14.0, -32.0), 62.0, 0.85, 55.0],
+		[Vector3(84.0, 2.0, 0.0), Vector3(60.0, 16.0, 0.0), 62.0, 0.95, 55.0],
+		[Vector3(84.0, 2.0, 32.0), Vector3(60.0, 14.0, 32.0), 62.0, 0.85, 55.0],
+		[Vector3(122.0, 2.0, 18.0), Vector3(122.0, 18.0, 0.0), 48.0, 0.95, 36.0],
+	])
 
 ## The four ranges round the quadrangle: walls to the cornice, a stone
 ## course, a low slated gable roof with chimney stacks, the courtyard.
@@ -182,3 +191,16 @@ static func _forecourt(lm: LandmarkMesh) -> void:
 	for gz in [-36.0, 36.0]:
 		LandmarkWestKit.blk(lm, "Stone", 88.0, 0, gz, 1.4, 2.8, 1.4)
 		lm.gable("Slate", Vector3(88.0, 2.8, gz), 1.6, 1.6, 0.6, Basis(), 0.1)
+
+## Queen Victoria Memorial (Thomas Brock & Aston Webb, 1911) on the Mall axis:
+## circular marble basin, stepped plinth, central Portland-and-marble shaft,
+## and gilded Winged Victory finial at 24.5 m.
+static func _victoria_memorial(lm: LandmarkMesh) -> void:
+	var c := Vector3(122.0, 0.0, 0.0)
+	lm.frustum("Marble", c, 19.0, 19.0, 1.1, 20)
+	lm.disc("Water", c + Vector3(0.0, 0.95, 0.0), Vector3.UP, 17.6, 20)
+	lm.frustum("Marble", c + Vector3(0.0, 1.0, 0.0), 10.5, 9.5, 2.2, 16)
+	lm.box("Marble", c + Vector3(0.0, 5.4, 0.0), Vector3(8.4, 4.4, 8.4))
+	lm.frustum("Marble", c + Vector3(0.0, 7.6, 0.0), 3.4, 2.5, 11.4, 12)
+	lm.frustum("Gilt", c + Vector3(0.0, 19.0, 0.0), 1.6, 0.6, 4.0, 10)
+	lm.box("Gilt", c + Vector3(0.0, 23.6, 0.0), Vector3(2.4, 1.6, 0.7))

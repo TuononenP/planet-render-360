@@ -297,6 +297,9 @@ static func _large_ships(data: LocationData, ground: GroundTruth, taken: Diction
 			b = swap
 		var dir := (b - a).normalized()
 		var ferry := _near_terminal(data, (a + b) * 0.5, m)
+		# The central tidal Thames upstream of Tower Bridge cannot pass ocean liners or ro-pax cruise ferries.
+		if data.latitude >= 51.45 and data.latitude <= 51.53 and data.longitude >= -0.22 and data.longitude <= -0.06:
+			continue
 		if not ferry and CargoBerths.port_run(data, a, b, m):
 			continue  # cargo quays berth cargo ships (CargoBerths)
 		var length := minf(200.0 if ferry else 230.0, run_m - 30.0)

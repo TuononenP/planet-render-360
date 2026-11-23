@@ -51,6 +51,7 @@ static func build(model: Node3D) -> void:
 	lm.use("Cable", LandmarkMaterials.paint("#B9C0C7", 0.5, 0.7))
 	lm.use("Capsule", LandmarkMaterials.glass("#7F97A6"))
 	lm.use("Concrete", LandmarkMaterials.pbr("concrete", "#BDB9B0", 4.0))
+	lm.use("RimLamp", LandmarkMaterials.lit("#B8DCFF", 1.35))
 	_rim(lm)
 	_hub(lm)
 	for k in CAPSULES:
@@ -60,6 +61,9 @@ static func build(model: Node3D) -> void:
 	var yaw := deg_to_rad(AXLE_YAW_DEG)
 	for mi in lm.commit(model):
 		mi.rotation.y = yaw
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-36.0, 4.0, 0.0), Vector3(0.0, HUB_Y, 0.0), 72.0, 0.95, 130.0],
+	])
 
 ## Point on the wheel at angle a (0 = top, turning toward +Z), radius r
 ## from the axle and x along it.
@@ -91,6 +95,7 @@ static func _rim(lm: LandmarkMesh) -> void:
 			lm.beam("Steel", _pt(a0, RIM_R, x), _pt(am, INNER_R, 0.0), 0.2)
 			lm.beam("Steel", _pt(am, INNER_R, 0.0), _pt(a1, RIM_R, x), 0.2)
 		LandmarkWestKit.tube(lm, "Steel", _pt(a0, INNER_R, 0.0), _pt(a1, INNER_R, 0.0), 0.32, 6)
+		lm.beam("RimLamp", _pt(a0, INNER_R - 0.38, 0.0), _pt(a1, INNER_R - 0.38, 0.0), 0.24, 0.24)
 		# Transverse frame at the node and the diagonal across the outer chords.
 		lm.beam("Steel", _pt(a0, RIM_R, -1.35), _pt(a0, RIM_R, 1.35), 0.22)
 		lm.beam("Steel", _pt(a0, RIM_R, -1.35), _pt(a1, RIM_R, 1.35), 0.16)

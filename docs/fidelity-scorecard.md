@@ -916,3 +916,34 @@ river panoramas); **the human "photographic" gate (AC-18) remains open for user 
   - **Ultra (`bangkok_p3`):** ground **587 ms**, world **9.31 s** (`2,771` children; ≤ 150 s cap).
   All Bangkok, bridge, water, vegetation, vehicle, architecture, and host-policy headless suites, `tools/check_class_size.sh`
   (max `996/1000`), and windowed `world_cache_test` / `screenshot_test` pass.
+
+### London rounds `london-r0` → `london-r1` → `london-r2` (2026-11-24)
+
+Frames in `visual-plan/reviews/london-r0-2026-11-23/` (baseline), `london-r1-2026-11-24/` (initial batch), and
+`london-r2-2026-11-24/` (Queen's Walk preset vantage `51.5018, -0.1196`, golden/night + Westminster Bridge, Golden
+Jubilee Bridge, and roof-height Thames panorama, Ultra), plus day/night 4-view studio sheets in
+`visual-plan/captures/{ln_lm_base,ln_lm_base_night,ln_lm_r1,ln_lm_r1_night}/`.
+Agent pre-rating: **recognisable** (major leap across Westminster, South Bank, City skyline, Thames bridges, and
+night lighting; human "photographic" gate remains open for user sign-off).
+
+- **Delivered:** 65 London landmarks verified in `tests/london_landmarks_test.gd` — 10 upgraded existing heroes
+  (`big_ben` warmed limestone, glowing Ayrton Light & 10 paired night uplights; `london_eye` LED rim glow;
+  `buckingham_palace` + Queen Victoria Memorial; `shard` crown uplights & aviation beacon; `st_mary_axe` night glow;
+  plus `tower_bridge`, `st_pauls`, `westminster_abbey`, `tower_of_london`, `waterloo_station`), 30 new bespoke
+  landmarks & Thames bridges (`county_hall`, `westminster_bridge` 7-arch Parliament-green Gothic iron,
+  `hungerford_golden_jubilee`, `millennium_bridge`, `portcullis_house`, `whitehall_horse_guards`, `whitehall_court`,
+  `admiralty_arch`, `trafalgar_square`, `royal_festival_hall`, `national_theatre` fixing OSM `h=6.5`,
+  `somerset_house` fixing `lv=2`, `oxo_tower`, `methodist_central_hall`, `lambeth_palace`, `cleopatras_needle`,
+  `tate_modern`, `shakespeares_globe`, `bank_junction`, `monument_london`, `lloyds_building`, `st_pancras_station`,
+  `british_museum`, `westminster_cathedral`, `battersea_power_station`, `bt_tower`, `royal_albert_hall`,
+  `natural_history_museum`, `marble_wellington_arches`, `o2_arena`), and 25 `LnTowerSpecs` skyline towers across the
+  City of London (22 Bishopsgate, Leadenhall/Cheesegrater, Walkie-Talkie, Heron, Scalpel, 8 Bishopsgate, Tower 42,
+  Willis, Barbican), South Bank/Nine Elms, and Canary Wharf (One Canada Square + flashing red beacon).
+- **City fabric, river & transport:** expanded London districts (6 → 16) with new `london_portland` (Whitehall,
+  Strand, Regent St) and `london_warehouse` (Southwark, Shad Thames, Clerkenwell) rows, added `"london"` to
+  `CityDetail.CITIES`, tuned silty olive-brown tidal Thames water, blocked ocean cruise liners/ro-pax ferries from
+  spawning upstream of Tower Bridge (`QuayMoorings` / `QuayFleet`), added the red double-decker London bus
+  (`bus_double`), and added the London Underground `roundel` to UK `StreetFurniture`.
+- **Verification:** `london_landmarks_test`, `landmark_lights_test`, `bridge_specs_test`, `bridge_select_test`,
+  `architecture_test`, `city_detail_test`, `street_furniture_test`, `bus_stop_test`, `car_fleet_test`,
+  `coastal_water_test`, `landmark_list_test`, `host_policy_test`, and `tools/check_class_size.sh` (996/1000) all pass.

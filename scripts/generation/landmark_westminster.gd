@@ -24,17 +24,30 @@ const TOP := 96.0
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#C9B488", 3.0))
-	lm.use("Palace", LandmarkMaterials.pbr("limestone", "#C2AD84", 3.5))
+	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#D8C59A", 3.0))
+	lm.use("Palace", LandmarkMaterials.pbr("limestone", "#D1BE94", 3.5))
 	lm.use("Roof", LandmarkMaterials.pbr("slate", "#4A5254", 2.0))
 	lm.use("Iron", LandmarkMaterials.paint("#2C3236", 0.55, 0.4))
 	lm.use("Gilt", LandmarkMaterials.gold())
-	lm.use("Dial", LandmarkMaterials.lit("#F2EEDF", 0.35))
+	lm.use("Dial", LandmarkMaterials.lit("#FBF5E2", 0.95))
+	lm.use("AyrtonLamp", LandmarkMaterials.lit("#FFF2C8", 2.2))
 	lm.use("Windows", LandmarkMaterials.glass("#252C30"))
 	_elizabeth(lm)
 	LandmarkWestminsterRanges.build(lm)
 	LandmarkWestminsterTowers.build(lm)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(24.0, 2.0, 0.0), Vector3(0.0, 56.0, 0.0), 48.0, 1.0, 95.0],
+		[Vector3(-24.0, 2.0, 0.0), Vector3(0.0, 56.0, 0.0), 48.0, 0.9, 95.0],
+		[Vector3(56.0, 2.0, 65.0), Vector3(32.0, 26.0, 65.0), 66.0, 0.85, 65.0],
+		[Vector3(-56.0, 2.0, 65.0), Vector3(-20.0, 26.0, 65.0), 66.0, 0.8, 65.0],
+		[Vector3(56.0, 2.0, 130.0), Vector3(12.0, 58.0, 130.0), 60.0, 0.95, 95.0],
+		[Vector3(-56.0, 2.0, 130.0), Vector3(-12.0, 58.0, 130.0), 60.0, 0.85, 95.0],
+		[Vector3(56.0, 2.0, 195.0), Vector3(32.0, 26.0, 195.0), 66.0, 0.85, 65.0],
+		[Vector3(-56.0, 2.0, 195.0), Vector3(-20.0, 26.0, 195.0), 66.0, 0.8, 65.0],
+		[Vector3(30.0, 2.0, 265.0), Vector3(-28.0, 68.0, 265.0), 54.0, 1.0, 110.0],
+		[Vector3(-58.0, 2.0, 265.0), Vector3(-28.0, 68.0, 265.0), 54.0, 0.9, 110.0],
+	])
 
 static func _face_basis(side: int) -> Basis:
 	return Basis(Vector3.UP, PI * 0.5 * float(side))
@@ -171,7 +184,7 @@ static func _belfry_spire(lm: LandmarkMesh, w: float) -> void:
 	# shafts, then the spirelet, orb and cross.
 	var ly := BELFRY_TOP + 12.0
 	lm.frustum("Gilt", Vector3(0, ly, 0), 2.6, 2.6, 0.5, 8, PI / 8.0)
-	lm.frustum("Windows", Vector3(0, ly + 0.5, 0), 2.1, 2.1, 3.0, 8, PI / 8.0)
+	lm.frustum("AyrtonLamp", Vector3(0, ly + 0.5, 0), 2.1, 2.1, 3.0, 8, PI / 8.0)
 	for k in 8:
 		var a := TAU * float(k) / 8.0
 		lm.beam("Iron", Vector3(cos(a) * 2.2, ly + 0.5, sin(a) * 2.2), Vector3(cos(a) * 2.2, ly + 3.5, sin(a) * 2.2),

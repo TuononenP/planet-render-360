@@ -80,9 +80,9 @@ static func sea_palette(data: LocationData) -> Dictionary:
 	var lat := data.latitude
 	var lon := data.longitude
 	var silty_delta := chao_phraya(lat, lon)
+	var thames := lat >= 51.43 and lat <= 51.57 and lon >= -0.25 and lon <= 0.12
 	var harbour := (lat >= 40.45 and lat <= 40.92 and lon >= -74.27 and lon <= -73.68) \
-		or (lat >= 51.43 and lat <= 51.57 and lon >= -0.25 and lon <= 0.12) \
-		or silty_delta
+		or thames or silty_delta
 	var salt := baltic(lat, lon)
 	var warm_shallow := Vector3(0.020, 0.185, 0.190)
 	var cold_shallow := Vector3(0.035, 0.075, 0.070)
@@ -94,6 +94,10 @@ static func sea_palette(data: LocationData) -> Dictionary:
 	if silty_delta:
 		shallow = Vector3(0.095, 0.086, 0.040)
 		deep = Vector3(0.052, 0.055, 0.026)
+	elif thames:
+		# Tidal Thames: silty olive-brown-grey estuary water.
+		shallow = Vector3(0.068, 0.066, 0.042)
+		deep = Vector3(0.036, 0.040, 0.026)
 	elif miami_water(lat, lon):
 		if lon >= -80.142:
 			shallow = Vector3(0.015, 0.228, 0.238)

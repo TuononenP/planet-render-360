@@ -86,19 +86,6 @@ static func rows() -> Array:
 				"centre spans stay derived; a bent plan cannot be modelled by a straight chain | round 2: " +
 				"round 2: hu Wikipedia: bent two-arm plan with clear openings and pier-centre spans derived; " +
 				"cannot be a straight chain"},
-		{"id": "br_london_westminster_bridge", "cc": "GB", "name": "Westminster Bridge", "wiki": "Westminster Bridge",
-			"aliases": ["westminster bridge london"], "lat": 51.5009, "lon": -0.1218, "bearing": 92.5,
-			"st": "arch_deck", "spans": [31.1, 36.5, 38.4, 40.2, 38.4, 36.5, 31.1], "width": 26.0, "clear": 8.5,
-			"rise": 3.0, "material": "iron", "base": "sea", "tier": 1, "conf": 1,
-			"src": "en Wikipedia (7 arches, 250 m, 26 m), Grace's Guide (arches 96-120 ft, 826.8 ft overall), " +
-				"OSM bearing; individual spans derived: symmetric 96/108/114/120 ft clear + 3.6 m piers; rise " +
-				"and clear estimated | verified: en Wikipedia (7 arches, 250 m, 26 m wide), Grace's Guide " +
-				"(arches 96-120 ft), Structurae snippet (spans 28.96-35.05 m clear); web sources disagree on " +
-				"length (810/820/827 ft) and width (84/85/88 ft) and no source lists the individual arch " +
-				"spans; OSM way 216998718/920237496 (brg 91.3-92.6, mid 51.50089,-0.12178) agree with row " +
-				"centre/bearing | round 2: round 2: web search: centre arch 120 ft with neighbours " +
-				"115/104.5/94.5 ft in one old source vs Grace's Guide 96-120 ft; the symmetric 96/108/114/120 " +
-				"ft split is not confirmed and pier thickness is not published"},
 		{"id": "br_london_waterloo_bridge", "cc": "GB", "name": "Waterloo Bridge", "wiki": "Waterloo Bridge",
 			"aliases": ["waterloo bridge london", "ladies bridge"], "lat": 51.508546, "lon": -0.116883,
 			"bearing": 331.0, "st": "girder", "spans": [72.0, 75.0, 75.0, 75.0, 72.0], "width": 24.0, "clear": 9.0,
@@ -111,20 +98,6 @@ static func rows() -> Array:
 				"river chain mid ~51.5079,-0.1163 within 15 m of row; clear 9 m estimated | placement: centre " +
 				"moved +69 m along the deck onto the middle of the mapped water crossing (offset measured in " +
 				"the bundled OSM snapshot)"},
-		{"id": "br_london_millennium_bridge", "cc": "GB", "name": "Millennium Bridge", "wiki": "Millennium Bridge, London",
-			"aliases": ["london millennium footbridge", "wobbly bridge", "millennium footbridge"], "lat": 51.5096,
-			"lon": -0.0986, "bearing": 182.3, "st": "lateral", "spans": [81.0, 144.0, 108.0], "width": 4.0,
-			"clear": 8.5, "tower": 12.5, "material": "steel", "base": "sea", "tier": 1, "conf": 2,
-			"src": "en Wikipedia (81/144/108 m north to south, 4 m deck, 325 m structure), OSM way (suspension, " +
-				"bearing 2.3 south-to-north, reversed to travel north to south); lateral-suspension, piers " +
-				"low: tower = pier-arm top estimated, clear estimated; NOT BUILT: its cables run beside the " +
-				"deck, which the tower-and-cable builder cannot show | verified: en Wikipedia + Arup-derived " +
-				"text (81/144/108 m north to south, 325 m structure, 4 m deck, two river piers), " +
-				"bridgeinfo.broer.no (325 m, main span 144 m, 4 m); OSM ways 7225360+7225371 " +
-				"(51.50814,-0.09869 to 51.51106,-0.09843 = 325 m, brg 2.3-3.2 south to north, mid " +
-				"51.5096,-0.09856) agree with row (bearing 182.3 reversed = 2.3); span sum 333 m vs 325 m " +
-				"total is unexplained; tower (pier-arm top) and clear (tourist site says ~10.8 m at high " +
-				"tide) estimated"},
 		{"id": "br_washington_arlington_memorial_bridge", "cc": "US", "name": "Arlington Memorial Bridge", "wiki": "Arlington Memorial Bridge",
 			"aliases": ["memorial bridge", "arlington memorial bridge dc"], "lat": 38.8873, "lon": -77.0554,
 			"bearing": 245.1, "st": "masonry",

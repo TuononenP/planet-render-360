@@ -51,10 +51,13 @@ const HOTEL_LIVERIES := [
 	{"hull": "#e9e6dc", "funnel": "#24415f"},
 ]
 
-## True when `at` (world XZ) lies on Riddarfjärden's shore.
+## True when `at` (world XZ) lies on Riddarfjärden's shore or the central tidal
+## Thames upstream of Tower Bridge (where ocean cruise liners cannot pass).
 static func hotel_water(data: LocationData, at: Vector2, m: float) -> bool:
 	var anchor := WorldScale.xz_from_latlon(HOTEL_ANCHOR.x, HOTEL_ANCHOR.y, data.latitude, data.longitude) * m
-	return at.distance_to(anchor) <= HOTEL_RADIUS_M * m
+	if at.distance_to(anchor) <= HOTEL_RADIUS_M * m:
+		return true
+	return data.latitude >= 51.45 and data.latitude <= 51.53 and data.longitude >= -0.22 and data.longitude <= -0.06
 
 ## A Riddarfjärden hotel ship as a LargeShips row.
 static func hotel_ship(centre: Vector3, yaw: float, length: float, beam: float, seed_value: float) -> Array:

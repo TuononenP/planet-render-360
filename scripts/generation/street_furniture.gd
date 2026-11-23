@@ -81,13 +81,13 @@ static func mesh_key(kind: String, family: String) -> String:
 		"bicycle_rental":
 			return "bikeshare"
 		"subway_entrance":
-			return "t_sign" if family == "nordic_se" else kind
+			return "t_sign" if family == "nordic_se" else ("roundel" if family == "uk" else kind)
 	return kind
 
 ## Whether mapped subway entrances are drawn in `family`: New York's
-## stairwells and Stockholm's blue T sign.
+## stairwells, Stockholm's blue T sign, and London's Underground roundel.
 static func shows_entrances(family: String) -> bool:
-	return family in ["nyc", "nordic_se"]
+	return family in ["nyc", "nordic_se", "uk"]
 
 ## Adds the furniture under one "StreetFurniture" node of `root` on
 ## desktop Ultra. Returns the number of items placed.
@@ -503,6 +503,13 @@ static func mesh(key: String) -> ArrayMesh:
 			for x in [-0.03, 0.03]:
 				StreetProps._box(buf.call("sign"), Vector3(x, 2.84, 0), Vector3(0.015, 0.1, 0.4))
 				StreetProps._box(buf.call("sign"), Vector3(x, 2.6, 0), Vector3(0.015, 0.34, 0.1))
+		"roundel":
+			# London Underground roundel: dark iron post, red circle, white centre, blue bar.
+			TreeMeshLibrary._tube(buf.call("iron"), [Vector3(0, 0, 0), Vector3(0, 3.1, 0)], [0.05, 0.045], 8, 1.0, 1.0)
+			StreetProps._box(buf.call("oxide"), Vector3(0, 2.85, 0), Vector3(0.06, 0.56, 0.56))
+			for x in [-0.032, 0.032]:
+				StreetProps._box(buf.call("sign"), Vector3(x, 2.85, 0), Vector3(0.014, 0.34, 0.34))
+				StreetProps._box(buf.call("blue"), Vector3(x * 1.15, 2.85, 0), Vector3(0.016, 0.12, 0.68))
 		"bikeshare":
 			# Five-bike kerbside dock row and solar kiosk (Miami CitiBike style).
 			StreetProps._box(buf.call("iron"), Vector3(-0.08, 0.02, 0.0), Vector3(1.65, 0.04, 4.5))

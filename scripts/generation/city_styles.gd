@@ -184,9 +184,19 @@ const DISTRICTS := [
 	["london", "london_stucco", 51.4975, -0.1560, 1.2, 8.0],     # Belgravia
 	["london", "london_stucco", 51.4990, -0.1900, 1.5, 6.0],     # Kensington
 	["london", "london_stucco", 51.5115, -0.2050, 0.9, 6.0],     # Notting Hill
+	["london", "london_stucco", 51.4895, -0.1390, 0.7, 6.0],     # Pimlico
+	["london", "london_portland", 51.5026, -0.1268, 0.45, 7.0],  # Whitehall & Westminster
+	["london", "london_portland", 51.5122, -0.1165, 0.55, 7.0],  # Strand & Aldwych
+	["london", "london_portland", 51.5105, -0.1395, 0.55, 7.0],  # Regent St & St James's
 	["london", "london_georgian", 51.5220, -0.1260, 1.1, 5.0],   # Bloomsbury
+	["london", "london_georgian", 51.5095, -0.1490, 0.65, 6.0],  # Mayfair
+	["london", "london_mansion", 51.5205, -0.1530, 0.8, 6.0],    # Marylebone
+	["london", "london_warehouse", 51.5045, -0.0950, 0.75, 6.0], # Southwark & Borough
+	["london", "london_warehouse", 51.5030, -0.0720, 0.65, 6.0], # Shad Thames & Bermondsey
+	["london", "london_warehouse", 51.5245, -0.0820, 0.9, 6.0],  # Clerkenwell & Shoreditch
 	["london", "london_modern", 51.5054, -0.0235, 1.0, 20.0],    # Canary Wharf
 	["london", "london_modern", 51.5140, -0.0830, 0.8, 8.0],     # the City
+	["london", "london_modern", 51.5062, -0.1110, 0.55, 9.0],    # South Bank & Blackfriars
 	["amsterdam", "amsterdam", 52.3700, 4.8880, 1.4, 4.0],       # Grachtengordel
 	["amsterdam", "amsterdam_school", 52.3530, 4.8960, 1.0, 6.0],  # De Pijp
 	["amsterdam", "amsterdam_school", 52.3480, 4.9010, 0.9, 6.0],  # Rivierenbuurt

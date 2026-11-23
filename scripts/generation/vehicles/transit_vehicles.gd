@@ -213,8 +213,9 @@ static func plan_buses(data: LocationData, ground: GroundTruth, m2u: float, trai
 	var region := CityStyles.region_at(data.latitude, data.longitude)
 	var city := CityStyles.city_of_region(region)
 	var bus_key := "bangkok" if region.begins_with("bangkok") else (city if city != "" else region)
+	var bus_kind := "bus_double" if bus_key == "london" else "bus"
 	var paint_entry: Variant = BUS_PAINT.get(bus_key, BUS_PALETTE[absi(hash(data.country + bus_key)) % BUS_PALETTE.size()])
-	var length := CarSpecs.length_m("bus") * m2u
+	var length := CarSpecs.length_m(bus_kind) * m2u
 	var spots: Array = []
 	for stop in data.bus_stops:
 		if not (stop is Dictionary):
@@ -279,7 +280,7 @@ static func plan_buses(data: LocationData, ground: GroundTruth, m2u: float, trai
 		var bus_col: Color = (paint_entry as Array)[int(_hash(p.x, p.y, 6.1) * float((paint_entry as Array).size())) % (paint_entry as Array).size()] \
 			if paint_entry is Array else (paint_entry as Color)
 		buses.append([Vector3(c.x, (yf + yb) * 0.5 + 0.04 * m2u, c.y),
-			Basis(forward, up, forward.cross(up)).scaled(Vector3.ONE * m2u), "bus", bus_col, float(spot[1]),
+			Basis(forward, up, forward.cross(up)).scaled(Vector3.ONE * m2u), bus_kind, bus_col, float(spot[1]),
 			Color(0.0, 0.15 + 0.3 * _hash(p.x, p.y, 4.4), 0.0, 0.0), a, b])
 	return buses
 
