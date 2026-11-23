@@ -51,13 +51,13 @@ Decoded from `assets/osm_snapshots/london_*.osmb` (base `2026-11-02`):
 | --- | --- | --- | ---: | ---: | --- |
 | `county_hall` | County Hall | `51.5019, -0.1188` | 45.0 m | -78.0° | OSM `relation 1789966` (Ralph Knott, 1922) |
 | `westminster_bridge` | Westminster Bridge | `51.5009, -0.1218` | 14.0 m | 2.5° | OSM `ways 216998718, 920237496` (Thomas Page, 1862; 7 green iron arches, 250 m) |
-| `hungerford_golden_jubilee` | Hungerford & Golden Jubilee Bridges | `51.5060, -0.1202` | 32.0 m | 35.0° | OSM `ways 4254121, 186931859, 151744359` (Hawkshaw 1864 + Lifschutz Davidson 2002) |
+| `hungerford_golden_jubilee` | Hungerford & Golden Jubilee Bridges | `51.50621, -0.12031` | 32.0 m | 26.0° | OSM `ways 4254121, 186931859, 151744359` (Hawkshaw 1864 + Lifschutz Davidson 2002) |
 | `millennium_bridge` | Millennium Bridge | `51.5096, -0.0986` | 16.0 m | 92.3° | OSM `ways 7225360, 7225371` (Foster + Arup 2000; 81/144/108 m lateral suspension) |
 | `portcullis_house` | Portcullis House | `51.5015, -0.1247` | 32.0 m | 6.0° | OSM `way 256497249` (Hopkins Architects, 2001) |
-| `whitehall_horse_guards` | Horse Guards & Banqueting House | `51.5047, -0.1270` | 28.0 m | -8.0° | OSM `ways 133153176, 140470549` (William Kent 1759; Inigo Jones 1622) |
-| `whitehall_court` | Whitehall Court | `51.5056, -0.1243` | 42.0 m | -12.0° | OSM `relation 5485985` (Archer & Green, 1884) |
+| `whitehall_horse_guards` | Horse Guards & Banqueting House | `51.5047, -0.1270` | 28.0 m | -101.0° | OSM `ways 133153176, 140470549` (William Kent 1759; Inigo Jones 1622) |
+| `whitehall_court` | Whitehall Court | `51.5056, -0.1243` | 42.0 m | -76.0° | OSM `relation 5485985` (Archer & Green, 1884) |
 | `trafalgar_square` | Trafalgar Square (Nelson's Column & National Gallery) | `51.5080, -0.1281` | 51.6 m | -10.0° | OSM `ways 150920358, 30734422` (Railton 1843; Wilkins 1838; Gibbs 1726) |
-| `admiralty_arch` | Admiralty Arch | `51.5068, -0.1287` | 28.0 m | -32.0° | OSM `relation 17074208` (Aston Webb, 1912) |
+| `admiralty_arch` | Admiralty Arch | `51.5068, -0.1287` | 28.0 m | 56.0° | OSM `relation 17074208` (Aston Webb, 1912) |
 | `royal_festival_hall` | Royal Festival Hall | `51.5058, -0.1167` | 28.0 m | 124.0° | OSM `way 5987419` (Robert Matthew & Leslie Martin, 1951) |
 | `national_theatre` | Royal National Theatre | `51.5071, -0.1142` | 35.0 m | -22.0° | OSM `relation 2023676` (Denys Lasdun, 1976) |
 | `somerset_house` | Somerset House | `51.5110, -0.1173` | 28.0 m | -22.0° | OSM `way 372841786` (William Chambers, 1796) |
