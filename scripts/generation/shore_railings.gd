@@ -21,6 +21,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 	if walks.is_empty():
 		return 0
 	var barriers := _index(data.barriers, centre, m, true)
+	var bridge_spans := LandmarkSites.bridge_spans(data)
+	var bridge_roads := _index_bridges(data.roads, centre, m)
 	var domains: ShoreDomains = ground.shoreline.domains
 	var buf := TreeMeshLibrary.Buf.new()
 	var count := 0
@@ -48,6 +50,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		var p0 := a + land * 0.35 * m
 		var p1 := b + land * 0.35 * m
 		if domains.at(p0) >= 0 or domains.at(p1) >= 0 or domains.at((p0 + p1) * 0.5) >= 0:
+			continue
+		if on_bridge(p0, p1, bridge_spans, _near(bridge_roads, mid, m), m):
 			continue
 		StreetProps._fence_piece(buf, p0, p1, float(seg["top_a"]), float(seg["top_b"]), 1.1 * m, m)
 		count += 1
@@ -116,6 +120,55 @@ static func _index(rows: Array, centre: Vector2, m: float, barriers: bool) -> Di
 			var lo := Vector2i(floori(minf(a.x, b.x) / cell), floori(minf(a.y, b.y) / cell))
 			var hi := Vector2i(floori(maxf(a.x, b.x) / cell), floori(maxf(a.y, b.y) / cell))
 			var line := [a, b, maxf(float(row.get("width_m", 2.0)), 0.0)]
+			for x in range(lo.x, hi.x + 1):
+				for z in range(lo.y, hi.y + 1):
+					var key := Vector2i(x, z)
+					if not cells.has(key):
+						cells[key] = []
+					cells[key].append(line)
+	return cells
+
+## True when a shoreline railing segment crosses a registry bridge deck or an
+## OSM bridge way landing on the bank, so guardrails never block bridge roads.
+static func on_bridge(p0: Vector2, p1: Vector2, bridge_spans: Array,
+		bridge_roads: Array, m: float) -> bool:
+	var mid := (p0 + p1) * 0.5
+	for sp in bridge_spans:
+		var at: Vector2 = sp[0]
+		var entry: Dictionary = sp[1]
+		var axis := LandmarkSites.axis(entry)
+		var cross := Vector2(-axis.y, axis.x)
+		var half_l := float(entry.get("span_m", 0.0)) * 0.5 * m + 3.0 * m
+		var half_w := maxf(float(entry.get("deck_width_m", 0.0)) * 0.5,
+			LandmarkSites.clear_m(entry) * 0.5) * m + 1.5 * m
+		for pt in [p0, mid, p1]:
+			var d: Vector2 = pt - at
+			if absf(d.dot(axis)) <= half_l and absf(d.dot(cross)) <= half_w:
+				return true
+	for line in bridge_roads:
+		var pad := (float(line[2]) * 0.5 + 2.0) * m
+		for pt in [p0, mid, p1]:
+			if Geometry2D.get_closest_point_to_segment(pt, line[0], line[1]).distance_to(pt) <= pad:
+				return true
+	return false
+
+## Spatial bins for OSM bridge ways near `centre`.
+static func _index_bridges(rows: Array, centre: Vector2, m: float) -> Dictionary:
+	var cells := {}
+	var cell := CELL_M * m
+	var reach := (RADIUS_M + 30.0) * m
+	for row in rows:
+		if not (row is Dictionary) or bool(row.get("tunnel", false)) or not bool(row.get("bridge", false)):
+			continue
+		var pts: PackedVector2Array = row.get("points", PackedVector2Array())
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			if Geometry2D.get_closest_point_to_segment(centre, a, b).distance_to(centre) > reach:
+				continue
+			var lo := Vector2i(floori(minf(a.x, b.x) / cell), floori(minf(a.y, b.y) / cell))
+			var hi := Vector2i(floori(maxf(a.x, b.x) / cell), floori(maxf(a.y, b.y) / cell))
+			var line := [a, b, maxf(float(row.get("width_m", 4.0)), 2.0)]
 			for x in range(lo.x, hi.x + 1):
 				for z in range(lo.y, hi.y + 1):
 					var key := Vector2i(x, z)

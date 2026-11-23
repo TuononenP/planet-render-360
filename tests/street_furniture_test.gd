@@ -127,6 +127,12 @@ func _run() -> void:
 	var wet_domains := ShoreDomains.new(wd, Rect2(-50, -50, 100, 100))
 	if ShoreRailings.eligible(shore, walk, [], 1.0, wet_domains):
 		failures.append("waterfront rail must ignore walks whose closest point lies in water")
+	# A guardrail along a quay must stop where a bridge lands, never blocking the roadway.
+	var span := [[Vector2(100, 0), {"span_m": 200.0, "yaw_deg": 0.0, "deck_width_m": 24.0, "clear_m": 24.0}]]
+	if not ShoreRailings.on_bridge(Vector2(0, -4), Vector2(0, 4), span, [], 1.0) \
+			or ShoreRailings.on_bridge(Vector2(0, 30), Vector2(0, 40), span, [], 1.0) \
+			or not ShoreRailings.on_bridge(Vector2(0, -3), Vector2(0, 3), [], [[Vector2(0, 0), Vector2(80, 0), 10.0]], 1.0):
+		failures.append("waterfront rail must yield where a registry or OSM bridge crosses the bank")
 	# Every mesh builds; a lit lens glows.
 	for key in ["bench_wood", "bench_park", "bench_stone", "bin_post", "bin_drum", "bin_black", "bollard_black",
 			"bollard_red", "bin_nyc", "subway_entrance", "signals_post_r", "signals_na_g", "signals_jp_r", "shelter", "stop_pole", "stop_hsl", "stop_sl", "stop_tram"]:

@@ -94,6 +94,9 @@ static func build_bridge(type: String, deck_m: float, tilt_m: float = 0.0, rise_
 	var root := Node3D.new()
 	root.name = "Landmark_%s" % type
 	var model := model_root(root)
+	if type == "westminster_bridge":
+		LandmarkLnWestminsterBridge.build_fitted(model, deck_m, tilt_m, rise_m)
+		return root
 	var row := BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m)
 	match type:
 		"br_turku_auransilta": FtBridgeAuransilta.build(model, row)
