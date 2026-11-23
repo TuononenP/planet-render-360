@@ -112,6 +112,7 @@ const GLOW := {
 	# Supertalls ground spots cannot reach: their own façade LEDs.
 	"burj_khalifa": [Color(0.78, 0.86, 1.0), 0.14],
 	"one_wtc": [Color(0.82, 0.88, 1.0), 0.1],
+	"miami_tower": [Color(0.18, 0.82, 0.98), 0.24],
 }
 
 ## Dresses `hero` (LandmarkBuilder.build, before it is placed) for the

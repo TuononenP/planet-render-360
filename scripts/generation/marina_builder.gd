@@ -63,6 +63,9 @@ const MESH_LEN_M := 10.0
 ## this class's own defaults.
 static func fleet_of(data: LocationData) -> Dictionary:
 	var row: Dictionary = HarbourVesselData.FLEET_PROFILES.get(data.country.to_upper(), {})
+	if WaterSurface.miami_water(data.latitude, data.longitude):
+		var dk := WorldScale.xz_from_latlon(25.7280, -80.2340, data.latitude, data.longitude)
+		row = HarbourVesselData.FLEET_PROFILES["US_DINNER_KEY" if dk.length() <= 2000.0 else "US_MIAMI"]
 	if row.is_empty() and FinnishGranite.applies(data):
 		row = HarbourVesselData.FLEET_PROFILES["FI"]
 	var hulls: Array = HULL_COLOURS
@@ -83,6 +86,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var cats := mediterranean(data)
 	var fleet := fleet_of(data)
+	var model_sites := LandmarkSites.model_rect_sites(data)
 	var piers: Array = []
 	for p in data.piers:
 		var pts: PackedVector2Array = (p as Dictionary).get("points", PackedVector2Array())
@@ -93,20 +97,22 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		if bool(HeritageZones.rule_at_xz(data, mid.x, mid.y).get("no_marina", false)):
 			continue
 		piers.append(p)
-	# Pontoon decks first, so boats keep off every one of them.
+	# Reserve every pier (floating pontoon or fixed dock) first so boats never cross a deck.
 	for p in piers:
-		if not bool((p as Dictionary).get("floating", false)):
-			continue
 		var pts: PackedVector2Array = (p as Dictionary)["points"]
 		if _length(pts) < MIN_PIER_M * m2u:
 			continue
-		decks.append(_deck(pts, ground, m2u, taken))
-	# Reserve mapped vessels and large berths before filling the harbour with small craft.
+		if bool((p as Dictionary).get("floating", false)):
+			decks.append(_deck(pts, ground, m2u, taken))
+		else:
+			_reserve_pier(pts, m2u, taken)
+	# Reserve mapped vessels, water landmarks and large berths before filling with small craft.
 	for b in data.buildings:
 		if b is Dictionary and ShipBuilder.accepts(b):
 			var vf := ShipBuilder.frame(b)
-			_claim(taken, (vf["centre"] as Vector2) - (vf["axis"] as Vector2) * float(vf["length"]) * 0.5,
+			_reserve(taken, (vf["centre"] as Vector2) - (vf["axis"] as Vector2) * float(vf["length"]) * 0.5,
 				vf["axis"], float(vf["length"]) / m2u + 4.0, float(vf["beam"]) / m2u + 3.0, m2u)
+	_claim_water_landmarks(taken, data, m2u)
 	# Helsinki's icebreakers, market and commuter boats keep small craft off their hulls.
 	HarbourTraffic.claim(taken, data, ground, mask, m2u)
 	var bridge_list := QuayMoorings.bridges(data, m2u)
@@ -120,9 +126,14 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		var total := _length(pts)
 		if total < MIN_PIER_M * m2u:
 			continue
-		var carved := ground.water_at(pts[pts.size() / 2].x, pts[pts.size() / 2].y) > MIN_DEPTH_M * m2u
+		var mid_pt := pts[pts.size() / 2]
+		if LandmarkSites.in_model_rects(mid_pt, model_sites):
+			continue  # a bespoke landmark occupies this pier
+		var carved := ground.water_at(mid_pt.x, mid_pt.y) > MIN_DEPTH_M * m2u
+		var has_shore: bool = ground.shoreline != null and not ground.shoreline.empty()
 		if not carved and not bool((p as Dictionary).get("floating", false)):
 			continue  # a quay or mole on dry ground: no berths
+		var require_water: bool = carved or has_shore
 		var y_ref := _pier_height(pts, ground)
 		k += 1
 		var t := 1.5 * m2u
@@ -152,10 +163,11 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 				var bow := stern + out * len_m * m2u
 				if QuayMoorings.near_bridge(bridge_list, stern, bow, (beam_m * 0.5 + 2.5) * m2u):
 					continue
-				if not _wet(ground, stern, m2u, y_ref, mask, true) or not _wet(ground, bow, m2u, y_ref, mask) \
-						or not _wet(ground, stern + out * len_m * 0.5 * m2u, m2u, y_ref, mask):
+				if not _wet(ground, stern, m2u, y_ref, mask, true, require_water) \
+						or not _wet(ground, bow, m2u, y_ref, mask, false, require_water) \
+						or not _wet(ground, stern + out * len_m * 0.5 * m2u, m2u, y_ref, mask, false, require_water):
 					continue
-				if kind == "catamaran" and not _wide_wet(ground, stern, out, len_m, beam_m, m2u, y_ref, mask):
+				if not _wide_wet(ground, stern, out, len_m, beam_m, m2u, y_ref, mask, require_water):
 					continue
 				var y := _berth_y(ground, stern, stern + out * len_m * 0.5 * m2u, bow, m2u)
 				if is_nan(y) or not _claim(taken, stern, out, len_m, beam_m + (CELL_M * 2.0 if kind == "catamaran" else 0.0), m2u):
@@ -296,9 +308,9 @@ static func _pier_height(pts: PackedVector2Array, ground: GroundTruth) -> float:
 	return float(hs[hs.size() / 2])
 
 ## A berth point is wet in carved water, else on flat terrain at the
-## pier's level that no building or road covers.
+## pier's level when the harbour has no carved water or shoreline polygons.
 static func _wet(ground: GroundTruth, p: Vector2, m2u: float, y_ref: float,
-		mask: VegetationMask, at_pier: bool = false) -> bool:
+		mask: VegetationMask, at_pier: bool = false, require_water: bool = false) -> bool:
 	if not ground.is_inside(p.x, p.y):
 		return false
 	# The pier itself is marked ROAD_EDGE for ground-cover exclusion. A
@@ -311,17 +323,72 @@ static func _wet(ground: GroundTruth, p: Vector2, m2u: float, y_ref: float,
 		return false
 	if ground.water_at(p.x, p.y) > MIN_DEPTH_M * m2u:
 		return true
+	if require_water or (ground.shoreline != null and not ground.shoreline.empty()):
+		return false
 	return absf(ground.height_at_world(p.x, p.y) - y_ref) <= FLAT_M * m2u
 
 static func _cell(p: Vector2, m2u: float) -> Vector2i:
 	return Vector2i(floori(p.x / (CELL_M * m2u)), floori(p.y / (CELL_M * m2u)))
+
+## Unconditionally reserves a rectangle of cells in `taken` for a fixed hull.
+static func _reserve(taken: Dictionary, stern: Vector2, out: Vector2, len_m: float,
+		beam_m: float, m2u: float) -> void:
+	var side := Vector2(-out.y, out.x)
+	var a := 0.0
+	while a <= len_m:
+		var w := -beam_m * 0.5
+		while w <= beam_m * 0.5 + 0.01:
+			taken[_cell(stern + (out * a + side * w) * m2u, m2u)] = true
+			w += CELL_M
+		a += CELL_M
+
+static func _reserve_pier(pts: PackedVector2Array, m2u: float, taken: Dictionary) -> void:
+	for i in pts.size() - 1:
+		var seg := pts[i + 1] - pts[i]
+		var seg_len := seg.length()
+		if seg_len < 0.01:
+			continue
+		_reserve(taken, pts[i], seg / seg_len, seg_len / m2u, DECK_W_M + 2.0, m2u)
+
+static func _claim_water_landmarks(taken: Dictionary, data: LocationData, m2u: float) -> void:
+	var rows: Array = []
+	if data.landmark_type != "none":
+		var primary := LocationData.entry_for_type(data.landmark_type)
+		if str(primary.get("base", "ground")) in ["water", "sea"]:
+			rows.append([TerrainBuilder.landmark_world_pos(data), primary])
+	for c in data.landmark_candidates:
+		var cd := c as Dictionary
+		if str(cd.get("base", "ground")) in ["water", "sea"]:
+			rows.append([Vector2(float(cd.get("x", 0.0)), float(cd.get("z", 0.0))), cd])
+	for r in rows:
+		var centre: Vector2 = r[0]
+		var entry: Dictionary = r[1]
+		var ax := LandmarkSites.axis(entry)
+		var span := maxf(float(entry.get("span_m", 0.0)), float(entry.get("clear_m", 36.0))) + 6.0
+		var beam := maxf(float(entry.get("clear_m", 18.0)) * 0.75, 18.0)
+		_reserve(taken, centre - ax * span * 0.5 * m2u, ax, span, beam, m2u)
+	# Reserve every landmark's model_rects_m (piers, barges, waterfront halls, buildings)
+	# so neither marina boats nor quay vessels can clip through a bespoke model.
+	for site in LandmarkSites.model_rect_sites(data):
+		var at: Vector2 = site[0]
+		var entry: Dictionary = site[1]
+		var ax := LandmarkSites.axis(entry)
+		var cross := Vector2(-ax.y, ax.x)
+		for raw in entry.get("model_rects_m", []):
+			var rect: Array = raw
+			if rect.size() < 4:
+				continue
+			var c_world := at + (ax * float(rect[0]) + cross * float(rect[1])) * m2u
+			var half_a := float(rect[2]) + 2.0
+			var half_c := float(rect[3]) + 2.0
+			_reserve(taken, c_world - ax * half_a * m2u, ax, half_a * 2.0, half_c * 2.0, m2u)
 
 ## Marks the boat's footprint taken, or returns false when any of it is.
 static func _claim(taken: Dictionary, stern: Vector2, out: Vector2, len_m: float,
 		beam_m: float, m2u: float) -> bool:
 	var side := Vector2(-out.y, out.x)
 	var cells: Array[Vector2i] = []
-	var a := 0.6
+	var a := 0.0
 	while a <= len_m:
 		var w := -beam_m * 0.5
 		while w <= beam_m * 0.5 + 0.01:
@@ -371,12 +438,12 @@ static func mediterranean(data: LocationData) -> bool:
 	return false
 
 static func _wide_wet(ground: GroundTruth, stern: Vector2, out: Vector2, length: float, beam: float,
-		m2u: float, y_ref: float, mask: VegetationMask) -> bool:
+		m2u: float, y_ref: float, mask: VegetationMask, require_water: bool = false) -> bool:
 	var cross := Vector2(-out.y, out.x)
 	for along in [0.08, 0.5, 0.95]:
 		for side in [-0.5, 0.5]:
 			var p := stern + (out * length * float(along) + cross * beam * float(side)) * m2u
-			if not _wet(ground, p, m2u, y_ref, mask):
+			if not _wet(ground, p, m2u, y_ref, mask, false, require_water):
 				return false
 	return true
 

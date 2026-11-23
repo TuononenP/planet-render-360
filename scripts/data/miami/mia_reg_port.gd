@@ -1,0 +1,85 @@
+class_name MiaRegPort
+extends RefCounted
+
+## Registry entries for PortMiami cruise terminals and port landmarks (MI-2C).
+
+static func entries() -> Array:
+	return [
+		{
+			"type": "portmiami_terminal_a",
+			"name": "Royal Caribbean Terminal A",
+			"lat": 25.778600,
+			"lon": -80.162800,
+			"radius_m": 4000.0,
+			"wiki_title": "PortMiami",
+			"height_m": 36.0,
+			"yaw_deg": -64.0,
+			"clear_m": 30.0,
+			"tree_clear_m": 24.0,
+			"skyline_priority": 2,
+			"kind": "Cruise terminal",
+			"aliases": [
+				"royal caribbean terminal a",
+				"crown of miami",
+				"portmiami terminal a",
+			],
+		},
+		{
+			"type": "portmiami_terminal_b",
+			"name": "Norwegian Cruise Line Terminal B",
+			"lat": 25.777700,
+			"lon": -80.165600,
+			"radius_m": 4000.0,
+			"wiki_title": "PortMiami",
+			"height_m": 30.0,
+			"yaw_deg": -64.0,
+			"clear_m": 30.0,
+			"tree_clear_m": 24.0,
+			"skyline_priority": 2,
+			"kind": "Cruise terminal",
+			"aliases": [
+				"norwegian cruise line terminal b",
+				"pearl of miami",
+				"portmiami terminal b",
+			],
+		},
+		{
+			"type": "portmiami_terminal_v",
+			"name": "Virgin Voyages Terminal V",
+			"lat": 25.780120,
+			"lon": -80.180182,
+			"radius_m": 4000.0,
+			"wiki_title": "Virgin Voyages",
+			"height_m": 22.0,
+			"yaw_deg": 21.0,
+			"clear_m": 24.0,
+			"tree_clear_m": 20.0,
+			"skyline_priority": 2,
+			"kind": "Cruise terminal",
+			"aliases": [
+				"virgin voyages terminal v",
+				"terminal v",
+				"portmiami terminal v",
+			],
+		},
+		{
+			"type": "portmiami_carnival_msc",
+			"name": "MSC Cruise Terminal AA",
+			"lat": 25.773500,
+			"lon": -80.155500,
+			"radius_m": 4000.0,
+			"wiki_title": "MSC Cruises",
+			"height_m": 26.0,
+			"yaw_deg": -64.0,
+			"clear_m": 30.0,
+			"tree_clear_m": 24.0,
+			"skyline_priority": 2,
+			"kind": "Cruise terminal",
+			"aliases": [
+				"msc cruise terminal aa",
+				"msc terminal",
+				"carnival terminal f",
+				"portmiami msc terminal",
+			],
+		},
+	]

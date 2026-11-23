@@ -89,6 +89,12 @@ const ZONES := [
 	["havana", "havana", 23.1136, -82.3666, 10.0],
 	["delhi", "delhi", 28.6139, 77.2090, 14.0],
 	["reykjavik", "reykjavik", 64.1466, -21.9426, 6.0],
+	["miami", "miami", 25.7750, -80.2050, 9.5],          # Mainland Miami: Downtown, Brickell, Edgewater, Wynwood, Little Havana, Grove
+	["miami", "miami", 25.7850, -80.1330, 3.8],          # South Beach, Fisher Island, Bay Islands
+	["miami", "miami", 25.8350, -80.1230, 4.5],          # Mid-Beach & North Beach
+	["miami", "miami", 25.9250, -80.1350, 5.5],          # Surfside, Bal Harbour, Sunny Isles, North Miami Beach
+	["miami", "miami", 25.7350, -80.2700, 5.5],          # Coral Gables & South Miami
+	["miami", "miami", 25.6950, -80.1620, 4.5],          # Virginia Key & Key Biscayne
 ]
 
 ## Cores the era rules measure distance from (historic centre or CBD,
@@ -156,6 +162,7 @@ const CORES := {
 	"havana": [[23.1370, -82.3510]],                       # Plaza Vieja
 	"delhi": [[28.6328, 77.2197], [28.6562, 77.2300]],     # Connaught Place, Chandni Chowk
 	"reykjavik": [[64.1470, -21.9400]],                    # Austurstræti
+	"miami": [[25.7743, -80.1890], [25.7650, -80.1915]],   # Downtown, Brickell
 }
 
 ## Named districts with a dominant sub-style: [city, era, lat, lon,
@@ -474,6 +481,36 @@ const DISTRICTS := [
 	["delhi", "delhi_lutyens", 28.6143, 77.2000, 3.0, 20.0],         # Lutyens' Delhi
 	["delhi", "delhi_old", 28.6562, 77.2300, 1.5, 20.0],             # Shahjahanabad
 	["reykjavik", "reykjavik_iron", 64.1450, -21.9350, 1.0, 12.0],   # the old town
+	["miami", "mi_office_glass", 25.7735, -80.1895, 0.75, 20.0],     # Downtown CBD
+	["miami", "mi_condo_tower", 25.7825, -80.1905, 0.75, 20.0],      # Park West / Worldcenter
+	["miami", "mi_condo_tower", 25.7980, -80.1870, 1.30, 20.0],      # Edgewater
+	["miami", "mi_condo_slab", 25.7900, -80.1895, 0.65, 12.0],       # Omni / Arts District
+	["miami", "mi_condo_tower", 25.7630, -80.1915, 0.95, 22.0],      # Brickell
+	["miami", "mi_condo_tower", 25.7665, -80.1855, 0.48, 22.0],      # Brickell Key
+	["miami", "mi_condo_slab", 25.7535, -80.1975, 0.85, 18.0],       # South Brickell
+	["miami", "mi_bungalow", 25.7865, -80.2015, 0.85, 14.0],         # Overtown
+	["miami", "mi_warehouse", 25.8010, -80.1990, 0.95, 25.0],        # Wynwood Arts & Warehouse District
+	["miami", "mi_condo_slab", 25.8085, -80.1930, 0.55, 16.0],       # Midtown Miami
+	["miami", "mi_office_glass", 25.8135, -80.1925, 0.55, 18.0],     # Design District
+	["miami", "mi_bungalow", 25.7660, -80.2250, 1.80, 18.0],         # Little Havana / Shenandoah
+	["miami", "mi_strip", 25.7655, -80.2220, 0.35, 22.0],            # Calle Ocho commercial spine
+	["miami", "mi_bungalow", 25.8280, -80.1960, 1.50, 15.0],         # Little Haiti
+	["miami", "mi_warehouse", 25.7980, -80.2230, 1.40, 18.0],        # Allapattah
+	["miami", "mi_office_glass", 25.7900, -80.2125, 0.85, 16.0],     # Health / Civic District
+	["miami", "mi_mimo", 25.8380, -80.1840, 1.60, 22.0],             # Upper East Side / Biscayne MiMo Boulevard
+	["miami", "mi_med_revival", 25.7285, -80.2415, 0.65, 18.0],      # Coconut Grove Village Centre
+	["miami", "mi_mansion", 25.7240, -80.2480, 1.60, 15.0],          # Coconut Grove residential
+	["miami", "mi_med_revival", 25.7495, -80.2610, 0.95, 25.0],      # Coral Gables Miracle Mile & Centre
+	["miami", "mi_med_revival", 25.7360, -80.2740, 2.60, 22.0],      # Coral Gables residential
+	["miami", "mi_condo_tower", 25.7685, -80.1355, 0.70, 22.0],      # South of Fifth
+	["miami", "mi_deco", 25.7810, -80.1315, 0.95, 35.0],             # Ocean Drive / Architectural Art Deco District
+	["miami", "mi_deco", 25.7825, -80.1380, 0.85, 25.0],             # Flamingo Park Deco residential
+	["miami", "mi_condo_slab", 25.7985, -80.1280, 1.10, 20.0],       # Collins Avenue Hotel Canyon
+	["miami", "mi_mimo", 25.8185, -80.1225, 1.40, 20.0],             # Mid-Beach Resort Canyon
+	["miami", "mi_mimo", 25.8520, -80.1215, 2.00, 22.0],             # North Beach MiMo District
+	["miami", "mi_mansion", 25.7875, -80.1590, 1.60, 25.0],          # Venetian, Star, Palm & Hibiscus Bay Islands
+	["miami", "mi_mansion", 25.6920, -80.1630, 1.80, 16.0],          # Key Biscayne
+	["miami", "mi_warehouse", 25.7745, -80.1680, 1.30, 20.0],        # PortMiami / Dodge Island
 ]
 
 ## The zone row containing (lat, lon), or [] outside every city.
@@ -522,7 +559,7 @@ static func local_frame(region: String, lat: float, lon: float) -> Dictionary:
 
 ## Cities whose district circles also shape the far fabric
 ## (FarCityBuilder), so the city past the detailed extent keeps them.
-const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki"]
+const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki", "miami"]
 
 ## The far fabric's district circles for a viewpoint's region, in its
 ## local metre frame: [[era, Vector2 centre, radius_m], ...], the most

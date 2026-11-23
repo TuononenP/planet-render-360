@@ -284,6 +284,8 @@ static func known_places() -> Array:
 		{"name": "Midtown Manhattan, United States", "lat": 40.7535, "lon": -73.9825},
 		{"name": "Central Park, New York, United States", "lat": 40.7760, "lon": -73.9700},
 		{"name": "San Francisco, United States", "lat": 37.7749, "lon": -122.4194},
+		{"name": "Miami, United States", "lat": 25.7743, "lon": -80.1855},
+		{"name": "Miami Beach, United States", "lat": 25.7810, "lon": -80.1300},
 		{"name": "Rio de Janeiro, Brazil", "lat": -22.9068, "lon": -43.1729},
 		{"name": "Tokyo, Japan", "lat": 35.6762, "lon": 139.6503},
 		{"name": "Sydney, Australia", "lat": -33.8688, "lon": 151.2093},

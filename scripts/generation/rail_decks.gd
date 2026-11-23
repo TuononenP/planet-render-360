@@ -32,18 +32,23 @@ var _cells := {}
 static var _last: RailDecks
 static var _last_rails: Array
 static var _last_ground: GroundTruth
+static var _last_lat := NAN
+static var _last_lon := NAN
 
 ## The levels of `data`'s bridge tracks over `surf`'s ground; built once
 ## for the builders that share them.
 static func of(data: LocationData, surf: RoadBuilder._Surface, m2u: float) -> RailDecks:
-	if _last != null and is_same(_last_rails, data.railways) and _last_ground == surf.ground:
+	if _last != null and is_same(_last_rails, data.railways) and _last_ground == surf.ground \
+			and is_equal_approx(_last_lat, data.latitude) and is_equal_approx(_last_lon, data.longitude):
 		return _last
-	_last = RailDecks.new(data.railways, surf, m2u)
+	_last = RailDecks.new(data.railways, surf, m2u, data)
 	_last_rails = data.railways
 	_last_ground = surf.ground
+	_last_lat = data.latitude
+	_last_lon = data.longitude
 	return _last
 
-func _init(railways: Array, surf: RoadBuilder._Surface, m2u: float) -> void:
+func _init(railways: Array, surf: RoadBuilder._Surface, m2u: float, data: LocationData = null) -> void:
 	_m2u = m2u
 	for w in railways:
 		if not (w is Dictionary) or not bool((w as Dictionary).get("bridge", false)) \
@@ -56,7 +61,9 @@ func _init(railways: Array, surf: RoadBuilder._Surface, m2u: float) -> void:
 				pts.append(p)
 		if pts.size() < 2:
 			continue
-		var deck := RoadBuilder.deck_profile(pts, surf, m2u, float(way.get("width_m", 3.3)) * m2u * 0.5, 0, false)
+		var look := RailViaductLook.look_for(data, str(way.get("class", "")))
+		var layer := RailViaductLook.bridge_layer(way, look)
+		var deck := RoadBuilder.deck_profile(pts, surf, m2u, float(way.get("width_m", 3.3)) * m2u * 0.5, layer, false)
 		if deck.size() != pts.size():
 			continue
 		for i in pts.size():

@@ -27,7 +27,7 @@ extends RefCounted
 
 ##   louvre     a plant floor: horizontal slats, no windows.
 
-const NAMES: Array[String] = ["panel", "ornate", "brownstone", "shophouse", "pier", "louvre"]
+const NAMES: Array[String] = ["panel", "ornate", "brownstone", "shophouse", "pier", "louvre", "balcony_band"]
 ## Matches FacadeComposer.CELL (pinned by tests/architecture_test.gd).
 const CELL := 128
 const DARK := Color(0.03, 0.03, 0.03)
@@ -86,6 +86,13 @@ static func prepass(pattern: String, base: Image, nor: Image, w: int, pv: Dictio
 				FacadePaint.shade(base, Rect2i(0, y + 7, w, 2), Color(1, 1, 1, 0.12))
 				if nor != null:
 					nor.fill_rect(Rect2i(0, y + 7, w, 2), Color(0.5, 0.72, 1.0))
+		"balcony_band":
+			# Deep shadow under the overhanging slab above, bright continuous slab edge below.
+			FacadePaint.shade(base, Rect2i(0, 0, w, 16), Color(0, 0, 0, 0.62))
+			FacadePaint.shade(base, Rect2i(0, 124, w, 4), Color(0, 0, 0, 0.48))
+			if nor != null:
+				nor.fill_rect(Rect2i(0, 102, w, 3), Color(0.5, 0.28, 1.0))
+				nor.fill_rect(Rect2i(0, 123, w, 4), Color(0.5, 0.76, 1.0))
 		"pier":
 			for x in range(0, w + 1, CELL):
 				var r := Rect2i(x - 22, 0, 44, CELL).intersection(Rect2i(0, 0, w, CELL))
@@ -126,6 +133,8 @@ static func bay(pattern: String, alb: Image, nor: Image, rgh: Image, emit: Image
 			_brownstone(alb, nor, rgh, emit, base, ox, hv, pv)
 		"shophouse":
 			_shophouse(alb, nor, rgh, emit, base, ox, hv, pv)
+		"balcony_band":
+			_balcony_band(alb, nor, rgh, emit, ox, hv)
 
 static func _panel(alb: Image, nor: Image, rgh: Image, emit: Image, base: Image,
 		ox: int, hv: float, pv: Dictionary) -> void:
@@ -255,6 +264,30 @@ static func _shophouse(alb: Image, nor: Image, rgh: Image, emit: Image, base: Im
 		_rail(alb, wx - 6, wy + wh - 18, ww + 12, 18)
 	if nor != null:
 		nor.fill_rect(Rect2i(wx - 8, wy + wh + 3, ww + 16, 2), Color(0.5, 0.3, 1.0))
+
+static func _balcony_band(alb: Image, nor: Image, rgh: Image, emit: Image,
+		ox: int, hv: float) -> void:
+	# Recessed soffit under balcony above.
+	alb.fill_rect(Rect2i(ox, 0, CELL, 14), Color(0.022, 0.028, 0.035))
+	# Recessed floor-to-ceiling sliding glass doors behind the balcony.
+	var r_glass := Rect2i(ox + 3, 14, CELL - 6, 54)
+	FacadeComposer.glass_pane(alb, r_glass, hv)
+	FacadePaint.pane(emit, Rect2i(ox + 6, 16, CELL - 12, 50), hv)
+	for mx in [ox + 2, ox + CELL / 2 - 1, ox + CELL - 4]:
+		alb.fill_rect(Rect2i(mx, 14, 2, 54), Color(0.08, 0.09, 0.10))
+	# Translucent aqua-tinted glass balcony railing + silver top handrail.
+	alb.fill_rect(Rect2i(ox, 66, CELL, 3), Color(0.46, 0.49, 0.51))
+	alb.fill_rect(Rect2i(ox, 69, CELL, 34), Color(0.145, 0.225, 0.255))
+	for px in [ox + 42, ox + 85]:
+		alb.fill_rect(Rect2i(px, 69, 2, 34), Color(0.30, 0.36, 0.39))
+	# Continuous crisp white concrete balcony slab edge wrapping the floor.
+	alb.fill_rect(Rect2i(ox, 103, CELL, 21), Color(0.68, 0.68, 0.66))
+	alb.fill_rect(Rect2i(ox, 124, CELL, 4), Color(0.05, 0.055, 0.06))
+	if rgh != null:
+		rgh.fill_rect(Rect2i(ox, 14, CELL, 89), Color(0.10, 0.10, 0.10))
+		rgh.fill_rect(Rect2i(ox, 103, CELL, 21), Color(0.42, 0.42, 0.42))
+	if nor != null:
+		nor.fill_rect(Rect2i(ox, 66, CELL, 2), Color(0.5, 0.34, 1.0))
 
 ## Window: frame ring, pane (some lit, some curtained), sky band at the
 ## head, glazing bars (cols x rows), sill shadow; glass roughness 0.2 so

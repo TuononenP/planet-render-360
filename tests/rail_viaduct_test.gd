@@ -80,6 +80,60 @@ func _run() -> void:
 		failures.append("tracks side by side must share the higher deck level: %s from %s" % [tops, raws])
 	if absf(tops[2] - raws[2]) > 0.0001:
 		failures.append("a track on its own keeps its profile: %s from %s" % [tops[2], raws[2]])
+
+	# Miami elevated concrete guideways (Metrorail / Metromover) & elevated stations.
+	var mi_data := LocationData.new()
+	mi_data.latitude = 25.7743
+	mi_data.longitude = -80.1855
+	mi_data.grid_size = 64
+	mi_data.heights.resize(4096)
+	mi_data.heights.fill(5.0)
+	mi_data.water_level = -3.0
+	if RailViaductLook.look_for(mi_data, "monorail") != "concrete_guideway" \
+			or RailViaductLook.look_for(mi_data, "subway") != "concrete_guideway":
+		failures.append("Miami monorail and subway bridges must select concrete_guideway")
+	if RailViaductLook.look_for(data, "subway") != "brick" \
+			or RailViaductLook.look_for(data, "monorail") != "brick":
+		failures.append("London bridges must select brick")
+	var mi_mono := OsmTags._rail_entry({"railway": "monorail", "bridge": "yes"},
+		PackedVector2Array([Vector2(-80, 0.0), Vector2(80, 0.0)]))
+	var mi_sub := OsmTags._rail_entry({"railway": "subway", "bridge": "yes"},
+		PackedVector2Array([Vector2(-80, 12.0), Vector2(80, 12.0)]))
+	var mi_tracks: Array = [mi_mono, mi_sub]
+	if _batch_verts(mi_data, mi_tracks, "deck_concrete") == 0:
+		failures.append("Miami guideways must emit deck_concrete fascias and piers")
+	if _batch_verts(mi_data, mi_tracks, "deck_brick") != 0:
+		failures.append("Miami guideways must emit zero deck_brick vertices")
+	if _batch_verts(mi_data, [mi_mono], "guideway_slab") == 0:
+		failures.append("Miami monorail must emit guideway_slab top finish")
+	var mi_surf := RoadBuilder._Surface.new(mi_data, GroundTruth.new(mi_data))
+	var mi_batches := {}
+	mi_data.railways = mi_tracks
+	var mi_beside := RailBuilder.deck_index(mi_tracks, 1.0)
+	mi_beside["decks"] = RailDecks.of(mi_data, mi_surf, 1.0)
+	for mt in mi_tracks:
+		RailBuilder._way(mi_batches, mt, mi_surf, [], 1.0, mi_data, null, mi_beside)
+	var conc_batch: RoadBuilder._Batch = mi_batches["deck_concrete"]
+	var max_guide_y := -INF
+	for v in conc_batch.verts:
+		if absf(v.x) < 15.0:
+			max_guide_y = maxf(max_guide_y, v.y)
+	# Ground is at 5.0 m; elevated layer 1 deck + 1.0 m parapet stands ~11.0 m (~5 m+ above ground).
+	if max_guide_y < 9.5:
+		failures.append("Miami guideway should stand ~5 m above ground (5.0 m), got max y %.2f" % max_guide_y)
+	# Adding a rail_stations node beside the Miami guideway generates elevated station canopy geometry.
+	mi_data.rail_stations = [{"x": 0.0, "z": 3.5, "name": "Government Center"}]
+	var root := Node3D.new()
+	RailBuilder.build(root, mi_data, GroundTruth.new(mi_data))
+	var canopy_mi := root.get_node_or_null("Rail_station_canopy") as MeshInstance3D
+	if canopy_mi == null or canopy_mi.mesh == null or canopy_mi.mesh.get_surface_count() == 0:
+		failures.append("a rail_stations node beside a Miami guideway must build Rail_station_canopy geometry")
+	else:
+		var c_aabb := canopy_mi.mesh.get_aabb()
+		if c_aabb.end.y < 14.0:
+			failures.append("elevated station canopy should stand above platform & guideway, got top %.2f" % c_aabb.end.y)
+	root.free()
+
 	failures.remove_at(0)
 	if failures.is_empty():
 		print("RAIL VIADUCT OK: no parapet between tracks side by side, outer edges and lone tracks keep theirs, one level across")

@@ -199,4 +199,105 @@ static func rows() -> Array:
 				"(1823 m, 14.9 deg) and 59592719 (2037 m) agree with the bearing; the Structurae span groups " +
 				"and their order are still unsourced guesses | round 2: round 2: es Wikipedia page is short " +
 				"and gives no span groups; span group order stays unsourced"},
+		{"id": "br_miami_macarthur_west", "cc": "US", "name": "MacArthur Causeway West Bridge", "wiki": "MacArthur Causeway",
+			"aliases": ["trooper robert g. smith bridge", "macarthur causeway bridge", "macarthur west bridge"],
+			"lat": 25.78716, "lon": -80.18261, "bearing": 86.9, "st": "girder",
+			"spans": [37.0, 38.0, 40.0, 40.0, 40.0, 41.0, 43.95, 46.0, 43.95, 41.0, 40.0, 40.0, 40.0, 38.0, 37.0],
+			"width": 34.0, "clear": 19.8, "material": "concrete", "base": "sea", "tier": 1, "conf": 2, "view": 3500.0,
+			"src": "USCG Light List / FDOT Trooper Robert G. Smith Bridge (1997 high-level fixed concrete " +
+				"girder over Biscayne Bay ICW main channel, 65 ft = 19.8 m vertical clearance, 46 m channel " +
+				"span) + OSM rel:13378650 / way:38842400 (605.9 m, bearing 86.9, mid 25.78716,-80.18261)"},
+		{"id": "br_miami_macarthur_east", "cc": "US", "name": "MacArthur Causeway East Bridge", "wiki": "MacArthur Causeway",
+			"aliases": ["macarthur east channel bridge", "macarthur east bridge"],
+			"lat": 25.7745, "lon": -80.1458, "bearing": 115.0, "st": "girder",
+			"spans": [34.0, 36.0, 37.5, 39.0, 42.0, 39.0, 37.5, 36.0, 34.0],
+			"width": 32.0, "clear": 10.7, "material": "concrete", "base": "sea", "tier": 2, "conf": 2, "view": 3500.0,
+			"src": "USCG Bridge Book / FDOT MacArthur Causeway East Channel fixed prestressed concrete girder " +
+				"bridge (35 ft = 10.7 m vertical clearance over Meloy Channel) + OSM way:601014485 (335.0 m, " +
+				"bearing 115.0, mid 25.77450,-80.14580)"},
+		{"id": "br_miami_port_boulevard", "cc": "US", "name": "PortMiami Bridge", "wiki": "Port Boulevard",
+			"aliases": ["port boulevard bridge", "port of miami bridge", "dodge island bridge"],
+			"lat": 25.77991, "lon": -80.18337, "bearing": 290.1, "st": "girder",
+			"spans": [40.0, 43.0, 45.0, 45.0, 46.0, 46.0, 47.0, 48.85, 50.0, 48.85, 47.0, 46.0, 46.0, 45.0, 45.0, 43.0, 40.0],
+			"width": 26.0, "clear": 19.8, "material": "concrete", "base": "sea", "tier": 1, "conf": 2, "view": 3200.0,
+			"src": "FDOT / PortMiami 1991 twin high-level fixed segmental concrete girder bridge over ICW to " +
+				"Dodge Island (65 ft = 19.8 m USCG vertical clearance) + OSM way:42778597 (771.7 m, bearing " +
+				"290.1, mid 25.77991,-80.18337)"},
+		{"id": "br_miami_venetian_west", "cc": "US", "name": "Venetian Causeway West Drawbridge", "wiki": "Venetian Causeway",
+			"aliases": ["venetian west bascule bridge", "venetian causeway west bridge"],
+			"lat": 25.78978, "lon": -80.183, "bearing": 87.0, "st": "bascule",
+			"spans": [20.5, 20.5, 20.5, 20.5, 20.5, 20.5, 20.5, 20.5, 20.5, 32.5, 20.5, 20.5, 20.5, 20.5, 20.5, 20.5, 20.5, 20.5, 20.5],
+			"width": 14.6, "clear": 4.6, "material": "concrete", "base": "sea", "tier": 1, "conf": 2, "view": 3200.0,
+			"src": "USCG / Historic Miami-Dade Venetian Causeway West Bridge (1926/1999 rehabilitation, " +
+				"twin-leaf bascule ICW span with 15 ft = 4.6 m closed clearance and low concrete trestle " +
+				"approach spans) + OSM way:39028112 (401.5 m, bearing 87.0, mid 25.78978,-80.18300)"},
+		{"id": "br_miami_venetian_east", "cc": "US", "name": "Venetian Causeway East Drawbridge", "wiki": "Venetian Causeway",
+			"aliases": ["venetian east bascule bridge", "venetian causeway east bridge"],
+			"lat": 25.79122, "lon": -80.15222, "bearing": 80.5, "st": "bascule",
+			"spans": [19.4, 19.4, 19.4, 19.4, 19.4, 30.4, 19.4, 19.4, 19.4, 19.4, 19.4],
+			"width": 14.6, "clear": 4.6, "material": "concrete", "base": "sea", "tier": 2, "conf": 2, "view": 3200.0,
+			"src": "USCG / Historic Miami-Dade Venetian Causeway East bascule bridge between Belle Isle and " +
+				"Miami Beach (15 ft = 4.6 m closed clearance + concrete trestle spans) + OSM way:997041200 " +
+				"(224.4 m, bearing 80.5, mid 25.79122,-80.15222)"},
+		{"id": "br_miami_brickell_ave", "cc": "US", "name": "Brickell Avenue Bridge", "wiki": "Brickell Avenue Bridge",
+			"aliases": ["brickell bridge", "us 1 miami river bridge"],
+			"lat": 25.77002, "lon": -80.19005, "bearing": 1.4, "st": "bascule",
+			"spans": [42.0, 56.1, 42.0], "width": 32.0, "clear": 7.6, "orn": 16.4,
+			"steel_hex": "#5E7268", "concrete_hex": "#DDD6C7",
+			"material": "steel", "base": "water", "tier": 1, "conf": 2,
+			"src": "USCG / FDOT SR 905 / US 1 Brickell Avenue Bridge (1995 twin-leaf bascule over Miami River " +
+				"mouth, 25 ft = 7.6 m closed clearance, 32.0 m wide, limestone tender houses and Manuel " +
+				"Carbonell's Pillar of History / Tequesta Family bronze monument rising 16.4 m above the SE " +
+				"deck to 24.0 m, built by LandmarkMiBrickellBridge) + OSM way:992945519 (140.1 m, bearing 1.4)"},
+		{"id": "br_miami_south_miami_ave", "cc": "US", "name": "South Miami Avenue Bridge", "wiki": "Miami River (Florida)",
+			"aliases": ["miami avenue bridge", "se 1st ave bridge"],
+			"lat": 25.76898, "lon": -80.19342, "bearing": 357.9, "st": "bascule",
+			"spans": [17.45, 42.0, 17.45], "width": 20.0, "clear": 6.7,
+			"material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"src": "USCG / Miami-Dade County twin-leaf bascule bridge over Miami River (22 ft = 6.7 m closed " +
+				"clearance) + OSM way:992946537 (76.9 m, bearing 357.9, mid 25.76898,-80.19342)"},
+		{"id": "br_miami_sw_2nd_ave", "cc": "US", "name": "SW 2nd Avenue Bridge", "wiki": "Miami River (Florida)",
+			"aliases": ["southwest 2nd avenue bridge", "sw second avenue bridge"],
+			"lat": 25.76884, "lon": -80.1976, "bearing": 178.0, "st": "bascule",
+			"spans": [25.95, 46.0, 25.95], "width": 21.0, "clear": 7.0,
+			"material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"src": "USCG / FDOT SR 933 SW 2nd Avenue twin-leaf bascule bridge over Miami River (23 ft = 7.0 m " +
+				"closed clearance) + OSM way:965031120 (97.9 m, bearing 178.0, mid 25.76884,-80.19760)"},
+		{"id": "br_miami_sw_1st_st", "cc": "US", "name": "SW 1st Street Bridge", "wiki": "Miami River (Florida)",
+			"aliases": ["southwest 1st street bridge", "sw first street bridge"],
+			"lat": 25.77304, "lon": -80.20059, "bearing": 81.1, "st": "bascule",
+			"spans": [17.95, 44.0, 17.95], "width": 19.5, "clear": 7.6,
+			"material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"src": "USCG / FDOT / Hardesty & Hanover 2022 replacement twin-leaf bascule over Miami River " +
+				"(25 ft = 7.6 m closed clearance) + OSM way:993098791 (79.9 m, bearing 81.1, mid 25.77304,-80.20059)"},
+		{"id": "br_miami_west_flagler", "cc": "US", "name": "West Flagler Street Bridge", "wiki": "Flagler Street",
+			"aliases": ["flagler street bridge", "w flagler bridge"],
+			"lat": 25.77411, "lon": -80.20203, "bearing": 264.0, "st": "bascule",
+			"spans": [31.35, 46.0, 31.35], "width": 22.0, "clear": 7.0,
+			"material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"src": "USCG / FDOT SR 968 West Flagler Street twin-leaf bascule over Miami River (23 ft = 7.0 m " +
+				"closed clearance) + OSM way:993098792 (108.7 m, bearing 264.0, mid 25.77411,-80.20203)"},
+		{"id": "br_miami_brickell_key", "cc": "US", "name": "Brickell Key Bridge", "wiki": "Brickell Key",
+			"aliases": ["claughton island bridge", "brickell key boulevard bridge"],
+			"lat": 25.76557, "lon": -80.18704, "bearing": 85.4, "st": "girder",
+			"spans": [25.0, 28.0, 29.0, 28.0, 25.0], "width": 18.0, "clear": 5.5,
+			"material": "concrete", "base": "sea", "tier": 2, "conf": 2,
+			"src": "USCG / Miami-Dade low fixed concrete girder bridge across Brickell Key Channel to " +
+				"Claughton Island (18 ft = 5.5 m clearance) + OSM way:38997223 (135.0 m, bearing 85.4, mid 25.76557,-80.18704)"},
+		{"id": "br_miami_william_powell", "cc": "US", "name": "William M. Powell Bridge", "wiki": "Rickenbacker Causeway",
+			"aliases": ["rickenbacker causeway bridge", "powell bridge miami", "rickenbacker high bridge"],
+			"lat": 25.7465, "lon": -80.18442, "bearing": 269.1, "st": "girder",
+			"spans": [46.0, 50.0, 53.0, 54.0, 56.0, 60.0, 62.0, 65.0, 67.95, 72.0, 67.95, 65.0, 62.0, 60.0, 56.0, 54.0, 53.0, 50.0, 46.0],
+			"width": 32.0, "clear": 22.9, "material": "concrete", "base": "sea", "tier": 1, "conf": 2, "view": 3800.0,
+			"src": "USCG / Miami-Dade 1985 William M. Powell high-level segmental concrete box-girder bridge " +
+				"on Rickenbacker Causeway (75.5 ft = 22.9 m ICW vertical clearance over Biscayne Bay) + OSM " +
+				"way:42691106 (1099.9 m, bearing 269.1, mid 25.74650,-80.18442)"},
+		{"id": "br_miami_julia_tuttle", "cc": "US", "name": "Julia Tuttle Causeway Bridge", "wiki": "Julia Tuttle Causeway",
+			"aliases": ["i-195 bridge miami", "julia tuttle bridge"],
+			"lat": 25.81079, "lon": -80.17653, "bearing": 270.6, "st": "girder",
+			"spans": [39.0, 41.0, 42.0, 43.0, 44.0, 46.0, 47.0, 51.0, 47.0, 46.0, 44.0, 43.0, 42.0, 41.0, 39.0],
+			"width": 38.0, "clear": 17.1, "material": "concrete", "base": "sea", "tier": 1, "conf": 2, "view": 4500.0,
+			"src": "USCG / FDOT I-195 / SR 112 Julia Tuttle Causeway high-level prestressed concrete girder " +
+				"bridge over Biscayne Bay ICW (56 ft = 17.1 m vertical clearance) + OSM way:39034736 " +
+				"(655.0 m, bearing 270.6, mid 25.81079,-80.17653)"},
 	]

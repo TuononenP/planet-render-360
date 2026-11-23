@@ -2231,6 +2231,24 @@
   18478,
   "0eb2b53f364c96e48dc6679a3165e5d482cc5cd5a22ab49f72268e93dc5572b8"
  ],
+ "miami_beach_horizon": [
+  25.781,
+  -80.13,
+  "horizon",
+  1,
+  "2026-11-22T21:20:48",
+  1867,
+  "46858a7fba554c323a1abef4ee1e88138c6aa1739ea11b1383a974b84721e8bd"
+ ],
+ "miami_horizon": [
+  25.7743,
+  -80.1855,
+  "horizon",
+  1,
+  "2026-11-22T21:20:48",
+  2313,
+  "c3b84ec3d6208a1b3c3ec43cadee0e66fc5a4a83a4f35bc436fa9ec32ee4028d"
+ ],
  "monaco_horizon": [
   43.731,
   7.4209,

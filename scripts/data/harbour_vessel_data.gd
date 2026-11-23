@@ -144,6 +144,13 @@ const FLEET_PROFILES := {
 	"FI": {"hulls": ["#e2e2dd", "#e2e2dd", "#e2e2dd", "#e2e2dd", "#7a4a26", "#6a3d1f", "#8b5a2b",
 			"#1c2b46", "#2f4a3a", "#d8d2bd", "#9b2a22"],
 		"sail_share": 0.5, "yacht_share": 0.25},
+	# Miamarina, Miami Beach Marina, Island Gardens: white and ice-blue motor yachts, sportfishers.
+	"US_MIAMI": {"hulls": ["#f2f3f0", "#f2f3f0", "#f2f3f0", "#f2f3f0", "#f2f3f0", "#dcebf2", "#16294a",
+			"#26323e", "#e8e3d3", "#42a8b8"],
+		"sail_share": 0.08, "yacht_share": 0.62},
+	# Dinner Key Marina, Coconut Grove: Miami's sailboat harbour.
+	"US_DINNER_KEY": {"hulls": ["#f2f3f0", "#f2f3f0", "#f2f3f0", "#16294a", "#e8e3d3", "#8c2620"],
+		"sail_share": 0.58, "yacht_share": 0.28},
 }
 
 ## The row for `id` in `rows`, or {}.

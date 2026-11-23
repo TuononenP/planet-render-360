@@ -23,6 +23,10 @@ const FINISHES := {
 	"waffle_bronze": ["concrete", "punched", "#6a6158"],
 	"red_granite": ["stone", "pier", "#8c5446"],
 	"steinway_terracotta": ["limestone", "pier", "#d6c0a2"],
+	"balcony_white": ["concrete", "balcony_band", "#eeece6"],
+	"balcony_aqua": ["concrete", "balcony_band", "#dce8ea"],
+	"travertine_pier": ["limestone", "pier", "#dfd6c4"],
+	"coral_stucco": ["render", "punched", "#ead8c4"],
 }
 
 static var _mutex := Mutex.new()

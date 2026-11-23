@@ -158,7 +158,7 @@ static var BASE: Dictionary = _merged([COUNTRY_BASE, ArchitectureMountain.BASE, 
 	ArchitectureCitiesEurope.BASE, ArchitectureCitiesWaterfront.BASE,
 	ArchitectureCitiesAmericas.BASE, ArchitectureCitiesAsia.BASE, ArchitectureCitiesEastAsia.BASE, ArchitectureCitiesNorth.BASE, ArchitectureCitiesFinland.BASE,
 	ArchitectureCitiesSouth.BASE, ArchitectureCitiesCentral.BASE, ArchitectureCitiesWorld.BASE,
-	ArchitectureCitiesNewWorld.BASE, ArchitectureCountryEras.BASE])
+	ArchitectureCitiesNewWorld.BASE, ArchitectureCitiesFlorida.BASE, ArchitectureCountryEras.BASE])
 
 ## OSM `building=*` values that name a kind outright. `yes`, `residential`
 ## and friends are decided by levels / footprint / density instead.
@@ -223,6 +223,7 @@ const INFILL_MIX := {
 	"new_york": {"apartments": 66, "commercial": 16, "house": 10, "civic": 4, "outbuilding": 4},
 	"chicago": {"apartments": 44, "house": 34, "commercial": 12, "civic": 4, "outbuilding": 6},
 	"san_francisco": {"apartments": 50, "house": 34, "commercial": 10, "outbuilding": 6},
+	"miami": {"apartments": 42, "house": 32, "commercial": 16, "industrial": 4, "civic": 4, "outbuilding": 2},
 	"tokyo": {"house": 38, "apartments": 36, "commercial": 18, "industrial": 2, "outbuilding": 6},
 	"hong_kong": {"apartments": 74, "commercial": 18, "civic": 4, "outbuilding": 4},
 	"singapore": {"apartments": 66, "commercial": 20, "civic": 6, "house": 4, "outbuilding": 4},
@@ -320,7 +321,7 @@ static var REGIONS: Dictionary = _merged([ArchitectureRegions.REGIONS, Architect
 	ArchitectureCitiesWaterfront.REGIONS, ArchitectureCitiesAmericas.REGIONS,
 	ArchitectureCitiesAsia.REGIONS, ArchitectureCitiesEastAsia.REGIONS, ArchitectureCitiesNorth.REGIONS, ArchitectureCitiesFinland.REGIONS, ArchitectureCitiesSouth.REGIONS,
 	ArchitectureCitiesCentral.REGIONS, ArchitectureCitiesWorld.REGIONS,
-	ArchitectureCitiesNewWorld.REGIONS, ArchitectureCountryEras.REGIONS])
+	ArchitectureCitiesNewWorld.REGIONS, ArchitectureCitiesFlorida.REGIONS, ArchitectureCountryEras.REGIONS])
 
 static func _merged(tables: Array) -> Dictionary:
 	var out := {}

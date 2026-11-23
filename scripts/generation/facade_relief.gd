@@ -75,6 +75,7 @@ static func add(root: Node3D, d: Dictionary) -> void:
 				trim_for(look, stone), str(look.get("ground", "")) == "" and not garage)
 	StreetFront.add(kit, spans, rows, d, stone)
 	AsiaFronts.add(kit, spans, rows, d)
+	DecoFront.add(kit, spans, rows, d)
 	if ModernBlockRelief.qualifies(d, uvp.z > 0.0):
 		ModernBlockRelief.add(kit, spans, rows, d, stone)
 	kit.flush(root, "Relief")

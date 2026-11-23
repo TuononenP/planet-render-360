@@ -99,6 +99,7 @@ static func build_bridge(type: String, deck_m: float, tilt_m: float = 0.0, rise_
 		"br_turku_auransilta": FtBridgeAuransilta.build(model, row)
 		"br_turku_kirjastosilta": FtBridgeKirjastosilta.build(model, row)
 		"br_turku_teatterisilta": FtBridgeTeatterisilta.build(model, row)
+		"br_miami_brickell_ave": LandmarkMiBrickellBridge.build(model, row)
 		_:
 			if not StoSetBridges.build_row(model, type, row):
 				BridgeParam.build(model, row)

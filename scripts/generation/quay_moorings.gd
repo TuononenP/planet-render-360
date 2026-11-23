@@ -24,6 +24,13 @@ const LINER_MAX_M := 300.0
 const LINER_RADIUS_M := 1200.0
 const LINER_SPACING_M := 400.0
 const LINER_DEPTH_M := 2.0
+## PortMiami (Dodge Island's north cruise berths): [lat0, lat1, lon0, lon1];
+## liners there show out to CRUISE_REACH_M, line up CRUISE_SPACING_M apart,
+## up to CRUISE_MAX_LINERS, bows east-south-east toward Government Cut.
+const CRUISE_PORT_BOX := [25.768, 25.785, -80.185, -80.148]
+const CRUISE_REACH_M := 3600.0
+const CRUISE_SPACING_M := 310.0
+const CRUISE_MAX_LINERS := 4
 ## The hull may not come nearer the eye than this (m).
 const LINER_EYE_CLEAR_M := 40.0
 const LINER_TURN_RAD := 0.12
@@ -273,6 +280,7 @@ static func _large_ships(data: LocationData, ground: GroundTruth, taken: Diction
 		return out
 	var eye := View360.spawn_xz(data)
 	var bridge_list := bridges(data, m)
+	var cap := CRUISE_MAX_LINERS if WaterSurface.miami_water(data.latitude, data.longitude) else MAX_LINERS
 	var runs: Array = []
 	for points in _quay_lines(data, m):
 		runs.append_array(_straight_runs(points, m))
@@ -310,8 +318,12 @@ static func _large_ships(data: LocationData, ground: GroundTruth, taken: Diction
 			var c: Vector2 = berth["centre"]
 			var port := port_at(data, c, m) if ferry else {}
 			var radius := float(port.get("reach_m", LINER_RADIUS_M))
+			var spacing := LINER_SPACING_M
+			if not ferry and cruise_port_at(data, c, m):
+				radius = CRUISE_REACH_M
+				spacing = CRUISE_SPACING_M
 			if c.distance_to(eye) > radius * m or _near_eye(c, dir, length, beam, eye, m) \
-					or not _spaced(out, c, m) or _mapped_ship_near(data, c, length, m):
+					or not _spaced(out, c, m, spacing) or _mapped_ship_near(data, c, length, m):
 				continue
 			var bow_dir := dir
 			var stern := c - dir * length * 0.5 * m
@@ -339,7 +351,7 @@ static func _large_ships(data: LocationData, ground: GroundTruth, taken: Diction
 				length, beam, clampf(length * 0.21 if ferry else length * 0.2, 22.0, 65.0),
 				seed_value, "ferry" if ferry else "liner", info])
 			break
-		if out.size() >= MAX_LINERS:
+		if out.size() >= cap:
 			return out
 	return out
 
@@ -553,10 +565,18 @@ static func _near_eye(c: Vector2, dir: Vector2, length: float, beam: float, eye:
 	return maxf(along - length * 0.5 * m, 0.0) < LINER_EYE_CLEAR_M * m \
 		and maxf(across - beam * 0.5 * m, 0.0) < LINER_EYE_CLEAR_M * m
 
-static func _spaced(out: Array, c: Vector2, m: float) -> bool:
+## Whether world point `at` lies inside PortMiami's cruise-berth box.
+static func cruise_port_at(data: LocationData, at: Vector2, m: float) -> bool:
+	if not WaterSurface.miami_water(data.latitude, data.longitude):
+		return false
+	var ll := WorldScale.latlon_from_xz(at.x / m, at.y / m, data.latitude, data.longitude)
+	return ll.x >= CRUISE_PORT_BOX[0] and ll.x <= CRUISE_PORT_BOX[1] \
+		and ll.y >= CRUISE_PORT_BOX[2] and ll.y <= CRUISE_PORT_BOX[3]
+
+static func _spaced(out: Array, c: Vector2, m: float, spacing: float = LINER_SPACING_M) -> bool:
 	for l in out:
 		var q: Vector3 = l[0]
-		if Vector2(q.x, q.z).distance_to(c) < LINER_SPACING_M * m:
+		if Vector2(q.x, q.z).distance_to(c) < spacing * m:
 			return false
 	return true
 

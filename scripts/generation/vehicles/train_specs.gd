@@ -14,7 +14,7 @@ extends RefCounted
 ## "cab" (the colour of a cab end, a warning yellow in Britain).
 ## A section id ending in "p" is the same car with a pantograph.
 
-const KINDS: Array[String] = ["emu", "emu_uk", "intercity", "metro"]
+const KINDS: Array[String] = ["emu", "emu_uk", "intercity", "metro", "mover"]
 const MIN_CARS := 2
 const MAX_CARS := 4
 
@@ -56,6 +56,21 @@ const LIVERIES := {
 	# round the windows, a pale roof, standard gauge.
 	"stockholm_metro": {"lower": METRO_BLUE, "band": Color(0.78, 0.8, 0.82), "upper": METRO_BLUE,
 		"door": METRO_BLUE, "pillar": TramSpecs.DARK, "roof": Color(0.8, 0.8, 0.78), "inner": WHITE, "gauge": 1.435},
+	# Miami's Metrorail: silver-white stainless body, emerald-blue band, pale roof.
+	"miami_metrorail": {"lower": Color(0.84, 0.85, 0.86), "band": Color(0.04, 0.48, 0.68),
+		"upper": Color(0.84, 0.85, 0.86), "door": Color(0.84, 0.85, 0.86), "pillar": TramSpecs.DARK,
+		"roof": Color(0.8, 0.8, 0.78), "inner": WHITE, "gauge": 1.435},
+	# Miami's Metromover: crisp white automated pod, cyan-blue band and doors, pale roof.
+	"miami_metromover": {"lower": WHITE, "band": Color(0.06, 0.56, 0.82), "upper": WHITE,
+		"door": Color(0.06, 0.56, 0.82), "pillar": TramSpecs.DARK, "roof": Color(0.8, 0.8, 0.78),
+		"inner": WHITE, "gauge": 1.435},
+	# South Florida's intercity express (Brightline): crisp white body, vibrant yellow cab and band, dark roof.
+	"brightline": {"lower": WHITE, "band": Color(0.96, 0.78, 0.06), "upper": WHITE,
+		"door": Color(0.12, 0.13, 0.14), "cab": Color(0.96, 0.78, 0.06), "pillar": Color(0.12, 0.13, 0.14),
+		"roof": Color(0.16, 0.17, 0.18), "inner": WHITE, "gauge": 1.435},
+	# South Florida's commuter line (Tri-Rail): ocean-blue lower, palm-green waist band, white upper.
+	"tri_rail": {"lower": Color(0.08, 0.46, 0.76), "band": Color(0.16, 0.62, 0.36), "upper": WHITE,
+		"door": Color(0.08, 0.46, 0.76), "pillar": TramSpecs.DARK, "roof": ROOF, "inner": WHITE, "gauge": 1.435},
 }
 const LONDON_LIVERIES: Array[String] = ["london_blue", "london_grey", "london_white"]
 ## Share of Helsinki's trains that are the long-distance unit.
@@ -115,27 +130,40 @@ const KIND := {
 			"mid": {"len": 22.0, "prof": PROF_METRO, "front": {}, "rear": {}, "doors": [-6.6, 0.0, 6.6],
 				"pitch": 1.6, "axle": 1.25, "bogies": [7.6, -7.6], "boxes": [[0.0, 3.0]],
 				"under": [[-3.4, 3.6], [3.4, 3.6]], "panto": -5.6}}},
+	# Automated people mover (Miami's Metromover): short cars in pairs on elevated guideways.
+	"mover": {"w": 2.85, "gap": 0.45, "wheel_r": 0.38, "gangway": Vector2(1.5, 2.0),
+		"sections": {
+			"cab": {"len": 13.4, "prof": PROF_METRO, "front": NOSE_METRO, "rear": {}, "doors": [-3.2, 3.2],
+				"pitch": 1.45, "axle": 1.1, "bogies": [4.2, -4.2], "boxes": [[0.0, 2.6]],
+				"under": [[0.0, 4.0]], "panto": -3.8},
+			"mid": {"len": 13.4, "prof": PROF_METRO, "front": {}, "rear": {}, "doors": [-3.2, 3.2],
+				"pitch": 1.45, "axle": 1.1, "bogies": [4.2, -4.2], "boxes": [[0.0, 2.6]],
+				"under": [[0.0, 4.0]], "panto": -3.8}}},
 }
 
-## The regions whose metro runs on surface track (Helsinki's, east of
-## Sörnäinen, Länsimetro is all underground; Stockholm's above-ground
-## tunnelbana, over Västerbron and out in the suburbs) and the livery
-## of each.
-const METRO_REGIONS: Array[String] = ["helsinki", "espoo", "stockholm"]
-const METRO_LIVERY := {"stockholm": "stockholm_metro"}
+## The regions whose metro runs on surface or viaduct track (Helsinki's,
+## Stockholm's tunnelbana, Miami's Metrorail) and the livery of each.
+const METRO_REGIONS: Array[String] = ["helsinki", "espoo", "stockholm", "miami"]
+const METRO_LIVERY := {"stockholm": "stockholm_metro", "miami": "miami_metrorail"}
 
 ## Whether a metro runs on `rail` in CityStyles region `region`: open
-## (or roofed) mapped subway track at or above ground in Helsinki and
-## Stockholm.
+## (or roofed) mapped subway track at or above ground in Helsinki,
+## Stockholm and Miami.
 static func metro(region: String, rail: Dictionary) -> bool:
 	if not region in METRO_REGIONS or str(rail.get("class", "")) != "subway":
 		return false
 	return (not bool(rail.get("tunnel", false)) or bool(rail.get("covered", false))) and int(rail.get("layer", 0)) >= 0
 
-## Whether trains stand on `rail` in region `region`: carries(), or a
-## city's surface metro track (metro()).
+## Whether an automated people mover runs on `rail` in `region`: Miami's
+## elevated Metromover guideways (mapped as monorail).
+static func mover(region: String, rail: Dictionary) -> bool:
+	return region == "miami" and str(rail.get("class", "")) == "monorail" \
+		and not bool(rail.get("tunnel", false)) and int(rail.get("layer", 0)) >= 0
+
+## Whether trains stand on `rail` in region `region`: carries(), a
+## city's surface metro track (metro()), or its people mover (mover()).
 static func carries_in(region: String, rail: Dictionary) -> bool:
-	return carries(rail) or metro(region, rail)
+	return carries(rail) or metro(region, rail) or mover(region, rail)
 
 ## Whether passenger trains run on `rail`: mapped heavy rail.
 static func carries(rail: Dictionary) -> bool:
@@ -155,10 +183,15 @@ static func overhead(rail: Dictionary) -> bool:
 ## "panto"}, or {} when none does. `h` (0..1) mixes a city's fleet and
 ## its train lengths.
 static func pick(region: String, country: String, rail: Dictionary, h: float) -> Dictionary:
+	if mover(region, rail):
+		return {"kind": "mover", "livery": "miami_metromover", "cars": 2, "panto": false}
 	if metro(region, rail):
 		return {"kind": "metro", "livery": METRO_LIVERY.get(region, "helsinki_metro"), "cars": 4, "panto": false}
 	if not carries(rail):
 		return {}
+	if region == "miami":
+		return {"kind": "intercity", "livery": "brightline", "cars": 4, "panto": false} if h < 0.55 \
+			else {"kind": "emu", "livery": "tri_rail", "cars": 3, "panto": false}
 	var wired := overhead(rail)
 	# A second, independent draw from the one hash: the train's length.
 	var cars := 3 + int(fposmod(h * 7.0, 1.0) * 2.0)

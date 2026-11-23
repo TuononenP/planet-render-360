@@ -46,10 +46,12 @@ const LENS := {"r": Color(1.0, 0.08, 0.03), "g": Color(0.1, 1.0, 0.45)}
 
 static var _meshes: Dictionary = {}
 
-## The place's furniture kit: "na", "japan", "uk", "nl" or "europe".
+## The place's furniture kit: "na", "miami", "nyc", "japan", "uk", "nl", "nordic", "nordic_se" or "europe".
 static func furniture_family(region: String, country: String, city: String = "") -> String:
 	if city == "new_york":
 		return "nyc"
+	if city == "miami":
+		return "miami"
 	var iso := country.to_upper()
 	if iso == "FI":
 		return "nordic"
@@ -71,11 +73,13 @@ static func mesh_key(kind: String, family: String) -> String:
 		"bench":
 			return "bench_stone" if family == "japan" else ("bench_park" if family == "nordic" else "bench_wood")
 		"bin":
-			return {"na": "bin_drum", "nyc": "bin_nyc", "uk": "bin_black"}.get(family, "bin_post")
+			return {"na": "bin_drum", "miami": "bin_drum", "nyc": "bin_nyc", "uk": "bin_black"}.get(family, "bin_post")
 		"bollard":
 			return "bollard_red" if family == "nl" else "bollard_black"
 		"signals":
-			return {"na": "signals_na", "nyc": "signals_na", "japan": "signals_jp"}.get(family, "signals_post")
+			return {"na": "signals_na", "miami": "signals_na", "nyc": "signals_na", "japan": "signals_jp"}.get(family, "signals_post")
+		"bicycle_rental":
+			return "bikeshare"
 		"subway_entrance":
 			return "t_sign" if family == "nordic_se" else kind
 	return kind
@@ -88,13 +92,15 @@ static func shows_entrances(family: String) -> bool:
 ## Adds the furniture under one "StreetFurniture" node of `root` on
 ## desktop Ultra. Returns the number of items placed.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
-		mask: VegetationMask, m2u: float) -> int:
+		mask: VegetationMask, m2u: float, marking_plan: RoadMarkings.Plan = null) -> int:
 	if not CityDetail.street_extras(data) or data.buildings.is_empty():
 		return 0
 	var region := ArchitectureStyle.country_region_for(data.latitude, data.longitude, data.country)
 	var family := furniture_family(region, data.country, CityStyles.region_at(data.latitude, data.longitude))
 	var centre := View360.spawn_xz(data)
 	var roads := RoadIndex.new(data, m2u, (RADIUS_M + SNAP_M) * m2u, centre)
+	var aprons := StreetProps.apron_grid(marking_plan, m2u)
+	var crossings := StreetProps.crossing_grid(data, marking_plan, m2u)
 	var items: Array = data.street_furniture
 	if items.is_empty():
 		items = fill(data, roads, family, m2u)
@@ -102,6 +108,12 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		items = items.duplicate()
 		for stop in data.tram_stops:
 			items.append({"x": float(stop.get("x", 0.0)), "z": float(stop.get("z", 0.0)), "kind": "tram_stop"})
+	elif family == "miami":
+		items = items.duplicate()
+		for poi: Variant in data.pois:
+			if poi is Dictionary and str((poi as Dictionary).get("kind", "")) == "bicycle_rental":
+				var d_poi: Dictionary = poi
+				items.append({"x": float(d_poi.get("x", 0.0)), "z": float(d_poi.get("z", 0.0)), "kind": "bicycle_rental"})
 	var r2 := pow(RADIUS_M * m2u, 2.0)
 	var near: Array = []
 	for it in items:
@@ -121,7 +133,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	for spot in all_spots:
 		if count >= MAX_ITEMS:
 			break
-		var p := _clear_of_lanes(spot[0], spot[1], str(spot[2]).begins_with("signals"), mask, m2u)
+		var p := _clear_of_lanes(spot[0], spot[1], str(spot[2]).begins_with("signals"), mask, m2u, aprons, crossings)
 		if p.x == INF or mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.WATER, 0.0) \
 				or ground.water_at(p.x, p.y) > 0.0:
 			continue
@@ -155,7 +167,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 ## street-furniture kind; poles/signs are too narrow for a ground blot.
 const SHADOW_FOOTPRINT := {
 	"bench_wood": Vector2(0.85, 2.0), "bench_park": Vector2(0.85, 2.0), "bench_stone": Vector2(0.85, 2.0),
-	"bus_stop": Vector2(1.8, 3.6),
+	"bus_stop": Vector2(1.8, 3.6), "bikeshare": Vector2(1.75, 4.6),
 	"bin_post": Vector2(0.55, 0.55), "bin_drum": Vector2(0.75, 0.75),
 	"bin_nyc": Vector2(0.75, 0.75), "bin_black": Vector2(0.65, 0.65),
 	"bollard_black": Vector2(0.42, 0.42), "bollard_red": Vector2(0.42, 0.42),
@@ -198,19 +210,25 @@ static func _add_contact_shadows(holder: Node3D, placed: Dictionary, m2u: float)
 	holder.add_child(mmi)
 
 ## `p`, or the nearest point along its street (a signal faces along it,
-## anything else faces across it) out of every carriageway; INF when
-## there is none within SLIDE_M.
+## anything else faces across it) out of every carriageway, apron and
+## pedestrian crossing; INF when there is none within SLIDE_M.
 static func _clear_of_lanes(p: Vector2, facing: Vector2, is_signal: bool, mask: VegetationMask,
-		m2u: float) -> Vector2:
-	if not mask.blocked(p.x, p.y, VegetationMask.ROAD, 0.0):
+		m2u: float, aprons: Dictionary = {}, crossings: Dictionary = {}) -> Vector2:
+	if not _spot_blocked(p, mask, m2u, aprons, crossings):
 		return p
 	var along := facing if is_signal else Vector2(-facing.y, facing.x)
 	for k in range(1, SLIDE_M + 1):
 		for sgn in [1.0, -1.0]:
 			var q: Vector2 = p + along * sgn * float(k) * m2u
-			if not mask.blocked(q.x, q.y, VegetationMask.ROAD, 0.0):
+			if not _spot_blocked(q, mask, m2u, aprons, crossings):
 				return q
 	return Vector2(INF, INF)
+
+static func _spot_blocked(q: Vector2, mask: VegetationMask, m2u: float,
+		aprons: Dictionary, crossings: Dictionary) -> bool:
+	return mask.blocked(q.x, q.y, VegetationMask.ROAD, 0.0) \
+		or StreetProps._on_apron(aprons, q, m2u) \
+		or StreetProps.on_crossing(crossings, q, m2u)
 
 ## [position, facing direction, mesh key] for one item: signals become a
 ## pole on each kerb facing its oncoming lane, stops and road-bound
@@ -485,6 +503,32 @@ static func mesh(key: String) -> ArrayMesh:
 			for x in [-0.03, 0.03]:
 				StreetProps._box(buf.call("sign"), Vector3(x, 2.84, 0), Vector3(0.015, 0.1, 0.4))
 				StreetProps._box(buf.call("sign"), Vector3(x, 2.6, 0), Vector3(0.015, 0.34, 0.1))
+		"bikeshare":
+			# Five-bike kerbside dock row and solar kiosk (Miami CitiBike style).
+			StreetProps._box(buf.call("iron"), Vector3(-0.08, 0.02, 0.0), Vector3(1.65, 0.04, 4.5))
+			StreetProps._box(buf.call("galv"), Vector3(0.42, 0.96, -2.02), Vector3(0.18, 1.84, 0.32))
+			StreetProps._box(buf.call("miami_cyan"), Vector3(0.42, 1.62, -2.02), Vector3(0.20, 0.44, 0.34))
+			StreetProps._box(buf.call("iron"), Vector3(0.42, 1.90, -2.02), Vector3(0.26, 0.04, 0.40))
+			for bz: float in [-1.42, -0.68, 0.06, 0.80, 1.54]:
+				StreetProps._box(buf.call("galv"), Vector3(0.50, 0.38, bz), Vector3(0.12, 0.68, 0.10))
+				StreetProps._box(buf.call("miami_cyan"), Vector3(0.46, 0.68, bz), Vector3(0.18, 0.14, 0.12))
+				for wx: float in [0.30, -0.66]:
+					for seg_k: int in 8:
+						var a0 := TAU * float(seg_k) / 8.0
+						var a1 := TAU * float(seg_k + 1) / 8.0
+						TreeMeshLibrary._tube(buf.call("iron"), [Vector3(wx + cos(a0) * 0.29, 0.33 + sin(a0) * 0.29, bz),
+							Vector3(wx + cos(a1) * 0.29, 0.33 + sin(a1) * 0.29, bz)], [0.028, 0.028], 4, 1.0, 1.0)
+				TreeMeshLibrary._tube(buf.call("miami_cyan"), [Vector3(0.24, 0.68, bz), Vector3(-0.18, 0.28, bz),
+					Vector3(-0.66, 0.33, bz)], [0.026, 0.028, 0.022], 5, 1.0, 1.0)
+				TreeMeshLibrary._tube(buf.call("miami_cyan"), [Vector3(-0.18, 0.28, bz), Vector3(-0.30, 0.72, bz)],
+					[0.026, 0.024], 5, 1.0, 1.0)
+				StreetProps._box(buf.call("miami_cyan"), Vector3(-0.66, 0.66, bz), Vector3(0.38, 0.04, 0.11))
+				TreeMeshLibrary._tube(buf.call("galv"), [Vector3(0.30, 0.33, bz), Vector3(0.22, 0.92, bz)],
+					[0.02, 0.02], 5, 1.0, 1.0)
+				TreeMeshLibrary._tube(buf.call("iron"), [Vector3(0.20, 0.94, bz - 0.24), Vector3(0.24, 0.94, bz),
+					Vector3(0.20, 0.94, bz + 0.24)], [0.016, 0.018, 0.016], 4, 1.0, 1.0)
+				StreetProps._box(buf.call("iron"), Vector3(0.34, 0.80, bz), Vector3(0.20, 0.18, 0.28))
+				StreetProps._box(buf.call("iron"), Vector3(-0.33, 0.84, bz), Vector3(0.24, 0.06, 0.14))
 	var m := ArrayMesh.new()
 	for mat in surf:
 		var arrays := (surf[mat] as TreeMeshLibrary.Buf).arrays()
@@ -514,12 +558,13 @@ static func _material(name: String) -> Material:
 		"concrete": Color(0.48, 0.47, 0.44), "green": Color(0.05, 0.12, 0.07),
 		"gold": Color(0.55, 0.42, 0.12), "oxide": Color(0.22, 0.07, 0.04),
 		"galv": Color(0.46, 0.47, 0.46), "glass": Color(0.6, 0.7, 0.72, 0.25),
-		"blue": Color(0.015, 0.19, 0.5), "tram_green": Color(0.0, 0.34, 0.2), "sign": Color(0.82, 0.80, 0.74), "lens_off": Color(0.03, 0.03, 0.03),
+		"blue": Color(0.015, 0.19, 0.5), "miami_cyan": Color(0.03, 0.36, 0.58),
+		"tram_green": Color(0.0, 0.34, 0.2), "sign": Color(0.82, 0.80, 0.74), "lens_off": Color(0.03, 0.03, 0.03),
 	}.get(name, Color(0.03, 0.03, 0.03))
 	m.albedo_color = col
 	m.vertex_color_use_as_albedo = true
 	m.roughness = 0.75 if name in ["wood", "wood_red", "concrete"] else 0.4
-	m.metallic = 0.5 if name in ["iron", "galv", "gold", "oxide", "green"] else 0.0
+	m.metallic = 0.5 if name in ["iron", "galv", "gold", "oxide", "green", "miami_cyan"] else 0.0
 	if name == "glass":
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		m.roughness = 0.05
@@ -534,7 +579,7 @@ static func _material(name: String) -> Material:
 		m.emission_enabled = true
 		m.emission = m.albedo_color
 		m.emission_energy_multiplier = 0.25
-	return StreetSnow.material(m) if name in ["wood", "wood_red", "iron", "concrete", "green", "galv"] else m
+	return StreetSnow.material(m) if name in ["wood", "wood_red", "iron", "concrete", "green", "galv", "miami_cyan"] else m
 
 ## Road segments near the eye on a coarse grid, for nearest-kerb lookups.
 class RoadIndex:

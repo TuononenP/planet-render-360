@@ -42,7 +42,7 @@ const CITIES := {
 	"la_defense": [48.8920, 2.2380, "haussmann"], "osaka": [34.6937, 135.5023, "japan"],
 	"kowloon": [22.3167, 114.1820, "hong_kong"], "rotterdam": [51.9244, 4.4777, "west_europe_brick"],
 	"milan": [45.4642, 9.19, "milan"], "boston": [42.3601, -71.0589, "boston"],
-	"havana": [23.1136, -82.3666, "havana"],
+	"havana": [23.1136, -82.3666, "havana"], "miami": [25.7743, -80.1855, "miami"],
 }
 
 ## Cities with a zone: the 200-building look census must differ between
@@ -68,7 +68,7 @@ const ZONE_CITIES := {
 	"mexico_city": [19.4326, -99.1332], "rio": [-22.95, -43.2], "buenos_aires": [-34.6037, -58.3816],
 	"sydney": [-33.8688, 151.2093], "melbourne": [-37.8136, 144.9631],
 	"warsaw": [52.2297, 21.0122], "moscow": [55.7558, 37.6173], "havana": [23.1136, -82.3666],
-	"delhi": [28.6139, 77.209], "reykjavik": [64.1466, -21.9426],
+	"delhi": [28.6139, 77.209], "reykjavik": [64.1466, -21.9426], "miami": [25.7743, -80.1855],
 }
 const ROOF_SHAPES := ["flat", "gabled", "hipped", "mansard", "pyramidal", "dome",
 	"gambrel", "skillion", "half-hipped", "saltbox", "round"]
@@ -80,7 +80,7 @@ const RELIEF_KEYS := {"balcony_rows": TYPE_ARRAY, "balconette": TYPE_FLOAT,
 	"altana": TYPE_FLOAT, "chimney_cap": TYPE_STRING, "garage": TYPE_FLOAT, "cornice": TYPE_FLOAT, "glazed_balcony": TYPE_FLOAT, "turret": TYPE_FLOAT,
 	"granite_plinth": TYPE_BOOL, "corner_dome": TYPE_FLOAT, "wall_lantern": TYPE_FLOAT,
 	"mullion": TYPE_BOOL, "danji_number": TYPE_FLOAT, "sign_bands": TYPE_FLOAT, "sign_stack": TYPE_FLOAT,
-	"modern": TYPE_DICTIONARY}
+	"thai_wat": TYPE_BOOL, "deco_front": TYPE_BOOL, "modern": TYPE_DICTIONARY}
 
 const PROFILE_KEYS := ["w", "p", "bay", "fr", "sh", "sp", "r", "pitch", "rf", "fh", "st", "ch", "eq"]
 const ROOF_SETS := ["slate", "terracotta", "membrane", "concrete", "wood", "copper", "sheet_metal"]
@@ -195,7 +195,7 @@ func _region_checks(failures: Array[String]) -> void:
 	# city's style zone, so its view reads as that city.
 	for row in PresetViews.ROWS:
 		var city := CityStyles.city_of_region(CityStyles.region_at(float(row["lat"]), float(row["lon"])))
-		var want: String = str({"alps": "interlaken", "big_sur": "", "new_york_midtown": "new_york", "central_park": "new_york"}.get(str(row["id"]), str(row["id"])))
+		var want: String = str({"alps": "interlaken", "big_sur": "", "new_york_midtown": "new_york", "central_park": "new_york", "miami_beach": "miami"}.get(str(row["id"]), str(row["id"])))
 		if city != want:
 			failures.append("quick pick %s stands in city zone '%s', expected '%s'" % [row["id"], city, want])
 	if ArchitectureStyle.region_for(48.8566, 2.3522, "FR") != "haussmann" \
@@ -881,6 +881,19 @@ func _era_checks(failures: Array[String]) -> void:
 		["boston", {"kind": "house", "start_year": 1870, "levels": 4}, {}, "boston_backbay"],
 		["toronto", {"kind": "apartments", "levels": 40}, {}, "toronto_tower"],
 		["rio", {"kind": "apartments", "levels": 12}, {}, "rio"],
+		# Greater Miami districts & typologies (MI-6.1 / MI-6.2).
+		["miami", {"kind": "commercial", "levels": 3, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("miami", 25.7810, -80.1315), "mi_deco"],
+		["miami", {"kind": "commercial", "levels": 2, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("miami", 25.7495, -80.2610), "mi_med_revival"],
+		["miami", {"kind": "apartments", "levels": 30, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("miami", 25.7630, -80.1915), "mi_condo_tower"],
+		["miami", {"kind": "commercial", "levels": 25, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("miami", 25.7735, -80.1895), "mi_office_glass"],
+		["miami", {"kind": "commercial", "levels": 1, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("miami", 25.8010, -80.1990), "mi_warehouse"],
+		["miami", {"kind": "house", "levels": 1, "x": 0.0, "z": 0.0},
+			CityStyles.local_frame("miami", 25.7660, -80.2250), "mi_bungalow"],
 	]
 	for o in other:
 		var got := _era(str(o[0]), o[1], o[2], 200.0 if str(o[1]["kind"]) == "house" else 600.0)

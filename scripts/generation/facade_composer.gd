@@ -30,7 +30,7 @@ const MULLION := Color(0.36, 0.375, 0.39)
 const CELL := 128
 const BAYS := 4
 const TILED: Array[String] = ["punched", "strip", "balcony", "clapboard",
-	"industrial", "adobe", "curtain", "tiles", "panel", "ornate", "brownstone", "shophouse", "pier", "louvre"]
+	"industrial", "adobe", "curtain", "tiles", "panel", "ornate", "brownstone", "shophouse", "pier", "louvre", "balcony_band"]
 const WINDOWS: Array[String] = ["casement", "french", "sash", "wide", "small", "gothic"]
 ## Photo repeats per bay cell: brick courses and boards must read at
 ## real size, so those bases tile 2x2 inside each bay.
@@ -43,7 +43,7 @@ const KEEP_CONTRAST := {"concrete": 0.4, "stone": 0.7, "render": 0.7}
 const STOCKHOLM_KEEP := 0.3
 ## Cities whose render is smooth plaster (the share above applies): Stockholm's, and Helsinki's, whose
 ## stippled stucco photo turned a shaded ochre front into speckled olive.
-const SMOOTH_PLASTER_CITIES: Array[String] = ["stockholm", "helsinki"]
+const SMOOTH_PLASTER_CITIES: Array[String] = ["stockholm", "helsinki", "miami"]
 
 static func smooth_plaster(set_name: String, look: Dictionary) -> bool:
 	return set_name == "render" and str(look.get("city", "")) in SMOOTH_PLASTER_CITIES

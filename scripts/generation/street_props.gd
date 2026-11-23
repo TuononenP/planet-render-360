@@ -64,8 +64,10 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	# Planned before the lamps: a side-street lamp gives way only where a
 	# utility pole really stands (the poles stop at their radius and cap).
 	var pole_plan := UtilityPoles.plan(data, ground, mask)
+	var marking_plan := RoadMarkings.shared_plan(data, ground)
 	ctx = ctx.duplicate()
 	ctx["pole_grid"] = UtilityPoles.pole_grid(pole_plan)
+	ctx["marking_plan"] = marking_plan
 	t = _lap(timings, "pole_plan", t)
 	var lamps := _lampposts(root, data, ground, mask, ctx)
 	t = _lap(timings, "lamps", t)
@@ -99,14 +101,16 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "trains", t)
 	if abort != null and abort.requested:
 		return {}
-	var wires := OverheadWires.build(root, data, ground)
+	var wires := OverheadWires.build(root, data, ground, mask, marking_plan)
 	t = _lap(timings, "wires", t)
 	var poles := UtilityPoles.build(root, data, ground, pole_plan)
 	t = _lap(timings, "utility_poles", t)
 	var snowbanks := Snowbanks.build(root, data, ground)
 	t = _lap(timings, "snowbanks", t)
+	var beach := BeachDressing.build(root, data, ground, mask)
+	t = _lap(timings, "beach", t)
 	print("PROPS timings ms ", timings)
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "plazas": plazas, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks}
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "plazas": plazas, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks, "beach": beach}
 
 ## Records the ms since `t` under `key`; returns the time now.
 static func _lap(timings: Dictionary, key: String, t: int) -> int:
@@ -133,7 +137,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 	var placed := {"lantern": [], "heritage": [], "cobra": [], "utility": [], "modern": [], "modern_s": [], "post_top": [], "nyc_f": [], "nyc_crook": []}
 	var occupied := {}
 	var occ_cell := 10.0 * m2u
-	var sites := _lamp_sites(data, ground, m2u)
+	var sites := _lamp_sites(data, ground, m2u, ctx.get("marking_plan"))
 	var pole_grid: Dictionary = ctx.get("pole_grid", {})
 	for r in data.roads:
 		var pts: PackedVector2Array
@@ -187,7 +191,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				if mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.ROAD
 						| VegetationMask.WATER, 0.0) or ground.water_at(p.x, p.y) > 0.0:
 					continue
-				if _on_apron(sites["aprons"], p, m2u):
+				if _on_apron(sites["aprons"], p, m2u) or on_crossing(sites["crossings"], p, m2u):
 					continue
 				# A utility pole (with its own bracket lamp) already stands here.
 				if style == "utility" and UtilityPoles.near_pole(pole_grid, p):
@@ -224,22 +228,60 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 		total += xf.size()
 	return total
 
-## Lookup grids from the road plan: the junction surfaces no lamp stands
-## on, and the signals whose streets take the main-road lamp.
-static func _lamp_sites(data: LocationData, ground: GroundTruth, m2u: float) -> Dictionary:
-	var plan := RoadMarkings.shared_plan(data, ground)
+## Lookup grids from the road plan: junction aprons, pedestrian crossings
+## no pole stands on, and signals whose streets take the main-road lamp.
+static func _lamp_sites(data: LocationData, ground: GroundTruth, m2u: float,
+		marking_plan: RoadMarkings.Plan = null) -> Dictionary:
+	var plan := marking_plan if marking_plan != null else RoadMarkings.shared_plan(data, ground)
+	var signals := {}
+	for q in plan.signals:
+		RoadMarkings._grid_add(signals, q, q, q, m2u)
+	return {"aprons": apron_grid(plan, m2u), "signals": signals,
+		"crossings": crossing_grid(data, plan, m2u)}
+
+static func apron_grid(plan: RoadMarkings.Plan, m2u: float) -> Dictionary:
 	var aprons := {}
+	if plan == null:
+		return aprons
 	for ring: PackedVector2Array in plan.aprons:
 		var box := Rect2(ring[0], Vector2.ZERO)
 		for q in ring:
 			box = box.expand(q)
 		RoadMarkings._grid_add(aprons, box.position, box.end, ring, m2u)
-	var signals := {}
-	for q in plan.signals:
-		RoadMarkings._grid_add(signals, q, q, q, m2u)
-	return {"aprons": aprons, "signals": signals}
+	return aprons
+
+static func crossing_grid(data: LocationData, plan: RoadMarkings.Plan, m2u: float) -> Dictionary:
+	var grid := {}
+	for raw in data.roads:
+		if not (raw is Dictionary):
+			continue
+		var rd: Dictionary = raw
+		if bool(rd.get("tunnel", false)) or bool(rd.get("bridge", false)):
+			continue
+		if not bool(rd.get("crossing", false)) and str(rd.get("crossing_style", "")) == "":
+			continue
+		var pts: PackedVector2Array = rd.get("points", PackedVector2Array())
+		var clear := (maxf(float(rd.get("width_m", 3.0)) * 0.5, 1.8) + 0.9) * m2u
+		for j in pts.size() - 1:
+			RoadMarkings._grid_add(grid, pts[j], pts[j + 1], [pts[j], pts[j + 1], clear], m2u)
+	if plan != null:
+		var inf_clear := (RoadMarkings.INFERRED_DEPTH_M * 0.5 + 0.9) * m2u
+		for c: PackedVector2Array in plan.inferred:
+			for j in c.size() - 1:
+				RoadMarkings._grid_add(grid, c[j], c[j + 1], [c[j], c[j + 1], inf_clear], m2u)
+	return grid
+
+static func on_crossing(grid: Dictionary, p: Vector2, m2u: float) -> bool:
+	if grid.is_empty():
+		return false
+	for seg: Array in RoadMarkings._grid_near(grid, p, 4.5 * m2u, m2u):
+		if p.distance_to(Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])) <= float(seg[2]):
+			return true
+	return false
 
 static func _on_apron(aprons: Dictionary, p: Vector2, m2u: float) -> bool:
+	if aprons.is_empty():
+		return false
 	for ring: PackedVector2Array in RoadMarkings._grid_near(aprons, p, 0.0, m2u):
 		if Geometry2D.is_point_in_polygon(p, ring):
 			return true

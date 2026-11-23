@@ -63,6 +63,8 @@ const ZONES := [
 		"rules": {"tree_mix": "lime_avenue", "trees_only": true}},
 	{"id": "humlegarden", "lat": [59.3355, 59.3395], "lon": [18.0700, 18.0780],
 		"rules": {"tree_mix": "lime_avenue", "trees_only": true}},
+	{"id": "miami_metro", "lat": [25.55, 26.02], "lon": [-80.42, -80.08],
+		"rules": {"tree_mix": "miami", "trees_only": true}},
 	{"id": "siem_reap_town", "lat": [13.330, 13.395], "lon": [103.820, 103.900],
 		"rules": {"max_storeys": 5, "no_new_era": true, "tree_mix": "khmer"}},
 ]

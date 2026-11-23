@@ -1,0 +1,7 @@
+centre	lat	lon	buildings	with_height	pct_height	with_levels	pct_levels	building_parts	with_colour	with_material	with_roof_shape	with_start_date	natural_beach	natural_sand_dune	swimming_pools	marinas	piers	lifeguards	trees	trees_with_genus	rail_ways
+A_Downtown	25.7743	-80.1855	3512	2534	72.2%	253	7.2%	379	0	0	57	6	0	1	191	4	88	0	1641	1	monorail(bridge=no):39; monorail(bridge=yes):68; rail(bridge=movable):1; rail(bridge=no):33; rail(bridge=yes):24; subway(bridge=no):17; subway(bridge=yes):14
+B_Brickell	25.767	-80.19	4853	4063	83.7%	261	5.4%	361	0	0	75	6	6	1	70	2	81	0	2074	1	monorail(bridge=no):39; monorail(bridge=yes):67; rail(bridge=movable):1; rail(bridge=no):19; rail(bridge=yes):24; subway(bridge=no):21; subway(bridge=yes):15
+C_SouthBeach	25.781	-80.13	3148	1405	44.6%	360	11.4%	86	2	0	108	10	3	45	180	3	117	0	1554	0	
+D_MidBeach	25.818	-80.122	3258	2207	67.7%	34	1.0%	32	0	0	38	2	2	50	96	0	9	1	872	0	
+E_VizcayaGrove	25.7444	-80.2105	9071	8641	95.3%	50	0.6%	51	0	0	27	2	6	0	53	3	81	0	797	60	monorail(bridge=yes):4; subway(bridge=no):11; subway(bridge=yes):5
+F_CoralGables	25.741	-80.279	15260	14692	96.3%	66	0.4%	107	0	0	2	2	0	171	27	0	0	0	1521	355	subway(bridge=yes):12

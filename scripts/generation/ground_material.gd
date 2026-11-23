@@ -113,9 +113,10 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	if cmap == null:
 		cmap = class_map(data)
 	m.set_shader_parameter("class_map", ImageTexture.create_from_image(cmap))
+	var colours := (ShoreApron.palette_overrides(data) if ShoreApron.stockholm(data) else FinnishGranite.palette_overrides(data)).duplicate()
+	colours.merge(BeachDressing.palette_overrides(data), true)
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
-		ClimateModel.grass_tint(data, data.season),
-		ShoreApron.palette_overrides(data) if ShoreApron.stockholm(data) else FinnishGranite.palette_overrides(data))))
+		ClimateModel.grass_tint(data, data.season), colours)))
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
 	if ShoreApron.stockholm(data):
 		# Södermalm's cliffs are bare granite: rock from gentler slopes, and grass holds

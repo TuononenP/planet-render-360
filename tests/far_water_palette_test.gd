@@ -13,6 +13,9 @@ func _init() -> void:
 	_place(40.706, -74.004, "New York harbour")
 	_place(13.75398, 100.50144, "Bangkok Chao Phraya")
 	_check_bangkok_silty()
+	_place(25.7743, -80.1855, "Miami Biscayne Bay")
+	_place(25.7810, -80.1300, "Miami Beach Atlantic")
+	_check_miami_water()
 	var mat := FarSurface.drape_material(null, null, false, null)
 	var code := mat.shader.code
 	_check(code.contains("uniform vec3 water_deep") and code.contains("water_far_rough"),
@@ -56,3 +59,27 @@ func _check_bangkok_silty() -> void:
 		var c_khlong: Color = inland["khlong"]
 		_check(c_deep.r > c_deep.b and c_deep.g > c_deep.b, "Chao Phraya river colour must have zero turquoise bias")
 		_check(c_khlong.g < c_deep.g and c_khlong.g > c_khlong.b, "Bangkok khlong palette must be darker olive-brown than river")
+
+func _check_miami_water() -> void:
+	var bay := LocationData.new()
+	bay.latitude = 25.7743
+	bay.longitude = -80.1855
+	var ocean := LocationData.new()
+	ocean.latitude = 25.7810
+	ocean.longitude = -80.1300
+	_check(WaterSurface.temperate_sea(bay) == 0.0, "Miami sea is tropical even without climate data")
+	var bay_sea := WaterSurface.sea_palette(bay)
+	var atl_sea := WaterSurface.sea_palette(ocean)
+	var sh: Vector3 = bay_sea["shallow"]
+	_check(sh.y > sh.x * 4.0 and sh.z > sh.x * 4.0, "Biscayne Bay must be turquoise-green: %s" % sh)
+	var bay_deep: Vector3 = bay_sea["deep"]
+	var atl_deep: Vector3 = atl_sea["deep"]
+	_check(atl_deep.z > bay_deep.z, "Atlantic must be bluer/deeper than the bay")
+	var river := LocationData.new()
+	river.latitude = 25.7700
+	river.longitude = -80.2000
+	var inland := WaterSurface.inland_palette(river)
+	_check(not inland.is_empty(), "Miami River needs an inland palette")
+	if not inland.is_empty():
+		var c: Color = inland["deep"]
+		_check(c.g > c.r and c.g > c.b, "Miami River must be brackish green-brown")

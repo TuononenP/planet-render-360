@@ -137,6 +137,18 @@ const ENTRIES := {
 	"new_york_transit": [40.7060, -74.0040, "transit", 1, "2026-11-11T01:19:20", 20384, "a357f1fc32655ee39ee7affe0415ca21fb5251c1987a961c20a1c4a18f96fccf"],
 	"central_park_transit": [40.7760, -73.9700, "transit", 1, "2026-11-14T13:55:20", 12134, "8edb602958639f128e468c367cb287f382cc49e78ebd7e3f97ed3e2f6cff17c8"],
 	"san_francisco_transit": [37.8040, -122.4195, "transit", 1, "2026-11-11T01:20:47", 15218, "80d325cb3da217c364d5ef0d76b91fa1aa4bad1db5c0071f0aa5245b21602579"],
+	"miami_detailed": [25.7743, -80.1855, "detailed_extract", 12, "2026-11-22T21:20:48", 231184, "7a4f4bb5a5cca224753991dc13492ca741674bd1285792a6180d3b606eff13c3"],
+	"miami_ring1600": [25.7743, -80.1855, "ring1600", 1, "2026-11-22T21:20:48", 53604, "caa4eaea2e1873f3ea15b5dd7369fbec144dfbb01eee39a93704d150f5d0fac1"],
+	"miami_ring2500": [25.7743, -80.1855, "ring2500", 1, "2026-11-22T21:20:48", 87356, "2e2d1e92c63339ae231773db015eab4254582f80167198f872387c362156d4b2"],
+	"miami_poi": [25.7743, -80.1855, "poi", 1, "2026-11-22T21:20:48", 22238, "940ccc69884a494752dc381c5904972066ead91fd844fcf2409f8ed728211d8c"],
+	"miami_far": [25.7743, -80.1855, "far", 3, "2026-11-22T21:20:48", 210168, "b5801dd3966fb92ea4cfa5d7ef984e5b703a815d616e983cb872a1aff0e23810"],
+	"miami_transit": [25.7743, -80.1855, "transit", 1, "2026-11-22T21:20:48", 10412, "e11f6b369f4eb99c6c38e297ac5e5399bc28be3ca4453833edaf01734208d790"],
+	"miami_beach_detailed": [25.7810, -80.1300, "detailed_extract", 12, "2026-11-22T21:20:48", 226814, "f2df5ed03f79e74b57b4e4f0bd131aba3569a1f65c1ec5640cae173b9d0b7684"],
+	"miami_beach_ring1600": [25.7810, -80.1300, "ring1600", 1, "2026-11-22T21:20:48", 20603, "1f3d364350c62f61f1a45459a578d261490168eb15313ed1bbfdbd1a9c9eebc2"],
+	"miami_beach_ring2500": [25.7810, -80.1300, "ring2500", 1, "2026-11-22T21:20:48", 42286, "9097163c0cc1e87b2a3627c5aa257e5ac63f176f51fe696f422b8482c1025baa"],
+	"miami_beach_poi": [25.7810, -80.1300, "poi", 1, "2026-11-22T21:20:48", 21481, "7b0b245663eecb39cfccc6a1cd55133a3c7bbecd0a827ff21db96faf630e4a65"],
+	"miami_beach_far": [25.7810, -80.1300, "far", 3, "2026-11-22T21:20:48", 152541, "a44dbc490e69d40241b96c9f9dc65bbb90bd22b4b7dd4f76a49509dd66010e2c"],
+	"miami_beach_transit": [25.7810, -80.1300, "transit", 1, "2026-11-22T21:20:48", 3439, "e0e22efd3192cf05810d1c8970a76b70af0d7c1f0d1a88a41ae12f264f90b066"],
 }
 const DIRECTORY := "res://assets/osm_snapshots/"
 const CAPITAL_MANIFEST := DIRECTORY + "capital_manifest.json"

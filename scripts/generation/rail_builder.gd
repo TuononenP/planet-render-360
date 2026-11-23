@@ -140,6 +140,11 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		if abort != null and abort.requested:
 			return
 		_way(batches, w, surf, spans, m2u, data, road_index, beside)
+	if RailViaductLook.has_guideways(data):
+		var decks_ref: RailDecks = beside.get("decks", null)
+		if decks_ref == null:
+			decks_ref = RailDecks.of(data, surf, m2u)
+		RailViaductLook.build_elevated_stations(batches, data, surf, decks_ref, m2u)
 	for key in batches:
 		var b: RoadBuilder._Batch = batches[key]
 		if b.indices.is_empty():
@@ -148,7 +153,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mi.name = "Rail_" + str(key)
 		mi.mesh = b.mesh()
 		mi.material_override = _material(str(key))
-		if not str(key) in ["deck", "deck_brick"]:
+		if not str(key) in ["deck", "deck_brick", "deck_concrete", "station_canopy"]:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
 
@@ -163,8 +168,9 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 	var gauge := float(way.get("gauge_m", 1.435)) * m2u
 	var bed := float(way.get("width_m", 3.3)) * m2u
 	var dense := RoadBuilder._resample(pts, surf.step * 0.34)
+	var cls := str(way.get("class", ""))
 	if bool(way.get("bridge", false)):
-		if data != null and str(way.get("class", "")) == "tram" and _on_road(pts[pts.size() / 2], data, m2u, road_index):
+		if data != null and cls == "tram" and _on_road(pts[pts.size() / 2], data, m2u, road_index):
 			# The carriageway bridge owns the slab; the tram adds rails only.
 			var deck := RoadBuilder.deck_profile(dense, surf, m2u, bed * 0.5)
 			if deck.size() == dense.size():
@@ -172,8 +178,10 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 					deck[i] += STREET_RAIL_LIFT_M * m2u
 				_rails(RoadBuilder._batch(batches, "rail"), dense, deck, gauge, 0.0, m2u, RAIL_LAYER)
 			return
+		var look := RailViaductLook.look_for(data, cls)
+		var layer := RailViaductLook.bridge_layer(way, look)
 		for piece in LandmarkSites.outside_spans(dense, spans):
-			_bridge(batches, BridgeLandings.landed(piece, dense, surf, m2u), gauge, bed, surf, m2u, beside)
+			_bridge(batches, BridgeLandings.landed(piece, dense, surf, m2u), gauge, bed, surf, m2u, beside, look, cls, layer)
 		return
 	var embedded := bool(way.get("embedded", false))
 	for run in RoadBuilder._dry_runs(dense, surf):
@@ -249,20 +257,24 @@ static func deck_beside(index: Dictionary, mid: Vector2, out: Vector2, m2u: floa
 ## and the rails on it. An edge another bridge track runs beside
 ## (`beside`, deck_index) carries no parapet.
 static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
-		bed: float, surf: RoadBuilder._Surface, m2u: float, beside: Dictionary = {}) -> void:
+		bed: float, surf: RoadBuilder._Surface, m2u: float, beside: Dictionary = {},
+		look: String = "brick", rail_class: String = "rail", layer: int = 0) -> void:
 	var inside := PackedVector2Array()
 	for p in pts:
 		if surf.inside(p):
 			inside.append(p)
 	if inside.size() < 2:
 		return
-	var top := RoadBuilder._batch(batches, "rail_deck")
+	var guideway := look == "concrete_guideway"
+	var top_key := "guideway_slab" if guideway else "rail_deck"
+	var side_key := "deck_concrete" if guideway else "deck_brick"
+	var top := RoadBuilder._batch(batches, top_key)
 	top.pad()
 	var k0 := top.verts.size()
-	var deck := RoadBuilder.deck_profile(inside, surf, m2u, bed * 0.5, 0, false)
+	var deck := RoadBuilder.deck_profile(inside, surf, m2u, bed * 0.5, layer, false)
 	if deck.size() != inside.size():
 		return
-	var fit := {"deck": deck, "side": "deck_brick", "metric_v": true}
+	var fit := {"deck": deck, "side": side_key, "metric_v": true}
 	if beside.has("decks"):
 		# Level with the tracks alongside; the fascia still reaches down to
 		# where the deck stood on its own.
@@ -281,17 +293,22 @@ static func _bridge(batches: Dictionary, pts: PackedVector2Array, gauge: float,
 			left.append(1 if deck_beside(beside, mid, out, m2u) else 0)
 			right.append(1 if deck_beside(beside, mid, -out, m2u) else 0)
 		fit["open"] = [left, right]
-	RoadBuilder._bridge(batches, inside, bed, surf, m2u, "rail_deck", "unknown", 0, fit)
+	RoadBuilder._bridge(batches, inside, bed, surf, m2u, top_key, "unknown", layer, fit)
 	top.pad()
 	for i in range(k0, top.verts.size()):
 		top.uv2s[i] = Vector2(bed / m2u, BED_LAYER)
 	if beside.has("decks"):
 		_fill(top, inside, deck, bed, beside["decks"], m2u)
-	var ys := PackedFloat32Array()
-	for d in deck:
-		ys.append(d + RAIL_HEIGHT_M * m2u)
-	_rails(RoadBuilder._batch(batches, "rail"), inside, ys, gauge,
-		RAIL_HEIGHT_M * m2u, m2u, BED_LAYER + 0.1)
+	if guideway:
+		RailViaductLook.add_guideway_piers(RoadBuilder._batch(batches, side_key), inside, deck, surf, m2u)
+	if guideway and rail_class == "monorail":
+		RailViaductLook.add_monorail_beam(RoadBuilder._batch(batches, "rail"), inside, deck, m2u)
+	else:
+		var ys := PackedFloat32Array()
+		for d in deck:
+			ys.append(d + RAIL_HEIGHT_M * m2u)
+		_rails(RoadBuilder._batch(batches, "rail"), inside, ys, gauge,
+			RAIL_HEIGHT_M * m2u, m2u, BED_LAYER + 0.1)
 
 ## The slab between a viaduct's track groups: along `pts` (deck heights
 ## `deck`), where a track `decks.across` stands FILL_MIN_M to LEVEL_M off
@@ -413,6 +430,12 @@ static func _material(key: String) -> Material:
 			m = rm
 		"deck_brick":
 			m = RoadBuilder._pbr("brick", VIADUCT_BRICK_HEX)
+		"deck_concrete":
+			m = RoadBuilder._pbr("concrete", "#D6D3CB")
+		"guideway_slab":
+			m = RoadSurface.paved_material("concrete", Color.html("#C8C5BD").srgb_to_linear())
+		"station_canopy":
+			m = RoadBuilder._pbr("sheet_metal", "#ECEAE4")
 		_:
 			m = RoadBuilder._material(key)
 	_mats[key] = m

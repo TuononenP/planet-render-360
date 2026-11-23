@@ -11,7 +11,10 @@ extends SceneTree
 ## viaduct's train stands on its deck; a mapped platform takes a train
 ## beside it; placement is deterministic and gated by quality.
 
-const LIVERY := {"emu": "helsinki_commuter", "emu_uk": "london_grey", "intercity": "finland_long", "metro": "helsinki_metro"}
+const LIVERY := {
+	"emu": "helsinki_commuter", "emu_uk": "london_grey", "intercity": "finland_long",
+	"metro": "helsinki_metro", "mover": "miami_metromover",
+}
 
 func _init() -> void:
 	_run()
@@ -53,10 +56,12 @@ func _run() -> void:
 			printerr("TRAIN FAIL: ", failure)
 		quit(1)
 
-## Body envelopes: width and roof height (m) and doorways a side. A metro
-## car is wider and lower than a main-line one and has three doorways.
+## Body envelopes: width, length and roof height (m) and doorways a side. A metro
+## car is wider and lower than a main-line one and has three doorways; a people
+## mover is a compact elevated pod.
 const WIDTH_M := {"metro": Vector2(3.0, 3.3)}
-const ROOF_M := {"metro": Vector2(3.6, 3.9)}
+const LEN_M := {"mover": Vector2(12.5, 14.5)}
+const ROOF_M := {"metro": Vector2(3.6, 3.9), "mover": Vector2(3.6, 3.9)}
 const DOORWAYS := {"metro": 3}
 
 func _models(failures: Array[String]) -> void:
@@ -85,8 +90,9 @@ func _models(failures: Array[String]) -> void:
 				var prof: Array = spec["prof"]
 				var top := float(prof[prof.size() - 1][0])
 				var roof: Vector2 = ROOF_M.get(kind, Vector2(3.8, 4.2))
-				if float(sec["len"]) < 19.0 or float(sec["len"]) > 25.5 or top < roof.x or top > roof.y:
-					failures.append("%s %s should be 19-25 m long and %s-%s m over the roof: %s, %s" % [kind, id, roof.x, roof.y, sec["len"], top])
+				var len_range: Vector2 = LEN_M.get(kind, Vector2(19.0, 25.5))
+				if float(sec["len"]) < len_range.x or float(sec["len"]) > len_range.y or top < roof.x or top > roof.y:
+					failures.append("%s %s should be %s-%s m long and %s-%s m over the roof: %s, %s" % [kind, id, len_range.x, len_range.y, roof.x, roof.y, sec["len"], top])
 				var doorways: int = DOORWAYS.get(kind, 2)
 				if (spec["bogies"] as Array).size() != 2 or (spec["doors"] as Array).size() != doorways or (spec["under"] as Array).is_empty():
 					failures.append("%s %s needs two bogies, %d doorways a side and underfloor cases" % [kind, id, doorways])
@@ -211,6 +217,31 @@ func _selection(failures: Array[String]) -> void:
 			failures.append("%s should be a livery" % id)
 	if yellow < 1 or TrainSpecs.has_livery("nope") or not TrainSpecs.has_livery("rail2"):
 		failures.append("a London colourway has yellow cab ends")
+	# Miami: Metromover two-car pods on elevated monorail, Metrorail on elevated
+	# subway track, and Brightline / Tri-Rail on heavy rail (all unwired).
+	var monorail := OsmTags._rail_entry({"railway": "monorail", "bridge": "viaduct", "layer": "1"}, PackedVector2Array(line))
+	var monorail_tunnel := OsmTags._rail_entry({"railway": "monorail", "tunnel": "yes"}, PackedVector2Array(line))
+	var subway_elev := OsmTags._rail_entry({"railway": "subway", "bridge": "viaduct", "layer": "1"}, PackedVector2Array(line))
+	var mover_pick := TrainSpecs.pick("miami", "US", monorail, 0.4)
+	if not TrainSpecs.carries_in("miami", monorail) or TrainSpecs.carries_in("london", monorail) \
+			or TrainSpecs.carries_in("miami", monorail_tunnel) \
+			or mover_pick != {"kind": "mover", "livery": "miami_metromover", "cars": 2, "panto": false}:
+		failures.append("Miami's elevated monorail stands two-car Metromover sets: %s" % mover_pick)
+	var metrorail_pick := TrainSpecs.pick("miami", "US", subway_elev, 0.4)
+	if not TrainSpecs.carries_in("miami", subway_elev) \
+			or metrorail_pick != {"kind": "metro", "livery": "miami_metrorail", "cars": 4, "panto": false}:
+		failures.append("Miami's elevated subway stands four-car Metrorail sets: %s" % metrorail_pick)
+	var brightline_pick := TrainSpecs.pick("miami", "US", bare, 0.3)
+	var trirail_pick := TrainSpecs.pick("miami", "US", wired, 0.8)
+	if brightline_pick != {"kind": "intercity", "livery": "brightline", "cars": 4, "panto": false} \
+			or trirail_pick != {"kind": "emu", "livery": "tri_rail", "cars": 3, "panto": false}:
+		failures.append("Miami heavy rail mixes Brightline and Tri-Rail without pantographs: %s / %s" % [brightline_pick, trirail_pick])
+	for miami_liv: String in ["miami_metrorail", "miami_metromover", "brightline", "tri_rail"]:
+		if not TrainSpecs.has_livery(miami_liv) or absf(float(TrainSpecs.livery(miami_liv)["gauge"]) - 1.435) > 0.001:
+			failures.append("%s should be a standard-gauge livery" % miami_liv)
+	for miami_row: Array in [["metro", "miami_metrorail"], ["intercity", "brightline"], ["emu", "tri_rail"]]:
+		if TramModel.mesh(str(miami_row[0]), "cab", str(miami_row[1])).get_surface_count() == 0:
+			failures.append("%s %s should build its cab mesh" % [miami_row[0], miami_row[1]])
 
 ## A terminus: six platform tracks 5 m apart, buffers at z = 0, running
 ## north for 200 m and merging through switches into two running lines.

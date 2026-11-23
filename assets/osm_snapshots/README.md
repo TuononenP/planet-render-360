@@ -213,6 +213,23 @@ invalidation and live refresh still apply.
 | new_york_midtown | 40.7535, -73.9825 | transit / OSM API map call | 2026-11-11 01:17:52 | 17,604 |
 | new_york | 40.7060, -74.0040 | transit / OSM API map call | 2026-11-11 01:19:20 | 11,295 |
 | san_francisco | 37.8040, -122.4195 | transit / OSM API map call | 2026-11-11 01:20:47 | 7,466 |
+| miami | 25.7743, -80.1855 | detailed / extract-compatible q12 | 2026-11-22 21:20:48 | 149,487 |
+| miami | 25.7743, -80.1855 | ring1600 / extract-compatible q1 | 2026-11-22 21:20:48 | 30,276 |
+| miami | 25.7743, -80.1855 | ring2500 / extract-compatible q1, highways uncapped | 2026-11-22 21:20:48 | 48,442 |
+| miami | 25.7743, -80.1855 | poi / extract-compatible q1 | 2026-11-22 21:20:48 | 13,025 |
+| miami | 25.7743, -80.1855 | far / extract-compatible q3 | 2026-11-22 21:20:48 | 150,064 |
+| miami | 25.7743, -80.1855 | transit / extract-compatible | 2026-11-22 21:20:48 | 4,651 |
+| miami_beach | 25.7810, -80.1300 | detailed / extract-compatible q12 | 2026-11-22 21:20:48 | 140,709 |
+| miami_beach | 25.7810, -80.1300 | ring1600 / extract-compatible q1 | 2026-11-22 21:20:48 | 11,237 |
+| miami_beach | 25.7810, -80.1300 | ring2500 / extract-compatible q1, highways uncapped | 2026-11-22 21:20:48 | 24,977 |
+| miami_beach | 25.7810, -80.1300 | poi / extract-compatible q1 | 2026-11-22 21:20:48 | 12,147 |
+| miami_beach | 25.7810, -80.1300 | far / extract-compatible q3 | 2026-11-22 21:20:48 | 114,410 |
+| miami_beach | 25.7810, -80.1300 | transit / extract-compatible | 2026-11-22 21:20:48 | 1,409 |
+
+Miami (`miami`) and Miami Beach (`miami_beach`) use Geofabrik's Florida extract
+(`florida-latest.osm.pbf`, replication `2026-11-22T21:20:48Z`), with the
+`ring2500` highway cap raised from 800 to 5,000 so `miami_ring2500` keeps all
+1,234 major roads inside 2,500 m.
 
 Paris, Monaco, Espoo, London, Rome, Venice and the Alps use cached Overpass
 responses or the Europe Overpass instance; London's far layer uses BBBike's

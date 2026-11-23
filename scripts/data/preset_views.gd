@@ -147,6 +147,17 @@ const ROWS := [
 	{"id": "turku", "label": "Turku", "name": "Turku, Finland",
 		"lat": 60.4518, "lon": 22.2666, "eye_lat": 60.45030, "eye_lon": 22.27295,
 		"eye_m": 6.0, "bearing": 46.0, "pitch": 4.0, "clear": false},
+	# Biscayne Bay off Bayfront Park (~650 m east of Chopin Plaza), in morning
+	# eastern sun across turquoise bay water to the Downtown wall, Skyviews
+	# wheel, InterContinental, One Thousand Museum and Freedom Tower.
+	{"id": "miami", "label": "Miami", "name": "Miami, United States",
+		"lat": 25.7743, "lon": -80.1855, "eye_lat": 25.77450, "eye_lon": -80.17900,
+		"eye_m": 18.0, "asl_m": 18.0, "bearing": 274.0, "pitch": 2.0, "hour": 8.5},
+	# Lummus Park promenade at 9th–10th Street, looking west-northwest across
+	# royal palms and Ocean Drive to the pastel Art Deco hotel strip.
+	{"id": "miami_beach", "label": "Miami Beach", "name": "Miami Beach, United States",
+		"lat": 25.7810, "lon": -80.1300, "eye_lat": 25.77980, "eye_lon": -80.12960,
+		"eye_m": 5.0, "bearing": 292.0, "pitch": 2.0, "clear": false},
 ]
 
 ## Index of the starting place in ROWS (and in LocationData.quick_picks()).

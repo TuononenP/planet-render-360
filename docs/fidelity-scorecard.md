@@ -802,6 +802,42 @@ PASS).
   active render (63.6 GB headroom on T3). All Turku headless suites and windowed `world_cache_test` /
   `screenshot_test` pass.
 
+### Miami & Miami Beach round miami-r1 (2026-11-23)
+
+Frames in `visual-plan/reviews/miami-r1-2026-11-23/` and `miami-r1-night-2026-11-23/` (Ultra, 20 frozen
+open-space eyes across Centres A–F: Downtown/Bayfront `A1..A6`, Brickell `B1..B4`, MacArthur Causeway
+`M1..M2`, South Beach & Ocean Drive `C1..C5`, Mid-Beach `D1`, Vizcaya `E1`, Biltmore `F1`; `stats.json`
+0 flags), plus 51 4-view studio sheets (`visual-plan/captures/miami_r1/` and `miami_r1_night/`) and baked
+preset thumbnails (`assets/preset_thumbs/miami.jpg`, `miami_beach.jpg`). Agent pre-rating only; the
+"photographic" call (AC-18) is the user's.
+51 bespoke Miami landmarks, 114 `MiamiTowerSpecs` skyline towers, 13 `BridgeSpecsNorthAmerica` rows
+(incl. bespoke Brickell Ave bascule + late-2026 4-arch I-395 Signature Bridge), 37 `MiamiDecoFronts`
+Ocean Drive 3D relief fronts (`DecoFront`), 129 `MiamiNotable` rows, 12 `ArchitectureCitiesFlorida` rows
+across 28 districts, concrete Metromover/Metrorail guideways (`RailViaductLook`), 8 Miami tree species
+(`TreeSpecies`), `BeachDressing` (pale sand, sea-oat dunes, 8 lifeguard towers, resort umbrellas, Lummus
+wall), Biscayne/Atlantic/Government Cut/Miami River colour boxes, PortMiami cruise berths, Miami transit
+liveries, and Miami Tower cyan night glow (`docs/miami-landmark-sources.md`).
+
+- **Reads as Miami & Miami Beach:** turquoise Biscayne Bay with Waldorf Astoria, One Thousand Museum
+  exoskeleton, Kaseya Center, Skyviews wheel, Aston Martin sail, One Miami twin balcony towers, and cyan
+  Miami Tower night wash; pale Miami Beach sand with turquoise umbrellas, sea-oat dunes, Lummus Park
+  palms, Ocean Drive Art Deco eyebrows/awnings/neon, South Pointe Pier light poles, Fontainebleau's curved
+  Chateau slab beside Eden Roc, Vizcaya with its Stone Barge and anchored yachts, and Biltmore's Giralda
+  tower over the Coral Gables fairway.
+- **Remaining tells:** eye `A5` (`25.78000, -80.18850, 3 m`) stands inside a Biscayne Blvd median tree
+  crown; an OSM clubhouse mass in front of the Biltmore sits outside its `clear_m`; human photographic
+  gate (AC-18) pending user sign-off.
+- **Performance (`tools/perf_baseline.gd`, before `miami-perf-before-2026-11-23` vs after
+  `miami-perf-after-2026-11-23`, 20 s fly, macOS Apple M5 Ultra Forward+):**
+  - High (`p2`) `miami`: cold 11.83 → **16.42 s**, build 7.29 → **10.10 s**, cached 0.84 → **1.15 s**,
+    settle p95 8.7 → **9.3 ms**, fly p95 **15.7 ms**, meshes 881 → **1,420**, peak 5,069 → **6,372 MB**.
+  - High (`p2`) `miami_beach`: cold 6.24 → **10.99 s**, build 4.08 → **5.02 s**, cached 0.67 → **0.97 s**,
+    settle p95 8.9 → **9.4 ms**, fly p95 **14.8 ms**, meshes 843 → **1,223**, peak 6,035 → **6,591 MB**.
+  - Ultra (`p3`) `miami`: cold 12.16 → **22.91 s** (≤ 150 s budget), settle p95 9.0 → **10.3 ms**,
+    fly p95 **12.2 ms**, peak 9,348 → **7,342 MB**.
+  - Ultra (`p3`) `miami_beach`: cold 7.76 → **32.37 s** (≤ 150 s budget), settle p95 9.5 → **9.8 ms**,
+    fly p95 **10.0 ms**, peak 10,287 → **7,261 MB**.
+
 ### Helsinki round hel-r10 (2026-11-23)
 
 Frames in `visual-plan/reviews/hel-r10-2026-11-23/` (`--preset=3 --look_ahead=100`, golden hour, noon,
