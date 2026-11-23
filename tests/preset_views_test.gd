@@ -82,6 +82,8 @@ func _pins() -> void:
 	_check(PresetViews.origin_for_name("Barcelona, Spain") == Vector2.INF, "non-preset names keep their own coordinates")
 	var tku := PresetViews.for_pin(60.4518, 22.2666)
 	_check(str(tku.get("id", "")) == "turku", "Turku pin resolves its curated riverfront view")
+	var bkk := PresetViews.for_pin(13.75398, 100.50144)
+	_check(str(bkk.get("id", "")) == "bangkok", "Bangkok pin resolves its curated Sanam Luang view")
 
 func _data_at(lat: float, lon: float) -> LocationData:
 	var data := LocationData.new()

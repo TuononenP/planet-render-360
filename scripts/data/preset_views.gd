@@ -158,6 +158,12 @@ const ROWS := [
 	{"id": "miami_beach", "label": "Miami Beach", "name": "Miami Beach, United States",
 		"lat": 25.7810, "lon": -80.1300, "eye_lat": 25.77980, "eye_lon": -80.12960,
 		"eye_m": 5.0, "bearing": 292.0, "pitch": 2.0, "clear": false},
+	# Southern promenade of Sanam Luang, looking south-southwest past the
+	# Ministry of Defence and Na Phra Lan Road onto the crenellated Grand Palace
+	# wall, spired gates, and Wat Phra Kaew's gold chedi and prangs.
+	{"id": "bangkok", "label": "Bangkok", "name": "Bangkok, Thailand",
+		"lat": 13.75398, "lon": 100.50144, "eye_lat": 13.75270, "eye_lon": 100.49260,
+		"eye_m": 8.0, "bearing": 192.0, "pitch": 3.0, "zoom": 1.15},
 ]
 
 ## Index of the starting place in ROWS (and in LocationData.quick_picks()).
