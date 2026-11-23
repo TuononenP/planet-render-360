@@ -17,6 +17,7 @@ func _init() -> void:
 	_check(failures, _lone_data(), "lone bridge way (straight extension)", HALF + 4.0)
 	_check(failures, _linked_data(), "two bridge pieces across a wet link way", HALF + 2.0)
 	_check_pier(failures)
+	_check_gangplank_omitted(failures)
 	if failures.is_empty():
 		print("BRIDGE CONNECTION OK: decks land on both banks, connected and unconnected")
 		quit(0)
@@ -99,6 +100,33 @@ func _check_pier(failures: Array[String]) -> void:
 			failures.append("pier apron: no deck over the centreline at x=%.0f" % x)
 			return
 		x += 5.0
+
+## A short dead-end footpath gangplank jutting from the bank into a wide
+## river (with no moored vessel or pier at its wet tip, as along Turku's
+## Aurajoki) must be omitted rather than bent sideways onto the bank.
+func _check_gangplank_omitted(failures: Array[String]) -> void:
+	var d := LocationData.new()
+	RenderSettings.apply_preset(d, RenderSettings.Preset.HIGH)
+	d.heights.resize(d.grid_size * d.grid_size)
+	d.heights.fill(3.0)
+	d.water_level = 0.0
+	d.seed_value = 7
+	d.latitude = 60.4465
+	d.longitude = 22.2636
+	d.land_polygons = [{"class": "water", "holes": [], "points": PackedVector2Array([
+		Vector2(-80.0, -300.0), Vector2(0.0, -300.0), Vector2(0.0, 300.0), Vector2(-80.0, 300.0)])}]
+	d.roads = [
+		{"class": "path", "width_m": 2.0, "lanes": 0, "bridge": false,
+			"points": PackedVector2Array([Vector2(4.0, 0.0), Vector2(1.0, 0.0)])},
+		{"class": "path", "width_m": 2.0, "lanes": 0, "bridge": true, "layer": 1,
+			"points": PackedVector2Array([Vector2(1.0, 0.0), Vector2(-3.5, 0.0)])},
+	]
+	var ground := GroundTruth.new(d)
+	var roads := RoadBuilder.build_roads(d, ground)
+	for child in roads.get_children():
+		if child is MeshInstance3D and str(child.name) in ["Road_bridge", "Road_deck"]:
+			failures.append("orphan gangplank should not build a bridge deck (%s)" % child.name)
+	roads.free()
 
 func _base() -> LocationData:
 	var d := LocationData.new()

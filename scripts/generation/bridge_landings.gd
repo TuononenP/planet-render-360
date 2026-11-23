@@ -161,10 +161,11 @@ static func landed(piece: PackedVector2Array, whole: PackedVector2Array,
 		return piece
 	var out := piece.duplicate()
 	var head_dir := (piece[0] - piece[1]).normalized()
+	var whole_span := whole[whole.size() - 1] - whole[0]
 	if piece[0] == whole[0] and not surf.bridge_joint(piece[0], head_dir) \
 			and surf.ground.water_at(piece[0].x, piece[0].y) > 0.0 \
 			and not _berth_end(piece[0], head_dir, surf, m2u):
-		var head := _tail(piece[0], head_dir, surf, m2u)
+		var head := _tail(piece[0], head_dir, -whole_span, surf, m2u)
 		head.reverse()
 		head.append_array(out)
 		out = head
@@ -174,7 +175,7 @@ static func landed(piece: PackedVector2Array, whole: PackedVector2Array,
 				(piece[piece.size() - 1] - piece[piece.size() - 2]).normalized()) \
 			and surf.ground.water_at(out[out.size() - 1].x, out[out.size() - 1].y) > 0.0 \
 			and not _berth_end(out[out.size() - 1], tail_dir, surf, m2u):
-		out.append_array(_tail(out[out.size() - 1], tail_dir, surf, m2u))
+		out.append_array(_tail(out[out.size() - 1], tail_dir, whole_span, surf, m2u))
 	return out
 
 ## True when a wet bridge end with no connected approach way already ends
@@ -198,7 +199,7 @@ static func _berth_end(p: Vector2, dir: Vector2, surf: RoadBuilder._Surface, m2u
 ## all along can strand the chained walk a few metres from the bank),
 ## and a seek toward the nearest dry ground in the outward cone (an
 ## end whose continuation is unmapped and whose axis misses the bank).
-static func _tail(from_p: Vector2, dir: Vector2, surf: RoadBuilder._Surface, m2u: float) -> PackedVector2Array:
+static func _tail(from_p: Vector2, dir: Vector2, span_out: Vector2, surf: RoadBuilder._Surface, m2u: float) -> PackedVector2Array:
 	if dir.length() < 0.001:
 		return PackedVector2Array()
 	var step_len := maxf(surf.step * 0.34, 1.0)
@@ -213,7 +214,7 @@ static func _tail(from_p: Vector2, dir: Vector2, surf: RoadBuilder._Surface, m2u
 	walked = _walk(straight, surf, m2u)
 	if bool(walked[1]):
 		return walked[0]
-	var sought := _walk(_seek_line(from_p, dir, surf, m2u), surf, m2u)
+	var sought := _walk(_seek_line(from_p, dir, span_out, surf, m2u), surf, m2u)
 	if bool(sought[1]):
 		return sought[0]
 	# Last resort: the mapped continuation is a pier a few metres on
@@ -288,13 +289,16 @@ static func _line_length(line: PackedVector2Array) -> float:
 	return total
 
 ## A straight line from `from_p` to the nearest dry point in the
-## outward cone (±75°), or an empty line when the cone stays wet.
-static func _seek_line(from_p: Vector2, dir: Vector2, surf: RoadBuilder._Surface, m2u: float) -> PackedVector2Array:
+## outward cone (±50°), never doubling back onto the starting bank.
+static func _seek_line(from_p: Vector2, dir: Vector2, span_out: Vector2,
+		surf: RoadBuilder._Surface, m2u: float) -> PackedVector2Array:
 	var best := PackedVector2Array()
 	var best_dist := LANDING_MAX_M * m2u
 	var step := 4.0 * m2u
-	for deg in range(-75, 76, 5):
+	for deg in range(-50, 51, 5):
 		var ray := dir.rotated(deg_to_rad(float(deg)))
+		if span_out.length_squared() > 0.01 and ray.dot(span_out) <= 0.0:
+			continue
 		var dist := step
 		while dist < best_dist:
 			var q: Vector2 = from_p + ray * dist
@@ -306,6 +310,93 @@ static func _seek_line(from_p: Vector2, dir: Vector2, surf: RoadBuilder._Surface
 				break
 			dist += step
 	return best
+
+## Indices in `data.roads` of short (<= 12 m) dead-end footpath/step
+## gangplanks jutting from a bank into open water with no opposite bank
+## within reach ahead (e.g. restaurant-boat boarding planks).
+const GANGPLANK_CLASSES: Array[String] = ["footway", "path", "steps", "corridor"]
+const GANGPLANK_MAX_M := 12.0
+
+static func orphan_gangplanks(data: LocationData, ground: GroundTruth) -> Dictionary:
+	var skip := {}
+	if data == null or ground == null:
+		return skip
+	var m2u := WorldScale.metres_to_units()
+	var bridge_deg := {}
+	var ground_deg := {}
+	var short_adj := {}
+	var cands := {}
+	for i in data.roads.size():
+		var raw: Variant = data.roads[i]
+		if not (raw is Dictionary):
+			continue
+		var d: Dictionary = raw
+		if bool(d.get("area", false)) or bool(d.get("tunnel", false)):
+			continue
+		var pts: PackedVector2Array = d.get("points", PackedVector2Array())
+		if pts.size() < 2:
+			continue
+		if bool(d.get("bridge", false)):
+			for e: Vector2 in [pts[0], pts[pts.size() - 1]]:
+				var k := RoadBuilder._Surface._node(e)
+				bridge_deg[k] = int(bridge_deg.get(k, 0)) + 1
+			if str(d.get("class", "")) in GANGPLANK_CLASSES and _line_length(pts) <= GANGPLANK_MAX_M * m2u:
+				cands[i] = pts
+				for e: Vector2 in [pts[0], pts[pts.size() - 1]]:
+					var k := RoadBuilder._Surface._node(e)
+					if not short_adj.has(k):
+						short_adj[k] = []
+					(short_adj[k] as Array).append(i)
+		else:
+			for v: Vector2 in pts:
+				var k := RoadBuilder._Surface._node(v)
+				ground_deg[k] = int(ground_deg.get(k, 0)) + 1
+	var seen := {}
+	for start_i: int in cands:
+		if seen.has(start_i):
+			continue
+		var comp: Array[int] = []
+		var queue: Array[int] = [start_i]
+		seen[start_i] = true
+		var total_len := 0.0
+		while not queue.is_empty():
+			var cur: int = queue.pop_back()
+			comp.append(cur)
+			var cpts: PackedVector2Array = cands[cur]
+			total_len += _line_length(cpts)
+			for e: Vector2 in [cpts[0], cpts[cpts.size() - 1]]:
+				for nxt: int in short_adj.get(RoadBuilder._Surface._node(e), []):
+					if not seen.has(nxt):
+						seen[nxt] = true
+						queue.append(nxt)
+		if total_len > (GANGPLANK_MAX_M + 2.0) * m2u:
+			continue
+		var gangplank := false
+		for ri: int in comp:
+			var pts: PackedVector2Array = cands[ri]
+			for end_idx in [0, pts.size() - 1]:
+				var p_end: Vector2 = pts[end_idx]
+				var k := RoadBuilder._Surface._node(p_end)
+				if int(bridge_deg.get(k, 0)) > 1 or int(ground_deg.get(k, 0)) > 0:
+					continue
+				if ground.water_at(p_end.x, p_end.y) <= 0.0:
+					continue
+				var prev_idx: int = 1 if end_idx == 0 else pts.size() - 2
+				var dir := (p_end - pts[prev_idx]).normalized()
+				if _reaches_opposite_bank(p_end, dir, ground, m2u):
+					continue
+				gangplank = true
+		if gangplank:
+			for ri: int in comp:
+				skip[ri] = true
+	return skip
+
+static func _reaches_opposite_bank(p: Vector2, dir: Vector2, ground: GroundTruth, m2u: float) -> bool:
+	for ahead_m in [3.0, 6.0, 10.0, 14.0]:
+		var q := p + dir * float(ahead_m) * m2u
+		if ground.is_inside(q.x, q.y) and ground.water_at(q.x, q.y) <= 0.0:
+			return true
+	return false
 
 ## [points, reached_end]: `line` walked from its head until the first
 ## dry point (plus one dry step, so deck and ribbon overlap) or the

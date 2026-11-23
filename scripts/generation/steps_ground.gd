@@ -85,6 +85,10 @@ const CELL_M := 4.0
 ## Steps this close to a water body's edge are riverbank/quay stairs and are
 ## omitted so riverbanks keep a continuous wall instead of misaligned steps.
 const SHORE_MARGIN_M := 3.0
+## Steps alongside a riverside quay or retaining wall (within RIVERSIDE_WALL_M
+## of water) are embanked bank stairs and are omitted for the same reason.
+const RIVERSIDE_WALL_M := 14.0
+const WALL_STEP_MARGIN_M := 4.0
 
 ## The loops that run over a whole place (the steps among the roads, the ways
 ## touching a stair's ends, the park levelling) run natively (StepsKernels,
@@ -229,6 +233,7 @@ static func _edges(data: LocationData, surface: PackedFloat32Array, size: int, s
 	var models := LandmarkSites.model_rect_sites(data)
 	var table := LandmarkStairCut.stairs()
 	var cuts := LandmarkTerrain._sites(data, table.keys())
+	var wall_segs := _riverside_walls(data, shoreline, m2u)
 	for i: int in _step_roads(data.roads):
 		var road: Dictionary = data.roads[i]
 		if bool(road.get("tunnel", false)) or bool(road.get("bridge", false)) or int(road.get("layer", 0)) < 0:
@@ -239,7 +244,7 @@ static func _edges(data: LocationData, surface: PackedFloat32Array, size: int, s
 			continue
 		if _in_landmark(pts, models, cuts, table):
 			continue
-		if near_shore(pts, shoreline, m2u, is_area):
+		if near_shore(pts, shoreline, m2u, is_area) or _near_wall(pts, wall_segs, WALL_STEP_MARGIN_M * m2u, is_area):
 			continue
 		var e: _Edge = null
 		if is_area:
@@ -318,6 +323,54 @@ static func near_shore(pts: PackedVector2Array, shoreline: ShorelineModel, m2u: 
 							pts[i], pts[(i + 1) % pts.size()], ea, eb)
 						if hits[0].distance_to(hits[1]) <= reach:
 							return true
+	return false
+
+## Segments of `data.shore_structures` (quays and retaining walls) that run
+## along a water body (`RIVERSIDE_WALL_M` from `shoreline`).
+static func _riverside_walls(data: LocationData, shoreline: ShorelineModel, m2u: float) -> Array:
+	if shoreline == null or shoreline.empty() or data.shore_structures.is_empty():
+		return []
+	var out: Array = []
+	var reach := RIVERSIDE_WALL_M * m2u
+	for raw: Variant in data.shore_structures:
+		if not (raw is Dictionary):
+			continue
+		var s: Dictionary = raw
+		if str(s.get("kind", "")) not in ["quay", "retaining_wall", "embankment"]:
+			continue
+		var pts: PackedVector2Array = s.get("points", PackedVector2Array())
+		for i in pts.size() - 1:
+			if _seg_near_shore(pts[i], pts[i + 1], shoreline, reach):
+				out.append([pts[i], pts[i + 1]])
+	return out
+
+static func _seg_near_shore(a: Vector2, b: Vector2, shoreline: ShorelineModel, reach: float) -> bool:
+	if shoreline.domains.at(a) >= 0 or shoreline.domains.at(b) >= 0:
+		return true
+	var box := Rect2(a, Vector2.ZERO).expand(b).grow(reach + 0.05)
+	var lo := shoreline.cell_at(box.position)
+	var hi := shoreline.cell_at(box.end)
+	for cx in range(lo.x, hi.x + 1):
+		for cz in range(lo.y, hi.y + 1):
+			for eid: int in shoreline.edge_cells.get(Vector2i(cx, cz), []):
+				var edge: Dictionary = shoreline._edges[eid]
+				var hits := Geometry2D.get_closest_points_between_segments(a, b, edge["a"], edge["b"])
+				if hits[0].distance_to(hits[1]) <= reach:
+					return true
+	return false
+
+static func _near_wall(pts: PackedVector2Array, wall_segs: Array, reach: float, closed: bool) -> bool:
+	if wall_segs.is_empty() or pts.is_empty():
+		return false
+	var seg_count := pts.size() if closed else pts.size() - 1
+	for w: Array in wall_segs:
+		var wa: Vector2 = w[0]
+		var wb: Vector2 = w[1]
+		for i in maxi(seg_count, 1):
+			var hits := Geometry2D.get_closest_points_between_segments(
+				pts[i], pts[(i + 1) % pts.size()], wa, wb)
+			if hits[0].distance_to(hits[1]) <= reach:
+				return true
 	return false
 
 ## A steps area as a flight along its steepest line: the DEM plane over
@@ -444,8 +497,15 @@ static func _solve(edges: Array, net: _Net, dem: PackedFloat32Array, kept: Array
 		var b := dem[e.b]
 		if e.incline == "" and absf(a - b) < maxf(MIN_DEM_STEP_M, DEM_AGREE * float(e.count) * RISER_M):
 			continue
+		var top_cand := e.a if (e.incline == "down" or (e.incline == "" and a >= b)) else e.b
+		var bot_cand := e.b if top_cand == e.a else e.a
+		# Untagged-count stairs need real DEM fall; tagged stairs never climb against a slope.
+		if e.count <= 0 and dem[top_cand] - dem[bot_cand] < MIN_DEM_STEP_M:
+			continue
+		if e.count > 0 and dem[top_cand] - dem[bot_cand] < -MIN_DEM_STEP_M:
+			continue
 		known.append(e)
-		e.top = e.a if (e.incline == "down" or (e.incline == "" and a >= b)) else e.b
+		e.top = top_cand
 		e.drop = float(e.count) * RISER_M if e.count > 0 else clampf(absf(a - b), DROP_RANGE_M.x, DROP_RANGE_M.y)
 		e.agree = dem[e.top] - dem[e.b if e.top == e.a else e.a] >= DEM_AGREE * e.drop
 		total += e.drop

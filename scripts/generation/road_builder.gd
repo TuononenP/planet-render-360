@@ -273,16 +273,21 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	# Flights of steps the ground was held to are drawn as stairs, not ribbons;
 	# riverbank/quay-edge steps are omitted altogether.
 	var stairs := StairBuilder.skipped_roads(ground)
+	for ri: int in surf.skipped_bridges:
+		stairs[ri] = true
 	if ground.shoreline != null and not ground.shoreline.empty():
+		var wall_segs := StepsGround._riverside_walls(data, ground.shoreline, m2u)
 		for i in n:
 			if stairs.has(i):
 				continue
 			var r_item: Variant = data.roads[i]
 			if r_item is Dictionary and str((r_item as Dictionary).get("class", "")) == "steps" \
-					and not bool((r_item as Dictionary).get("bridge", false)) \
-					and StepsGround.near_shore((r_item as Dictionary).get("points", PackedVector2Array()),
-						ground.shoreline, m2u, bool((r_item as Dictionary).get("area", false))):
-				stairs[i] = true
+					and not bool((r_item as Dictionary).get("bridge", false)):
+				var s_pts: PackedVector2Array = (r_item as Dictionary).get("points", PackedVector2Array())
+				var s_area := bool((r_item as Dictionary).get("area", false))
+				if StepsGround.near_shore(s_pts, ground.shoreline, m2u, s_area) \
+						or StepsGround._near_wall(s_pts, wall_segs, StepsGround.WALL_STEP_MARGIN_M * m2u, s_area):
+					stairs[i] = true
 	var job := func(c: int) -> void:
 		var own := {}
 		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):
@@ -824,6 +829,26 @@ class _Surface extends RefCounted:
 	var aprons: Dictionary = {}
 	## The same aprons as [ring, bounds]: they are cut out of paved areas.
 	var apron_rings: Array = []
+	var skipped_bridges: Dictionary = {}
+
+	func _index_way(w: Variant) -> void:
+		if not (w is Dictionary):
+			return
+		var ends: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
+		if ends.size() < 2:
+			return
+		if bool((w as Dictionary).get("bridge", false)):
+			_bridge_lines.append(ends)
+			for e: Vector2 in [ends[0], ends[ends.size() - 1]]:
+				_bridge_ends[_node(e)] = int(_bridge_ends.get(_node(e), 0)) + 1
+				_bridge_end_pts.append(e)
+		elif not bool((w as Dictionary).get("tunnel", false)) \
+				and not bool((w as Dictionary).get("area", false)):
+			for vi in ends.size():
+				var node := _node(ends[vi])
+				if not _way_nodes.has(node):
+					_way_nodes[node] = []
+				(_way_nodes[node] as Array).append([ends, vi])
 
 	func _init(data: LocationData, g: GroundTruth) -> void:
 		ground = g
@@ -832,27 +857,16 @@ class _Surface extends RefCounted:
 			if pier is Dictionary:
 				_pier_lines.append((pier as Dictionary).get("points", PackedVector2Array()))
 		_vessel_rings = ShipBuilder.vessel_rings(data, 3.0 * WorldScale.metres_to_units())
-		road_bridges = RoadBridgeDecks.Index.new(data.roads)
+		skipped_bridges = BridgeLandings.orphan_gangplanks(data, ground)
+		road_bridges = RoadBridgeDecks.Index.new(data.roads, skipped_bridges)
 		road_bridges.structures = BridgeStructures.Plan.new(data.bridge_areas, road_bridges, data.railways)
 		roof_sites = LandmarkRoofs.collect(data)
-		for w: Variant in data.roads + data.railways:
-			if not (w is Dictionary):
+		for ri in data.roads.size():
+			if skipped_bridges.has(ri):
 				continue
-			var ends: PackedVector2Array = (w as Dictionary).get("points", PackedVector2Array())
-			if ends.size() < 2:
-				continue
-			if bool((w as Dictionary).get("bridge", false)):
-				_bridge_lines.append(ends)
-				for e: Vector2 in [ends[0], ends[ends.size() - 1]]:
-					_bridge_ends[_node(e)] = int(_bridge_ends.get(_node(e), 0)) + 1
-					_bridge_end_pts.append(e)
-			elif not bool((w as Dictionary).get("tunnel", false)) \
-					and not bool((w as Dictionary).get("area", false)):
-				for vi in ends.size():
-					var node := _node(ends[vi])
-					if not _way_nodes.has(node):
-						_way_nodes[node] = []
-					(_way_nodes[node] as Array).append([ends, vi])
+			_index_way(data.roads[ri])
+		for rw: Variant in data.railways:
+			_index_way(rw)
 
 		var region := CityStyles.region_at(data.latitude, data.longitude)
 		districts = CityStyles.local_frame(region, data.latitude, data.longitude).get("districts", [])

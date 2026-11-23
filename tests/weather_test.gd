@@ -54,6 +54,8 @@ func _init() -> void:
 	Precipitation.apply(fall, WeatherLook.for_code(71, 100.0))
 	if fall.preprocess * float(fall.fixed_fps) > 120.0:
 		failures.append("the snow preroll must stay cheap: %f s at %d fps" % [fall.preprocess, fall.fixed_fps])
+	if not Precipitation.VEIL_SHADER.contains("col_id") or not Precipitation.SHADER.contains("INSTANCE_ID"):
+		failures.append("snow veil columns and near-field particles must decorrelate vertical rows")
 	# Night snow goes dark with the sky instead of glowing.
 	Precipitation.set_light(fall, Color(0.02, 0.02, 0.03), true)
 	var flake: Color = ((fall.draw_pass_1 as QuadMesh).material as ShaderMaterial).get_shader_parameter("tint")

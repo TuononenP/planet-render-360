@@ -69,10 +69,12 @@ class Index extends RefCounted:
 	## member lines read the structure's level as their profile.
 	var structures: BridgeStructures.Plan = null
 
-	func _init(roads: Array = []) -> void:
+	func _init(roads: Array = [], skipped: Dictionary = {}) -> void:
 		var m := WorldScale.metres_to_units()
 		_cell = CELL_M * m
 		for ri in roads.size():
+			if skipped.has(ri):
+				continue
 			var w: Variant = roads[ri]
 			if not (w is Dictionary):
 				continue

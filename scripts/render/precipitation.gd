@@ -78,6 +78,9 @@ void vertex() {
 	float s = mix(snow ? 0.5 : 0.7, snow ? 1.7 : 1.3, h1);
 	float seed = fract(sin(float(INSTANCE_ID) * 78.233 + 3.1) * 43758.5453);
 	if (snow) {
+		// Decorrelate particles born on the same 15 Hz tick so none share a plane.
+		float hy = fract(sin(float(INSTANCE_ID) * 41.63 + 5.7) * 43758.5453);
+		c.y += (hy - 0.5) * 3.2;
 		// Flakes wander as they fall: a path that is a function of height.
 		float ph = seed * 6.2831853;
 		c.x += sin(c.y * 1.1 + ph) * 0.35 + sin(c.y * 2.9 + ph * 2.0) * 0.1;
@@ -198,11 +201,20 @@ float rain_layer(vec2 uv, float t) {
 }
 
 float snow_layer(vec2 uv, float t) {
-	vec2 g = vec2(uv.x * round(columns * 0.25), (uv.y * height_m - t * fall_mps) * cells_per_m);
-	vec2 id = floor(g);
-	float h = v_hash(id.x * 7.0 + id.y * 113.0);
-	vec2 c = fract(g) - 0.5 - vec2(sin(t * 0.7 + h * 40.0) * 0.18, (h - 0.5) * 0.5);
-	return (1.0 - smoothstep(0.02, 0.11, length(c))) * step(h, 0.35);
+	float cols = max(round(columns * 0.25), 1.0);
+	float gx = uv.x * cols;
+	float col_id = mod(floor(gx), cols);
+	float hc = v_hash(col_id * 19.31 + 0.7);
+	float hc2 = v_hash(col_id * 53.7 + 4.3);
+	float gy = (uv.y * height_m - t * fall_mps * (0.78 + 0.44 * hc)) * cells_per_m + hc2 * 37.0;
+	float row_id = floor(gy);
+	float h = v_hash(col_id * 127.1 + row_id * 311.7);
+	float hx = v_hash(col_id * 269.5 + row_id * 183.3 + 11.0);
+	float hy = v_hash(col_id * 419.2 + row_id * 97.1 + 23.0);
+	vec2 jitter = vec2((hx - 0.5) * 0.44 + sin(t * (0.55 + 0.4 * hx) + h * 40.0) * 0.16, (hy - 0.5) * 0.78);
+	vec2 c = vec2(fract(gx), fract(gy)) - 0.5 - jitter;
+	float r = 0.085 + 0.045 * hx;
+	return (1.0 - smoothstep(r * 0.25, r, length(c))) * step(h, 0.35);
 }
 
 void fragment() {

@@ -108,6 +108,36 @@ func _init() -> void:
 		failures.append("the obstruction fixture must stand on carved water")
 	if MarinaBuilder._wet(wet_ground, Vector2(0, 10) * m, m, 0.0, wet_mask):
 		failures.append("a building on mapped water must block a berth")
+	# A floating pontoon flush against a river quay (water on south, flat grass
+	# bank on north, as at Forum Marinum in Turku) must never berth boats onto
+	# the dry bank even when the bank sits within FLAT_M of the water level.
+	var riverside := LocationData.new()
+	RenderSettings.apply_preset(riverside, RenderSettings.Preset.ULTRA)
+	riverside.grid_size = 49
+	riverside.heights.resize(49 * 49)
+	riverside.heights.fill(2.0)
+	riverside.water_level = 0.0
+	riverside.seed_value = 7
+	riverside.latitude = 60.437
+	riverside.longitude = 22.238
+	riverside.country = "FI"
+	riverside.land_polygons = [{"class": "water", "tidal": true,
+		"points": PackedVector2Array([Vector2(-600, 0) * m, Vector2(600, 0) * m,
+			Vector2(600, 400) * m, Vector2(-600, 400) * m])}]
+	riverside.piers = [{"points": PackedVector2Array([Vector2(-40.0 * m, 0.5 * m), Vector2(40.0 * m, 0.5 * m)]),
+		"floating": true, "width_m": NAN}]
+	var rground := GroundTruth.new(riverside)
+	var rboats: Array = MarinaBuilder.plan(riverside, rground, m, VegetationMask.new(riverside, rground))["boats"]
+	if rboats.is_empty():
+		failures.append("a riverside floating pontoon should still berth boats on its water side")
+	for rb in rboats:
+		var ro: Vector3 = rb[0]
+		var ryaw: float = rb[1]
+		var rout := Vector2(cos(ryaw), -sin(ryaw))
+		var rbow := Vector2(ro.x, ro.z) + rout * float(rb[2]) * MarinaBuilder.MESH_LEN_M
+		if rground.water_at(ro.x, ro.z) <= 0.0 or rground.water_at(rbow.x, rbow.y) <= 0.0:
+			failures.append("a riverside pontoon moored a boat onto dry land: stern=%s bow=%s" % [ro, rbow])
+			break
 	# A steep ramp across the berths (quay slope): boats would be buried, none placed.
 	var ramp := LocationData.new()
 	RenderSettings.apply_preset(ramp, RenderSettings.Preset.ULTRA)

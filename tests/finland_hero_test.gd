@@ -231,3 +231,30 @@ func _wires_and_snow() -> void:
 	_check((StreetFurniture._material("wood") as ShaderMaterial).shader.code.contains("snow_cover"), "snow on benches")
 	_check(StreetProps.lamp_family("nordic", "FI") == "span", "Finnish span lamps")
 	_check(StreetFurniture.furniture_family("nordic", "FI") == "nordic", "Nordic furniture")
+	# Boulevard tram + parallel carriageways + pedestrian crossing: no wire pole
+	# may stand inside a drivable carriageway or on a mapped crossing.
+	var blvd := _data()
+	blvd.country = "FI"
+	blvd.buildings = [{"x": 0.0, "z": 24.0 * m, "height": 18.0}, {"x": 0.0, "z": -24.0 * m, "height": 18.0}]
+	blvd.railways = [OsmTags._rail_entry({"railway": "tram", "electrified": "contact_line"},
+		PackedVector2Array([Vector2(-90, 0) * m, Vector2(90, 0) * m]))]
+	blvd.roads = [
+		OsmTags._road_entry({"highway": "primary", "width": "10"}, PackedVector2Array([Vector2(-90, 8) * m, Vector2(90, 8) * m])),
+		OsmTags._road_entry({"highway": "primary", "width": "10"}, PackedVector2Array([Vector2(-90, -8) * m, Vector2(90, -8) * m])),
+		OsmTags._road_entry({"highway": "footway", "footway": "crossing", "crossing": "traffic_signals", "width": "4"},
+			PackedVector2Array([Vector2(0, -16) * m, Vector2(0, 16) * m])),
+	]
+	var blvd_ground := GroundTruth.new(blvd)
+	var blvd_spans := OverheadWires.plan(blvd, blvd_ground)
+	_check(not blvd_spans.is_empty(), "a boulevard with parallel lanes still gets overhead wires")
+	var pole_in_lane_or_crossing := false
+	for sp in blvd_spans:
+		for sup in sp["supports"]:
+			if bool(sup[1]):
+				continue
+			var p3: Vector3 = sup[0]
+			var px := p3.x / m
+			var pz := p3.z / m
+			if absf(pz - 8.0) < 5.5 or absf(pz + 8.0) < 5.5 or (absf(px) < 2.5 and absf(pz) <= 16.5):
+				pole_in_lane_or_crossing = true
+	_check(not pole_in_lane_or_crossing, "wire poles step past parallel carriageways and stay off crossings")

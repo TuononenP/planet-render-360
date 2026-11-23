@@ -291,3 +291,15 @@ func _run() -> void:
 			_steps([Vector2(-30, 0), Vector2(-20, 0)], 12)]), m, shoreline)
 	_check(shore_flights.size() == 1 and int((shore_flights[0] as Dictionary)["road"]) == 1,
 		"StepsGround.apply with shoreline should skip near-shore steps and keep inland steps, got %d" % shore_flights.size())
+
+	# Riverbank stairs next to a riverside retaining wall and untagged-count
+	# stairs whose incline opposes the DEM slope must be omitted.
+	var bank_data := _data([
+		_steps([Vector2(-8, -6), Vector2(-8, 6)], 0, "up"),
+		_steps([Vector2(-1, 0), Vector2(9, 0)], 0, "up"),
+	])
+	bank_data.shore_structures = [{"kind": "retaining_wall",
+		"points": PackedVector2Array([Vector2(-6, -10) * m, Vector2(-6, 10) * m])}]
+	var bank_flights := StepsGround.apply(dem.duplicate(), _dry(), SIZE, step, bank_data, m, shoreline)
+	_check(bank_flights.is_empty(),
+		"riverside retaining-wall stairs and reverse-slope untagged stairs should be omitted, got %d" % bank_flights.size())
