@@ -153,11 +153,12 @@ const ROWS := [
 	{"id": "miami", "label": "Miami", "name": "Miami, United States",
 		"lat": 25.7743, "lon": -80.1855, "eye_lat": 25.77450, "eye_lon": -80.17900,
 		"eye_m": 18.0, "asl_m": 18.0, "bearing": 274.0, "pitch": 2.0, "hour": 8.5},
-	# Lummus Park promenade at 9th–10th Street, looking west-northwest across
-	# royal palms and Ocean Drive to the pastel Art Deco hotel strip.
+	# South Beach sand off 9th Street, looking north-northeast along the pale
+	# Atlantic beach, lifeguard towers and turquoise ocean on the right, with
+	# Lummus Park's royal palms and Ocean Drive's Art Deco strip on the left.
 	{"id": "miami_beach", "label": "Miami Beach", "name": "Miami Beach, United States",
-		"lat": 25.7810, "lon": -80.1300, "eye_lat": 25.77980, "eye_lon": -80.12960,
-		"eye_m": 5.0, "bearing": 292.0, "pitch": 2.0, "clear": false},
+		"lat": 25.7810, "lon": -80.1300, "eye_lat": 25.77900, "eye_lon": -80.12820,
+		"eye_m": 10.0, "bearing": 14.0, "pitch": -3.0, "clear": false},
 	# Southern promenade of Sanam Luang, looking south-southwest past the
 	# Ministry of Defence and Na Phra Lan Road onto the crenellated Grand Palace
 	# wall, spired gates, and Wat Phra Kaew's gold chedi and prangs.
