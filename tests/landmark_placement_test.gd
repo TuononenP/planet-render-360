@@ -86,11 +86,10 @@ func _run() -> void:
 	var square := PackedVector2Array([Vector2(-5,-5), Vector2(5,-5), Vector2(5,5), Vector2(-5,5)])
 	_check(bare_ground.asl_y(BuildingBuilder._mass_base(bare_ground, square, Vector2.ZERO, bare_ground.render_y(0))) >= 2.8 - 0.01,
 		"coastal building floors clear the legacy wave crest without water polygons")
-	# Low pier land can be dry at the static datum yet covered by waves.
+	# Legacy sea grid (no shoreline mask): low coastal land can be dry at the
+	# static datum yet covered by the legacy wave swell.
 	for height in [0.5,0.67,1.22]:
 		var pier := _data("golden_gate",height,0.5)
-		pier.land_polygons = [{"class":"water","tidal":true,"points":PackedVector2Array([
-			Vector2(100,100),Vector2(200,100),Vector2(200,200),Vector2(100,200)])}]
 		var pg := GroundTruth.new(pier)
 		var foundation := BuildingFoundation.sample(pg,square,Vector2.ZERO,pg.render_y(WaterBuilder.SEA_LEVEL_M))
 		_check(bool(foundation["raised"]) and pg.asl_y(foundation["floor"]) >= 1.99,

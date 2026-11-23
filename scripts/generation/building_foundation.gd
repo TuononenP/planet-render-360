@@ -124,9 +124,10 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 	var has_dry := is_finite(dry_low)
 	var low := dry_low if has_dry else all_low
 	var high := dry_high if has_dry else all_high
+	var shoreline_ready: bool = ground.shoreline != null and bool(ground.shoreline.ready)
 	var freeboard := FREEBOARD_M
 	# Legacy sea grids retain a 1.3 m upward swell offset.
-	if ground.shoreline == null or not ground.shoreline.ready:
+	if not shoreline_ready:
 		freeboard += 1.3
 	# A dry-centred building whose dry side carries most of its ring is a
 	# quayside building the water polygon clips, not a pier: it seats on
@@ -146,7 +147,11 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 				floor_y = cleared
 	else:
 		# Mostly wet is a pier however high its one dry corner stands.
-		raised = is_finite(water) and (wet_n > dry_n or low < water + freeboard * m)
+		# When the shoreline mask is active, a completely dry footprint
+		# (wet_n == 0, not centre_wet) sits on land behind the shore —
+		# never on pier pilings just because its ground is near sea level.
+		var low_pier: bool = (not shoreline_ready or wet_n > 0 or centre_wet) and low < water + freeboard * m
+		raised = is_finite(water) and (wet_n > dry_n or low_pier)
 		floor_y = water + freeboard * m if raised else low
 		if raised and high - low <= SLAB_RELIEF_M * m:
 			floor_y = maxf(floor_y, high)

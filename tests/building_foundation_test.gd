@@ -205,16 +205,14 @@ func _run() -> void:
 		if max_x > -4.0 * m:
 			failures.append("piles stand on dry quay ground (max pile x %.2f)" % max_x)
 	mroot.free()
-	# Low dry pier: no wet stretch, but the freeboard lifts the floor off
-	# the dry ground, so the deck still needs its piles.
+	# Legacy sea grid (no shoreline mask): no wet stretch, but the freeboard
+	# lifts the floor off the low dry ground, so the deck still needs its piles.
 	var ld := LocationData.new()
 	ld.grid_size = 49
 	ld.heights.resize(49 * 49)
 	ld.heights.fill(0.67)
 	ld.centre_elevation_m = 80.0
 	ld.water_level = 0.5
-	ld.land_polygons = [{"class": "water", "tidal": true, "points": PackedVector2Array([
-		Vector2(100, 100), Vector2(200, 100), Vector2(200, 200), Vector2(100, 200)]), "holes": []}]
 	var low_ground := GroundTruth.new(ld)
 	var lring := _square(Vector2.ZERO, 5.0 * m)
 	var lf := BuildingFoundation.sample(low_ground, lring, Vector2.ZERO,
@@ -226,6 +224,20 @@ func _run() -> void:
 	if not lroot.has_node("WaterFoundationPiles"):
 		failures.append("low dry pier built a deck without piles (floating deck)")
 	lroot.free()
+	# Low dry land behind a shoreline mask (e.g. a riverfront street < 1.5 m
+	# above sea level): wet_n == 0 and not centre_wet must seat on dry ground,
+	# never on pier pilings.
+	var dry_quay := _quay_ground(0.0)
+	var dring := _square(Vector2(60.0, 0.0) * m, 10.0 * m)
+	var df := BuildingFoundation.sample(dry_quay, dring, Vector2(60.0, 0.0) * m,
+		dry_quay.render_y(WaterBuilder.SEA_LEVEL_M))
+	if bool(df["raised"]):
+		failures.append("low dry building behind shoreline must not sit on pier pilings: %s" % [df])
+	var dland := Node3D.new()
+	BuildingFoundation.build(dland, dring, [], df, {"kind": "house"}, dry_quay)
+	if dland.get_child_count() != 0:
+		failures.append("low dry building behind shoreline built a water foundation (%d children)" % dland.get_child_count())
+	dland.free()
 	# Pile depth cap: a bad deep ground sample must not grow a pile
 	# hundreds of metres under the water.
 	var droot := Node3D.new()

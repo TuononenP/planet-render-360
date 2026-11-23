@@ -457,9 +457,9 @@ static func roof_for_building(b: Dictionary, region: String, shape: String,
 		region = "urban"
 	var tag_set: String = MaterialLibrary.ROOF_TAGS.get(
 		str(b.get("roof_material", "")).strip_edges().to_lower(), "")
+	var tag := MaterialLibrary.parse_colour_tag(str(b.get("roof_colour", "")))
 	if tag_set != "":
 		var tint := roof_base_tint(tag_set)
-		var tag := MaterialLibrary.parse_colour_tag(str(b.get("roof_colour", "")))
 		if tag.a > 0.0 and tag_set != "glass":
 			var q := Color(roundf(tag.r * 12.0) / 12.0,
 				roundf(tag.g * 12.0) / 12.0, roundf(tag.b * 12.0) / 12.0)
@@ -467,6 +467,13 @@ static func roof_for_building(b: Dictionary, region: String, shape: String,
 			tint = _roof_floor(tag_set, _keep_chroma(tag_set, _calib(tag_set, q)))
 		return roof_set_material(tag_set, tint, detail)
 	var styled := str(style.get("roof_set", ""))
+	if tag.a > 0.0:
+		var cset := _colour_tag_set(tag, shape, styled)
+		var q := Color(roundf(tag.r * 12.0) / 12.0,
+			roundf(tag.g * 12.0) / 12.0, roundf(tag.b * 12.0) / 12.0)
+		q = Color.from_hsv(q.h, minf(q.s, 0.72 if cset in ["copper", "sheet_metal"] else 0.42), q.v)
+		var tint := _roof_floor(cset, _keep_chroma(cset, _calib(cset, q)))
+		return roof_set_material(cset, tint, detail)
 	# A grey sample on a pitched roof in a terracotta region is shadow, moss
 	# or a panel, not slate: keep the style's tiles (Venice, Rome, ...).
 	var grey_tiles := styled == "terracotta" and shape != "flat" \
@@ -563,6 +570,19 @@ static func roof_for_color(c: Color, set_name: String = "", detail: int = 1) -> 
 	var m := roof_set_material(set_name, tint, detail)
 	_roof_mats[key] = m
 	return m
+
+## Roof set for an explicit `roof:colour` tag when `roof:material` is absent:
+## keeps flat roofs membrane/concrete, keeps Nordic metal roofs metal, maps
+## red/orange tags to terracotta, and routes neutral/cool tags away from
+## terracotta tiles onto slate/wood.
+static func _colour_tag_set(tag: Color, shape: String, styled: String) -> String:
+	if shape == "flat":
+		return styled if styled in ["membrane", "concrete", "copper"] else "membrane"
+	if styled in ["copper", "sheet_metal"]:
+		return styled
+	if tag.r > tag.g * 1.15 and tag.r > tag.b * 1.25:
+		return "terracotta"
+	return styled if styled in ["slate", "wood"] else "slate"
 
 ## Roof set for a satellite sample: the photo gives the colour, the
 ## shape and regional style give the finish. Red-dominant samples read

@@ -303,6 +303,29 @@ func _roof_angle_checks(failures: Array[String]) -> void:
 		failures.append("an explicit roof:height must beat roof:angle (want 5.0, got %.2f)" % float(rise[-1.0]))
 	if absf(float(rise[0.0]) - want20) < 0.01 and absf(float(rise[0.0]) - want45) < 0.01:
 		failures.append("an untagged angle should keep the regional pitch")
+	# A 56 x 12 m bar rotated 45 deg has a ~48 m AABB, but its oriented short
+	# span is still 12 m: roof:angle must pitch over 12 m, not squash the wall.
+	var cs := cos(PI * 0.25)
+	var sn := sin(PI * 0.25)
+	var rot_ring := PackedVector2Array()
+	for pt in [Vector2(-28, -6), Vector2(28, -6), Vector2(28, 6), Vector2(-28, 6)]:
+		rot_ring.append(Vector2(600.0 + pt.x * cs - pt.y * sn, 300.0 + pt.x * sn + pt.y * cs))
+	var rot_b := {"x": 600.0, "z": 300.0, "size_x": 48.0, "size_z": 48.0,
+		"height": 8.6, "height_source": "tag_height", "kind": "house",
+		"roof_shape": "hipped", "roof_angle": 22.7, "footprint": rot_ring}
+	var rot_masses := BuildingMasses.plan(rot_b, ctx)
+	if rot_masses.is_empty():
+		failures.append("no mass planned for rotated roof-angle block")
+	else:
+		var rm := rot_masses[0] as Dictionary
+		var rspan := BuildingHeights._ring_span_m(rm["ring"] as PackedVector2Array)
+		var rrh := float(rm["rh_m"])
+		var rwall := float(rm["wall_m"])
+		if absf(rspan - 12.0) > 0.2:
+			failures.append("rotated 56x12 ring span should be ~12 m, got %.2f" % rspan)
+		if rrh > 3.0 or rwall < 5.5:
+			failures.append("rotated 8.6 m bar at 22.7 deg should keep wall >=5.5 m and roof <=3.0 m, got wall=%.2f rh=%.2f"
+				% [rwall, rrh])
 
 ## A bare-membrane flat roof is no longer one photo colour: Tokyo's roofs span
 ## several greys; a row naming its own roof colours keeps them; Tokyo's walls

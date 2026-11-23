@@ -29,6 +29,11 @@ func _init() -> void:
 		"Red imagery over a Nordic sheet roof must colour the paint, not change it to tiles")
 	var flat := _roof({}, "flat", absent, {"roof_set": "sheet_metal"})
 	_check(flat.albedo_texture == MaterialLibrary._set_tex("membrane", "diff"), "Untagged flat roofs retain membrane")
+	var grey_only := _roof({"roof_colour": "grey"}, "hipped", absent, {"roof_set": "terracotta"})
+	_check(grey_only.albedo_texture != MaterialLibrary._set_tex("terracotta", "diff"),
+		"Explicit roof:colour=grey without roof:material must not stay terracotta")
+	_check(absf(grey_only.albedo_color.r - grey_only.albedo_color.b) < 0.08,
+		"Explicit roof:colour=grey without roof:material must stay neutral grey")
 	_folds()
 	_means()
 	_membrane(absent)

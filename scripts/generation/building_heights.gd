@@ -301,9 +301,33 @@ static func _roof_height_m(shape: String, span_m: float, tag_m: float,
 			return clampf(span_m * 0.25 * pitch, 1.0 * lo, 5.0 * hi)
 	return 0.0
 
+## Short span of `ring` in metres, measured along its dominant axis (oriented
+## bounding box) rather than the world AABB so rotated elongated footprints
+## do not inflate roof rise or tower-massing span. For concave L/T/courtyard
+## rings whose OBB spans a courtyard gap, bound by the mean wing width.
 static func _ring_span_m(ring: PackedVector2Array) -> float:
-	var bb := RingGeometry.aabb(ring)
-	return minf(bb.size.x, bb.size.y) / WorldScale.metres_to_units()
+	if ring.size() < 3:
+		return 0.0
+	var u := RingGeometry.dominant_axis(ring)
+	var v := Vector2(-u.y, u.x)
+	var u0 := INF
+	var u1 := -INF
+	var v0 := INF
+	var v1 := -INF
+	for p in ring:
+		var pu := p.dot(u)
+		var pv := p.dot(v)
+		u0 = minf(u0, pu)
+		u1 = maxf(u1, pu)
+		v0 = minf(v0, pv)
+		v1 = maxf(v1, pv)
+	var span := minf(u1 - u0, v1 - v0)
+	var long_side := maxf(u1 - u0, v1 - v0)
+	if long_side > 0.001:
+		var mean_w := absf(RingGeometry.signed_area(ring)) / long_side
+		if mean_w > 0.001 and mean_w < span * 0.85:
+			span = mean_w * 1.15
+	return span / WorldScale.metres_to_units()
 
 ## Pitched roof over a cleaned ring, rising rh from the eave level top
 ## (RoofGeometry builds the mesh; rings whose centroid falls outside keep
