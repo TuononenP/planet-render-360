@@ -19,6 +19,7 @@ const CAFE := ["#7a1f24", "#1f3b2c", "#c8a24a", "#2a2f4a", "#8a2a1a"]
 
 const BASE := {
 	"paris_post_haussmann": "haussmann", "paris_faubourg": "haussmann",
+	"paris_royal": "haussmann", "paris_marais": "haussmann",
 	"paris_hbm": "haussmann", "paris_modern": "haussmann", "paris_pavillon": "haussmann",
 }
 
@@ -100,6 +101,36 @@ const REGIONS := {
 		"house": {"w": [["render", ["#ecebe6", "#e0ddd6"]], ["concrete", ["#c8c4bc"]]],
 			"p": "strip", "r": [["flat", 2], ["skillion", 1]], "rf": [["membrane", []]],
 			"st": [2, 3], "fix": true, "ch": 0.0, "dm": 0.0, "ev": 0.2, "rv": {}},
+	},
+	# Grand Siècle classical stone (Place Vendôme, Rue de Rivoli, Palais-Royal,
+	# Île Saint-Louis, Concorde): ashlar limestone, steep blue-black Angers slate mansards.
+	"paris_royal": {
+		"apartments": {"w": [["limestone", ["#dfd4b8", "#d7caa8", "#e3d9c0"]]], "p": "haussmann",
+			"bay": 2.5, "r": [["mansard", 1]], "pitch": 1.25,
+			"rf": [["slate", ["#424b54", "#4a535c", "#3c454e"]]],
+			"fh": 3.3, "st": [4, 6], "fix": true, "ch": 0.9, "dm": 1.0, "eq": 0.0, "g": [], "ev": 0.0,
+			"rv": {"balcony_rows": [2], "balconette": 0.65, "string_course": true,
+				"awning": 0.25, "awning_colours": CAFE}},
+		"commercial": {"w": [["limestone", ["#dfd4b8", "#d7caa8"]]], "p": "haussmann",
+			"bay": 2.6, "r": [["mansard", 1]], "pitch": 1.25,
+			"rf": [["slate", ["#424b54", "#4a535c"]]],
+			"fh": 3.4, "st": [4, 6], "fix": true, "ch": 0.8, "dm": 1.0, "eq": 0.0, "g": [], "ev": 0.0,
+			"rv": {"balcony_rows": [2], "balconette": 0.6, "string_course": true,
+				"awning": 0.35, "awning_colours": CAFE}},
+	},
+	# Le Marais & Place des Vosges hôtels particuliers: warm limestone, shuttered
+	# render and Louis XIII brick-and-stone accents under steep slate/terracotta roofs.
+	"paris_marais": {
+		"apartments": {"w": [["limestone", ["#dfd2b5", "#d6c7a6"]], ["render", ["#e6d8be", "#ded0b4"]],
+				["brick", ["#a44e3d", "#9a4636"]]],
+			"p": "punched", "wn": "french", "bay": 2.1, "fr": "#f1ede4",
+			"sh": ["#5c6d63", "#7a8078", "#6d6052"], "sp": 0.65, "rl": 0.25,
+			"r": [["mansard", 3], ["gabled", 2]], "pitch": 1.25,
+			"rf": [["slate", ["#424b54", "#4a535c"]], ["terracotta", ["#9a4a2c", "#a8552f"]]],
+			"fh": 2.95, "st": [4, 5], "fix": true, "ch": 0.9, "dm": 0.8, "eq": 0.0,
+			"g": [["shop", 3], ["none", 1]], "gc": ArchitectureData.FASCIA, "ev": 0.1,
+			"rv": {"balconette": 0.4, "string_course": true, "quoins": true, "awning": 0.35,
+				"awning_colours": CAFE}},
 	},
 	# Pavillons (outer arrondissements / petite couronne): millstone
 	# (meulière) or render with brick quoins, tiled roofs.

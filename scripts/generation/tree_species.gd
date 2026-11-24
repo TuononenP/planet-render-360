@@ -22,6 +22,12 @@ const SPECIES := {
 		"leader": 0.8, "branches": 9, "trunk_r": 0.30, "up": 0.6, "droop": 0.15,
 		"clusters": 62, "card": 3.0, "leaf": "broad", "bark": "furrowed",
 		"tint": "lime", "evergreen": false},
+	# Parisian Horse Chestnut (Aesculus hippocastanum — 2,039 mapped trees around Champ de Mars & Trocadéro):
+	# broad, dense rounded canopy with deep palmate foliage and warm autumn amber.
+	"horse_chestnut": {"gen": "broad", "h": 19.0, "h_var": 0.22, "bole": 0.24, "crown_r": 0.36,
+		"leader": 0.45, "branches": 8, "trunk_r": 0.36, "up": 0.52, "droop": 0.12,
+		"clusters": 66, "card": 3.3, "leaf": "broad", "bark": "furrowed",
+		"tint": "broad", "evergreen": false},
 	"honey_locust": {"gen": "broad", "h": 17.0, "h_var": 0.2, "bole": 0.38, "crown_r": 0.38,
 		"leader": 0.35, "branches": 7, "trunk_r": 0.24, "up": 0.52, "droop": 0.1,
 		"clusters": 40, "card": 2.3, "leaf": "birch", "bark": "furrowed", "tint": "birch", "evergreen": false},
@@ -389,7 +395,7 @@ static func mix(biome: String, setting: String) -> Array:
 const GENUS := {
 	"platanus": "plane", "tilia": "lime", "quercus": "oak", "fagus": "oak",
 	"castanea": "oak", "carpinus": "oak", "juglans": "oak",
-	"acer": "lime", "aesculus": "lime", "ulmus": "zelkova", "fraxinus": "lime",
+	"acer": "lime", "aesculus": "horse_chestnut", "ulmus": "zelkova", "fraxinus": "lime",
 	"robinia": "lime", "prunus": "lime", "sorbus": "lime", "malus": "lime",
 	"celtis": "lime", "styphnolobium": "lime", "sophora": "lime", "gleditsia": "honey_locust",
 	"pyrus": "callery_pear", "magnolia": "lime", "ginkgo": "ginkgo", "zelkova": "zelkova",

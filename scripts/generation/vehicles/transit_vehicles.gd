@@ -49,7 +49,8 @@ const BUS_PAINT := {
 	"london": Color(0.5, 0.03, 0.03), "helsinki": HSL_BLUE, "espoo": HSL_BLUE,
 	"turku": FOLI_YELLOW,
 	"stockholm": Color(0.5, 0.04, 0.04), "lisbon": Color(0.85, 0.62, 0.04), "berlin": Color(0.85, 0.66, 0.05),
-	"new_york": Color(0.78, 0.8, 0.84), "san_francisco": Color(0.72, 0.72, 0.7), "paris": Color(0.35, 0.62, 0.52),
+	"new_york": Color(0.78, 0.8, 0.84), "san_francisco": Color(0.72, 0.72, 0.7),
+	"paris": [Color(0.24, 0.62, 0.82), Color(0.32, 0.64, 0.54)],
 	"bangkok": [
 		Color(0.62, 0.08, 0.06),  # BMTA classic cream-red
 		Color(0.10, 0.34, 0.72),  # BMTA air-conditioned blue-white

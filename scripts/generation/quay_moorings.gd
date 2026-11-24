@@ -75,6 +75,12 @@ const QUAY_ROWS := [
 	{"id": "aurajoki_west", "houseboat": 0.75, "kind": "restaurant_boat", "corridor_m": 35.0, "reach_m": 2600.0,
 		"points": [[60.44799, 22.26680], [60.44767, 22.26555], [60.44613, 22.25984],
 			[60.44506, 22.25596], [60.44476, 22.25492], [60.44381, 22.25241], [60.44280, 22.25027]]},
+	# Paris Seine quays: Port de la Bourdonnais & Port de Suffren (Bateaux Parisiens,
+	# Vedettes de Paris & moored péniches below the Eiffel Tower), plus Port de la Conférence.
+	{"id": "seine_eiffel", "houseboat": 0.6, "kind": "restaurant_boat", "corridor_m": 45.0, "reach_m": 2600.0,
+		"points": [[48.8559, 2.2889], [48.8586, 2.2921], [48.8608, 2.2962], [48.8622, 2.3008]]},
+	{"id": "seine_alma", "houseboat": 0.5, "kind": "restaurant_boat", "corridor_m": 45.0, "reach_m": 2600.0,
+		"points": [[48.8641, 2.3025], [48.8643, 2.3082], [48.8642, 2.3130]]},
 ]
 const ROW_MAX_BOATS := 16
 
@@ -297,8 +303,9 @@ static func _large_ships(data: LocationData, ground: GroundTruth, taken: Diction
 			b = swap
 		var dir := (b - a).normalized()
 		var ferry := _near_terminal(data, (a + b) * 0.5, m)
-		# The central tidal Thames upstream of Tower Bridge cannot pass ocean liners or ro-pax cruise ferries.
-		if data.latitude >= 51.45 and data.latitude <= 51.53 and data.longitude >= -0.22 and data.longitude <= -0.06:
+		# The central tidal Thames upstream of Tower Bridge and the Paris Seine cannot pass ocean liners or cruise ferries.
+		if (data.latitude >= 51.45 and data.latitude <= 51.53 and data.longitude >= -0.22 and data.longitude <= -0.06) \
+				or WaterSurface.seine(data.latitude, data.longitude):
 			continue
 		if not ferry and CargoBerths.port_run(data, a, b, m):
 			continue  # cargo quays berth cargo ships (CargoBerths)

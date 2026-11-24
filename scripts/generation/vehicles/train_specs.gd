@@ -60,6 +60,13 @@ const LIVERIES := {
 	"miami_metrorail": {"lower": Color(0.84, 0.85, 0.86), "band": Color(0.04, 0.48, 0.68),
 		"upper": Color(0.84, 0.85, 0.86), "door": Color(0.84, 0.85, 0.86), "pillar": TramSpecs.DARK,
 		"roof": Color(0.8, 0.8, 0.78), "inner": WHITE, "gauge": 1.435},
+	# Paris RATP / IDFM elevated Métro Line 6 (MP 73 / MP 89): crisp white body, RATP jade-green & sky-blue band.
+	"paris_metro": {"lower": Color(0.18, 0.58, 0.76), "band": Color(0.24, 0.64, 0.54),
+		"upper": WHITE, "door": WHITE, "pillar": TramSpecs.DARK, "roof": ROOF, "inner": WHITE, "gauge": 1.435},
+	# Paris RER C / Transilien commuter EMU (IDFM blue & silver-white).
+	"paris_rer": {"lower": Color(0.14, 0.42, 0.72), "band": Color(0.76, 0.12, 0.32),
+		"upper": Color(0.86, 0.87, 0.89), "door": Color(0.14, 0.42, 0.72), "pillar": TramSpecs.DARK,
+		"roof": ROOF, "inner": WHITE, "gauge": 1.435},
 	# Miami's Metromover: crisp white automated pod, cyan-blue band and doors, pale roof.
 	"miami_metromover": {"lower": WHITE, "band": Color(0.06, 0.56, 0.82), "upper": WHITE,
 		"door": Color(0.06, 0.56, 0.82), "pillar": TramSpecs.DARK, "roof": Color(0.8, 0.8, 0.78),
@@ -142,9 +149,9 @@ const KIND := {
 }
 
 ## The regions whose metro runs on surface or viaduct track (Helsinki's,
-## Stockholm's tunnelbana, Miami's Metrorail) and the livery of each.
-const METRO_REGIONS: Array[String] = ["helsinki", "espoo", "stockholm", "miami"]
-const METRO_LIVERY := {"stockholm": "stockholm_metro", "miami": "miami_metrorail"}
+## Stockholm's tunnelbana, Miami's Metrorail, Paris's elevated Métro Line 6) and the livery of each.
+const METRO_REGIONS: Array[String] = ["helsinki", "espoo", "stockholm", "miami", "haussmann"]
+const METRO_LIVERY := {"stockholm": "stockholm_metro", "miami": "miami_metrorail", "haussmann": "paris_metro"}
 
 ## Whether a metro runs on `rail` in CityStyles region `region`: open
 ## (or roofed) mapped subway track at or above ground in Helsinki,

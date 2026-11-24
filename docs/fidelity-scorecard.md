@@ -947,3 +947,45 @@ night lighting; human "photographic" gate remains open for user sign-off).
 - **Verification:** `london_landmarks_test`, `landmark_lights_test`, `bridge_specs_test`, `bridge_select_test`,
   `architecture_test`, `city_detail_test`, `street_furniture_test`, `bus_stop_test`, `car_fleet_test`,
   `coastal_water_test`, `landmark_list_test`, `host_policy_test`, and `tools/check_class_size.sh` (996/1000) all pass.
+
+### Paris rounds `paris-r0` → `paris-r1` → `paris-r2` (2026-11-24)
+
+Frames in `visual-plan/reviews/paris-r0-2026-11-24/` (baseline, 11 landmarks built), `paris-r1-2026-11-24/` (initial
+87-landmark pass), and `paris-r2-2026-11-24/` (Trocadéro Parvis preset vantage `48.8622, 2.2887`, golden/night +
+Palais de Chaillot, Pont d'Iéna, Pont de Bir-Hakeim, Champ de Mars, Seine east panorama, La Défense NW skyline, and
+Place d'Iéna, Ultra), plus 4-angle studio sheets in `visual-plan/captures/{paris-models,paris-models-fix}/`.
+Agent pre-rating: **recognisable** (major leap across the Trocadéro–Eiffel–École Militaire–Montparnasse axis, Seine
+bridges, Bateaux Mouches, Front de Seine & La Défense skylines, and *La Ville Lumière* night illumination; human
+"photographic" gate AC-18 remains open for user sign-off).
+
+- **Delivered:** 82 Paris landmarks verified in `tests/paris_landmarks_test.gd` — 10 upgraded existing icons (`eiffel`
+  3-tone Tour Eiffel Brown gradation, gilded 72-scientists 1st-floor frieze, summit searchlight + 330 m red aviation
+  beacon; `arc_de_triomphe` Eternal Flame + halo + floods; `louvre_pyramid` `pool_water` + amber core; `notre_dame`
+  post-2024 blond limestone + glowing roses; `sacre_coeur` Château-Landon travertine; `pantheon_paris` 90° west-portico
+  yaw fix; `les_invalides`, `sainte_chapelle`, `palais_garnier` `LoggiaLamp`, `gare_du_nord`; raised `radius_m` &
+  `skyline_priority`), 30 new bespoke landmarks (`palais_de_chaillot`, `ecole_militaire`, `palais_de_tokyo`,
+  `musee_quai_branly`, `cathedrale_sainte_trinite`, `maison_de_la_radio`, `statue_liberte_paris`, `grand_palais`,
+  `petit_palais`, `palais_bourbon`, `place_de_la_concorde`, `palais_du_louvre`, `musee_dorsay`, `centre_pompidou`,
+  `hotel_de_ville_paris`, `conciergerie_palais_justice`, `eglise_madeleine`, `palais_luxembourg`, `institut_de_france`,
+  `saint_sulpice`, `saint_eustache` fixing OSM `h=10`, `place_vendome`, `bastille_ensemble`, `gare_de_lyon`,
+  `gare_de_lest`, `palais_royal_bourse`, `place_des_vosges`, `grande_arche`, `fondation_louis_vuitton`,
+  `bnf_mitterrand`), 5 bespoke fitted Seine bridges (`pont_de_bir_hakeim`, `pont_alexandre_iii`, `pont_d_iena`,
+  `pont_neuf`, `passerelle_debilly`), and 37 `PaTowerSpecs` skyline towers (Tour Montparnasse 210 m, Pullman 116 m, 10
+  Front de Seine 98 m towers, 25 La Défense 110–241 m towers fixing `Cœur Défense h=1.0`, `Tour Égée`, `Tour Panorama`,
+  `Tour Beaugrenelle`).
+- **City fabric, Seine, trees & transit:** widened Paris zone radius `5.5 → 10.5 km`, added `"paris"` to
+  `FAR_DISTRICT_CITIES` and `CityDetail.CITIES` (`VERSION := 5`), expanded Paris districts `5 → 16` with new
+  `paris_royal` and `paris_marais` era rows, added olive-jade Seine water palette (`WaterSurface`), blocked ocean
+  liners on the Seine and added `seine_eiffel` / `seine_alma` Bateaux Mouches & péniche moorings, added
+  `horse_chestnut` (`Aesculus`) canopy in `TreeSpecies`, added `"paris"` street furniture with Hector Guimard Art
+  Nouveau Métro entrances & Vélib' docks, enabled elevated Métro Line 6 trains (`"paris_metro"` in `TrainSpecs`), and
+  updated Paris buses to IDFM sky-blue + RATP jade-green (`TransitVehicles`).
+- **Visual polish from `paris-r1` / studio sheets:** recentered `palais_de_chaillot` (`48.86225, 2.28858`) with an
+  84 m open Parvis so the preset vantage is completely unobstructed, fixed left-wing inward gallery orientation,
+  reversed inverted grid winding on `LandmarkPaKit.mansard` / `pavilion_dome` and Grand Palais `_barrel_vault_z`, and
+  eliminated vertical `FLOOD_META` colinear warnings.
+- **Verification:** `paris_landmarks_test`, `architecture_test`, `landmark_lights_test`, `bridge_select_test`,
+  `bridge_specs_test`, `city_detail_test`, `street_furniture_test`, `train_test`, `coastal_water_test`,
+  `host_policy_test`, `tools/check_class_size.sh` (996/1000), and batched windowed `screenshot_test` / `world_cache_test`
+  pass (Paris Ultra build: 87 landmarks in 35 s on Apple M5 Ultra, Forward+).
+

@@ -116,7 +116,7 @@ static func glass(hex: String = "#2E3A40") -> StandardMaterial3D:
 
 ## Glossy outdoor pool water without LandmarkShader weathering or glass
 ## greying, keeping vivid turquoise-cyan hue on desktop Ultra.
-static func pool_water(hex: String, roughness: float = 0.08) -> StandardMaterial3D:
+static func pool_water(hex: String = "#386878", roughness: float = 0.08) -> StandardMaterial3D:
 	_mutex.lock()
 	var key := "pool_water|%s|%.2f" % [hex, roughness]
 	if _cache.has(key):

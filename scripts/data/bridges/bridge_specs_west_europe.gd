@@ -168,28 +168,7 @@ static func rows() -> Array:
 				"estimated | verified: fr Wikipedia: main arch 93 m, two side arches 32.4 m, total 173 m (the " +
 				"side arches continue over the quays), 20 m wide (12 m roadway + 2 x 4 m); OSM ways re- " +
 				"measured bearing 303.2, centre 48.84663,2.27572 (matches)"},
-		{"id": "br_paris_pont_de_bir_hakeim", "cc": "FR", "name": "Pont de Bir-Hakeim", "wiki": "Pont de Bir-Hakeim",
-			"aliases": ["bir hakeim bridge", "pont de passy", "pont de bir hakeim"], "lat": 48.85571, "lon": 2.28757,
-			"bearing": 323.1, "st": "arch_deck", "spans": [24.0, 42.0, 24.0, 33.0, 30.0, 54.0, 30.0], "width": 24.7,
-			"clear": 9.5, "rise": 6.5, "material": "steel", "base": "water", "tier": 2, "conf": 1,
-			"src": "en Wikipedia (237 m, 24.7 m; petit bras 24/42/24 m, grand bras 30/54/30 m), OSM ways bearing " +
-				"(left bank to right bank); 33 m island span is the remainder to reach 237 m; Metro viaduct " +
-				"above not modelled; rise and clear estimated | verified: en Wikipedia (citing AFGC): petit " +
-				"bras half-arches/arch 24/42/24 m, grand bras 30/54/30 m, 237 m total, 24.7 m; the island " +
-				"section (33 m) is the remainder, a masonry arch under the viaduct, and the Metro viaduct " +
-				"dominates; OSM bearing 327.6 (4.5 deg off, within tolerance), centre matches | round 2: " +
-				"verify2: searched and not found - fr Wikipedia re-read; Structurae snippet repeats 24/42/24 " +
-				"and 30/54/30 but gives no figure for the island masonry arch (33 m is still the remainder)"},
-		{"id": "br_paris_passerelle_debilly", "cc": "FR", "name": "Passerelle Debilly", "wiki": "Passerelle Debilly",
-			"aliases": ["debilly footbridge"], "lat": 48.86256, "lon": 2.29693, "bearing": 332.4, "st": "arch_through",
-			"spans": [125.0], "width": 8.0, "clear": 6.5, "rise": 7.0, "material": "steel", "base": "water", "tier": 3,
-			"conf": 1,
-			"src": "en Wikipedia (through arch, 125 m, 8 m), OSM way 17066795 bearing; span subdivision and arch " +
-				"form unverified (may be several spans), rise and clear estimated | verified: fr Wikipedia " +
-				"160 m x 8 m, en 125 m; Structurae search: side arches of 22.5 m are half arches, designed " +
-				"Resal/Alby/Lion; OSM footway bearing 332.2, centre matches; span layout (central arch + two " +
-				"half arches) not resolved | round 2: verify2: searched and not found - fr Wikipedia re-read: " +
-				"no span split; 160 m vs 125 m conflict stays"},
+		# Pont de Bir-Hakeim and Passerelle Debilly are built by bespoke builders in LandmarkSetParis.
 		{"id": "br_paris_pont_de_sully", "cc": "FR", "name": "Pont de Sully", "wiki": "Pont de Sully",
 			"aliases": ["pont sully paris"], "lat": 48.84977, "lon": 2.35796, "bearing": 245.4, "st": "arch_deck",
 			"spans": [49.0, 52.0, 49.0], "width": 20.0, "clear": 9.0, "rise": 4.5, "material": "iron", "base": "water",

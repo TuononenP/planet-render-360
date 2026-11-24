@@ -18,13 +18,12 @@ extends RefCounted
 ## Paris keeps its ArchitectureData box too (the inner suburbs inside it
 ## stay "haussmann"); the zone only makes the city/era cues available.
 const ZONES := [
-	["paris", "haussmann", 48.8566, 2.3522, 5.5],
+	["paris", "haussmann", 48.8566, 2.3522, 10.5],
 	["london", "london", 51.5074, -0.1278, 12.0],
 	["amsterdam", "amsterdam", 52.3676, 4.9041, 7.0],
 	["berlin", "berlin", 52.5200, 13.4050, 12.0],
 	["barcelona", "barcelona", 41.3874, 2.1686, 8.0],
 	["rome", "rome", 41.9028, 12.4964, 9.0],
-	["venice", "venice", 45.4375, 12.3358, 3.0],        # old city + Giudecca
 	["stockholm", "stockholm", 59.3293, 18.0686, 6.0],
 	["stockholm", "stockholm", 59.2760, 17.9060, 1.0], # Skärholmen
 	["stockholm", "stockholm", 59.3920, 17.9170, 1.8], # Tensta / Rinkeby
@@ -176,11 +175,22 @@ const CORES := {
 ## Million Programme estates and the new quarters. A city in
 ## FAR_DISTRICT_CITIES also draws them into the far fabric.
 const DISTRICTS := [
-	["paris", "paris_faubourg", 48.8590, 2.3620, 0.9, 5.0],      # Le Marais
-	["paris", "paris_faubourg", 48.8867, 2.3431, 0.6, 5.0],      # Montmartre
-	["paris", "paris_modern", 48.8920, 2.2380, 0.9, 30.0],       # La Défense
-	["paris", "paris_modern", 48.8270, 2.3650, 0.7, 8.0],        # Olympiades
-	["paris", "paris_modern", 48.8480, 2.2830, 0.4, 8.0],        # Front de Seine
+	["paris", "paris_marais", 48.8590, 2.3620, 0.85, 6.0],        # Le Marais & Place des Vosges
+	["paris", "paris_royal", 48.8674, 2.3294, 0.55, 7.0],         # Place Vendôme & Rue de Rivoli
+	["paris", "paris_royal", 48.8518, 2.3568, 0.35, 7.0],         # Île Saint-Louis
+	["paris", "paris_royal", 48.8562, 2.3215, 0.45, 5.0],         # Faubourg Saint-Germain (7e)
+	["paris", "paris_post_haussmann", 48.8615, 2.2840, 1.1, 6.0], # Trocadéro & Passy (16e)
+	["paris", "paris_post_haussmann", 48.8700, 2.3050, 0.85, 5.5],# Champs-Élysées & Triangle d'Or (8e)
+	["paris", "haussmann", 48.8720, 2.3320, 0.9, 6.0],            # Opéra & Grands Boulevards
+	["paris", "haussmann", 48.8560, 2.3060, 0.85, 5.5],           # Invalides & Gros-Caillou (7e)
+	["paris", "paris_faubourg", 48.8485, 2.3465, 0.7, 5.0],       # Quartier Latin (5e)
+	["paris", "paris_faubourg", 48.8867, 2.3431, 0.65, 6.0],      # Montmartre
+	["paris", "paris_faubourg", 48.8690, 2.3660, 0.8, 5.0],       # Canal Saint-Martin & Bastille
+	["paris", "paris_modern", 48.8920, 2.2380, 1.0, 30.0],        # La Défense
+	["paris", "paris_modern", 48.8270, 2.3650, 0.7, 8.0],         # Olympiades (13e)
+	["paris", "paris_modern", 48.8335, 2.3760, 0.75, 10.0],       # Paris Rive Gauche & Bercy
+	["paris", "paris_modern", 48.8480, 2.2830, 0.45, 10.0],       # Front de Seine
+	["paris", "paris_modern", 48.8415, 2.3215, 0.35, 6.0],        # Montparnasse core
 	["london", "london_stucco", 51.4975, -0.1560, 1.2, 8.0],     # Belgravia
 	["london", "london_stucco", 51.4990, -0.1900, 1.5, 6.0],     # Kensington
 	["london", "london_stucco", 51.5115, -0.2050, 0.9, 6.0],     # Notting Hill
@@ -569,7 +579,7 @@ static func local_frame(region: String, lat: float, lon: float) -> Dictionary:
 
 ## Cities whose district circles also shape the far fabric
 ## (FarCityBuilder), so the city past the detailed extent keeps them.
-const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki", "miami"]
+const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki", "miami", "paris"]
 
 ## The far fabric's district circles for a viewpoint's region, in its
 ## local metre frame: [[era, Vector2 centre, radius_m], ...], the most

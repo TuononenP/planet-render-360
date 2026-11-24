@@ -1,0 +1,85 @@
+class_name LandmarkPaChaillot
+extends RefCounted
+
+## Palais de Chaillot (Carlu, Boileau & Azéma, 1937; OSM relation 6826569).
+## Twin symmetrical Art Deco travertine & limestone wings curving around the
+## Jardins du Trocadéro, framing the wide open Parvis des Droits de l'Homme
+## (where the Paris preset camera stands at 48.8622, 2.2887 looking SE toward
+## the Eiffel Tower). The central parvis (x = -34..+34 m) stays completely open
+## at pavement level; the two monumental pavilions (Passy Wing -X, Paris Wing +X)
+## rise to 28 m with fluted piers, gilded roof inscriptions, bronze terrace statues,
+## and warm golden night uplighting.
+
+static func build(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	lm.use("Stone", LandmarkPaKit.lutetian("#E4DAC4", 3.5))
+	lm.use("Ashlar", LandmarkPaKit.ashlar("#C9BEA6", 3.2))
+	lm.use("Pave", LandmarkMaterials.pbr("pavement", "#C7C0B2", 4.0))
+	lm.use("Glass", LandmarkMaterials.glass("#2A353E"))
+	lm.use("Gilt", LandmarkMaterials.gold())
+	lm.use("Bronze", LandmarkPaKit.bronze("#4A5044"))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE4A8", 1.45))
+	# Open central Parvis des Droits de l'Homme terrace slab (y = 0..0.3, completely unobstructed!)
+	lm.box("Pave", Vector3(0.0, 0.15, 2.0), Vector3(84.0, 0.3, 46.0))
+	# Front terrace balustrade overlooking Warsaw Fountains (+Z toward Eiffel Tower)
+	lm.box("Stone", Vector3(0.0, 0.55, 24.5), Vector3(80.0, 1.0, 0.9))
+	# Frame left & right edges with gilded bronze Art Deco statues & Paris lamps; keep center x = -20..+20 completely open!
+	for sx in [-36.0, -24.0, 24.0, 36.0]:
+		var x := float(sx)
+		lm.box("Ashlar", Vector3(x, 1.0, 24.5), Vector3(1.5, 1.4, 1.5))
+		if absf(x) > 30.0:
+			lm.frustum("Gilt", Vector3(x, 1.7, 24.5), 0.55, 0.38, 2.8, 8)
+		else:
+			LandmarkPaKit.paris_lamp(lm, "Bronze", "Lamp", Vector3(x, 1.7, 24.5), 3.4)
+	# Twin monumental corner pavilions flanking the 84 m wide Parvis (x = +/-58 m, height 28.0 m)
+	for side in [-1.0, 1.0]:
+		var s := float(side)
+		var px := s * 58.0
+		lm.box("Ashlar", Vector3(px, 2.0, 0.0), Vector3(34.0, 4.0, 38.0))
+		lm.box("Stone", Vector3(px, 14.5, 0.0), Vector3(32.0, 21.0, 35.0))
+		# Stepped Art Deco attic crown reaching 28.0 m with gilded rooftop inscription band
+		lm.box("Stone", Vector3(px, 26.2, 0.0), Vector3(29.0, 3.6, 32.0))
+		lm.box("Gilt", Vector3(px, 25.8, 16.15), Vector3(24.0, 1.0, 0.18))
+		lm.box("Gilt", Vector3(px - s * 16.15, 25.8, 0.0), Vector3(0.18, 1.0, 24.0))
+		# Fluted monumental Art Deco piers & tall vertical glass bays on garden (+Z) & parvis inner faces
+		for k in 6:
+			var fx := px + lerpf(-13.0, 13.0, float(k) / 5.0)
+			lm.box("Stone", Vector3(fx, 14.5, 17.9), Vector3(1.8, 20.5, 1.2))
+		LandmarkPaKit.win_grid_z(lm, "Glass", px - 11.5, px + 11.5, 17.58, [8.5, 14.5, 20.5], 5, 2.3, 4.2)
+		for k in 5:
+			var fz := lerpf(-12.5, 12.5, float(k) / 4.0)
+			lm.box("Stone", Vector3(px - s * 16.3, 14.5, fz), Vector3(1.2, 20.5, 1.8))
+		LandmarkPaKit.win_grid_x(lm, "Glass", px - s * 16.08, -11.0, 11.0, [8.5, 14.5, 20.5], 4, 2.3, 4.2)
+		# Sweeping curved gallery wing arcing forward (+Z) around Jardins du Trocadéro (9 segments, ~140 m)
+		var segs := 9
+		var r_arc := 155.0
+		var arc_cz := 155.0
+		for i in segs:
+			var a0 := lerpf(0.46, 1.24, float(i) / float(segs)) * s
+			var a1 := lerpf(0.46, 1.24, float(i + 1) / float(segs)) * s
+			var p0 := Vector3(sin(a0) * r_arc, 0.0, arc_cz - cos(a0) * r_arc)
+			var p1 := Vector3(sin(a1) * r_arc, 0.0, arc_cz - cos(a1) * r_arc)
+			var pm := (p0 + p1) * 0.5
+			var seg_l := p0.distance_to(p1) + 0.8
+			var yaw := atan2(-(p1.z - p0.z), p1.x - p0.x)
+			var rot := Basis(Vector3.UP, yaw)
+			lm.box("Ashlar", pm + Vector3(0.0, 1.8, 0.0), Vector3(seg_l, 3.6, 17.5), rot)
+			lm.box("Stone", pm + Vector3(0.0, 12.6, 0.0), Vector3(seg_l, 18.2, 16.0), rot)
+			lm.box("Stone", pm + Vector3(0.0, 22.6, 0.0), Vector3(seg_l, 1.8, 16.8), rot)
+			# Tall Art Deco gallery glazing facing inward toward Jardins du Trocadéro & Eiffel Tower
+			var inward := rot * Vector3(0.0, 0.0, 8.15 * s)
+			lm.box("Glass", pm + Vector3(0.0, 12.2, 0.0) + inward, Vector3(seg_l * 0.68, 12.0, 0.2), rot)
+			# Columnar pilaster between bays
+			lm.box("Stone", p0 + Vector3(0.0, 12.6, 0.0) + inward, Vector3(1.5, 18.2, 1.2), rot)
+		# End sculptural rotunda pavilion at the outer tip of each curved wing
+		var a_end := 1.24 * s
+		var pe := Vector3(sin(a_end) * r_arc, 0.0, arc_cz - cos(a_end) * r_arc)
+		lm.box("Stone", pe + Vector3(0.0, 12.5, 0.0), Vector3(22.0, 25.0, 22.0))
+		lm.box("Gilt", pe + Vector3(0.0, 25.4, 0.0), Vector3(18.0, 0.8, 18.0))
+	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-54.0, 2.0, 34.0), Vector3(-54.0, 18.0, 18.0), 64.0, 1.0, 68.0],
+		[Vector3(54.0, 2.0, 34.0), Vector3(54.0, 18.0, 18.0), 64.0, 1.0, 68.0],
+		[Vector3(-104.0, 2.0, 56.0), Vector3(-104.0, 16.0, 38.0), 64.0, 0.9, 68.0],
+		[Vector3(104.0, 2.0, 56.0), Vector3(104.0, 16.0, 38.0), 64.0, 0.9, 68.0],
+	])

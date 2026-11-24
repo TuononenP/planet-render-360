@@ -46,12 +46,14 @@ const LENS := {"r": Color(1.0, 0.08, 0.03), "g": Color(0.1, 1.0, 0.45)}
 
 static var _meshes: Dictionary = {}
 
-## The place's furniture kit: "na", "miami", "nyc", "japan", "uk", "nl", "nordic", "nordic_se" or "europe".
+## The place's furniture kit: "na", "miami", "nyc", "paris", "japan", "uk", "nl", "nordic", "nordic_se" or "europe".
 static func furniture_family(region: String, country: String, city: String = "") -> String:
 	if city == "new_york":
 		return "nyc"
 	if city == "miami":
 		return "miami"
+	if city == "haussmann":
+		return "paris"
 	var iso := country.to_upper()
 	if iso == "FI":
 		return "nordic"
@@ -81,13 +83,13 @@ static func mesh_key(kind: String, family: String) -> String:
 		"bicycle_rental":
 			return "bikeshare"
 		"subway_entrance":
-			return "t_sign" if family == "nordic_se" else ("roundel" if family == "uk" else kind)
+			return "t_sign" if family == "nordic_se" else ("roundel" if family == "uk" else ("guimard" if family == "paris" else kind))
 	return kind
 
 ## Whether mapped subway entrances are drawn in `family`: New York's
-## stairwells, Stockholm's blue T sign, and London's Underground roundel.
+## stairwells, Stockholm's blue T sign, London's Underground roundel, and Paris's Guimard arch.
 static func shows_entrances(family: String) -> bool:
-	return family in ["nyc", "nordic_se", "uk"]
+	return family in ["nyc", "nordic_se", "uk", "paris"]
 
 ## Adds the furniture under one "StreetFurniture" node of `root` on
 ## desktop Ultra. Returns the number of items placed.
@@ -108,7 +110,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		items = items.duplicate()
 		for stop in data.tram_stops:
 			items.append({"x": float(stop.get("x", 0.0)), "z": float(stop.get("z", 0.0)), "kind": "tram_stop"})
-	elif family == "miami":
+	elif family in ["miami", "paris"]:
 		items = items.duplicate()
 		for poi: Variant in data.pois:
 			if poi is Dictionary and str((poi as Dictionary).get("kind", "")) == "bicycle_rental":
@@ -510,6 +512,16 @@ static func mesh(key: String) -> ArrayMesh:
 			for x in [-0.032, 0.032]:
 				StreetProps._box(buf.call("sign"), Vector3(x, 2.85, 0), Vector3(0.014, 0.34, 0.34))
 				StreetProps._box(buf.call("blue"), Vector3(x * 1.15, 2.85, 0), Vector3(0.016, 0.12, 0.68))
+		"guimard":
+			# Hector Guimard Art Nouveau Paris Métro entrance: bottle-green cast-iron posts,
+			# curved side balustrade, arched "METROPOLITAIN" plaque & glowing red-amber globes.
+			for sz in [-1.0, 1.0]:
+				TreeMeshLibrary._tube(buf.call("green"), [Vector3(0, 0, sz * 1.35), Vector3(0, 3.6, sz * 1.35)],
+					[0.08, 0.05], 8, 1.0, 1.0)
+				StreetProps._box(buf.call("green"), Vector3(-0.9, 0.55, sz * 1.35), Vector3(1.9, 0.95, 0.08))
+				StreetProps._box(buf.call("lens_r"), Vector3(0.08, 3.55, sz * 1.42), Vector3(0.26, 0.34, 0.26))
+			StreetProps._box(buf.call("green"), Vector3(0, 3.1, 0), Vector3(0.10, 0.42, 2.85))
+			StreetProps._box(buf.call("sign"), Vector3(0.06, 3.1, 0), Vector3(0.02, 0.26, 2.4))
 		"bikeshare":
 			# Five-bike kerbside dock row and solar kiosk (Miami CitiBike style).
 			StreetProps._box(buf.call("iron"), Vector3(-0.08, 0.02, 0.0), Vector3(1.65, 0.04, 4.5))

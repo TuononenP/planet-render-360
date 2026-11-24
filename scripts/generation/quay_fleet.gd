@@ -21,6 +21,17 @@ const FLEETS := {
 		{"model": "houseboat", "length": 18.0, "beam": 5.4, "height": 5.0, "hull": "#3d5a64", "funnel": ""},
 		{"model": "archipelago", "length": 30.0, "beam": 6.4, "height": 8.0, "hull": "#f0eee8", "funnel": "#b53a2c"},
 	],
+	# Paris Seine fleet: wide low-clearance Bateaux Mouches / Bateaux Parisiens sightseeing boats & Freycinet péniches.
+	"seine_eiffel": [
+		{"model": "restaurant_boat", "length": 44.0, "beam": 9.0, "height": 4.2, "hull": "#eae7df", "funnel": "#1e3a5f"},
+		{"model": "houseboat", "length": 36.0, "beam": 5.2, "height": 4.4, "hull": "#26362e", "funnel": ""},
+		{"model": "restaurant_boat", "length": 48.0, "beam": 9.5, "height": 4.4, "hull": "#f2efe8", "funnel": "#8c2420"},
+		{"model": "houseboat", "length": 32.0, "beam": 5.0, "height": 4.2, "hull": "#324456", "funnel": ""},
+	],
+	"seine_alma": [
+		{"model": "restaurant_boat", "length": 54.0, "beam": 10.5, "height": 4.5, "hull": "#f0ede6", "funnel": "#1d385c"},
+		{"model": "houseboat", "length": 38.0, "beam": 5.2, "height": 4.4, "hull": "#6b2e26", "funnel": ""},
+	],
 }
 ## Fleet vessels dressed per row, and the open water kept between a hull
 ## and the quay edge (m).
@@ -57,7 +68,8 @@ static func hotel_water(data: LocationData, at: Vector2, m: float) -> bool:
 	var anchor := WorldScale.xz_from_latlon(HOTEL_ANCHOR.x, HOTEL_ANCHOR.y, data.latitude, data.longitude) * m
 	if at.distance_to(anchor) <= HOTEL_RADIUS_M * m:
 		return true
-	return data.latitude >= 51.45 and data.latitude <= 51.53 and data.longitude >= -0.22 and data.longitude <= -0.06
+	return (data.latitude >= 51.45 and data.latitude <= 51.53 and data.longitude >= -0.22 and data.longitude <= -0.06) \
+		or WaterSurface.seine(data.latitude, data.longitude)
 
 ## A Riddarfjärden hotel ship as a LargeShips row.
 static func hotel_ship(centre: Vector3, yaw: float, length: float, beam: float, seed_value: float) -> Array:

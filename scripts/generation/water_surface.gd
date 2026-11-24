@@ -51,9 +51,13 @@ static func miami_water(lat: float, lon: float) -> bool:
 static func chao_phraya(lat: float, lon: float) -> bool:
 	return lat >= 13.45 and lat <= 13.98 and lon >= 100.35 and lon <= 100.72
 
+## True along the Paris Seine corridor (`PA-8.1`).
+static func seine(lat: float, lon: float) -> bool:
+	return lat >= 48.78 and lat <= 48.94 and lon >= 2.18 and lon <= 2.46
+
 ## Inland river and canal colours (`WaterShader` `deep_color` / `shallow_color`
 ## and surface chop/roughness). Silty olive-brown for Bangkok's Chao Phraya & khlongs;
-## default green-grey elsewhere.
+## muted olive-jade for the Paris Seine; default green-grey elsewhere.
 static func inland_palette(data: LocationData) -> Dictionary:
 	if data != null and chao_phraya(data.latitude, data.longitude):
 		return {
@@ -63,6 +67,14 @@ static func inland_palette(data: LocationData) -> Dictionary:
 			"near_rough": 0.16,
 			"spec": 0.22,
 			"wave_amp": 0.72,
+		}
+	if data != null and seine(data.latitude, data.longitude):
+		return {
+			"deep": Color(0.088, 0.128, 0.098, 1.0),
+			"shallow": Color(0.145, 0.192, 0.144, 1.0),
+			"near_rough": 0.13,
+			"spec": 0.24,
+			"wave_amp": 0.58,
 		}
 	if data != null and miami_water(data.latitude, data.longitude):
 		return {

@@ -14,10 +14,11 @@ extends RefCounted
 ## the Unknown Soldier's tomb under the vault.
 static func arc_de_triomphe(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#CDB991", 3.0))
-	lm.use("Relief", LandmarkMaterials.pbr("limestone", "#B3A07C", 3.0))
+	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#D6C5A2", 3.0))
+	lm.use("Relief", LandmarkMaterials.pbr("limestone", "#BEA984", 3.0))
 	lm.use("Steps", LandmarkMaterials.pbr("pavement", "#A8A294", 4.0))
 	lm.use("Bronze", LandmarkMaterials.paint("#5A5446", 0.5, 0.6))
+	lm.use("FlameLamp", LandmarkMaterials.lit("#FF9B38", 2.6))
 	LandmarkWestKit.blk(lm, "Steps", 0, 0.0, 0, 52.0, 0.4, 30.0)
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
@@ -50,6 +51,7 @@ static func arc_de_triomphe(model: Node3D) -> void:
 			lm.box("Relief", p, Vector3(1.6, 1.6, 1.6), Basis(Vector3(0, 0, 1), t - PI * 0.5) , 0.0)
 	lm.box("Relief", Vector3(0, 0.5, 0), Vector3(2.0, 0.2, 3.0), Basis(), 0.0)
 	lm.frustum("Bronze", Vector3(0, 0.6, -1.0), 0.25, 0.1, 0.5, 8)
+	lm.frustum("FlameLamp", Vector3(0, 1.05, -1.0), 0.22, 0.06, 0.65, 8)
 	# Entablature, frieze, cornice, attic with shields, crowning cornice.
 	LandmarkWestKit.blk(lm, "Stone", 0, 38.8, 0, 45.4, 0.8, 22.4)
 	for i in 4:
@@ -104,6 +106,14 @@ static func arc_de_triomphe(model: Node3D) -> void:
 		for k in 7:
 			LandmarkWestKit.figure(lm, "Relief", Vector3(sx * 22.95, 30.2, -7.2 + 2.4 * float(k)), 5.0)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.HALO_META, [[Vector3(0.0, 1.5, -1.0), 1.6, Color(1.0, 0.58, 0.16)]])
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-12.0, 1.5, 22.0), Vector3(-12.0, 26.0, 11.0), 62.0, 1.0, 70.0],
+		[Vector3(12.0, 1.5, 22.0), Vector3(12.0, 26.0, 11.0), 62.0, 1.0, 70.0],
+		[Vector3(-12.0, 1.5, -22.0), Vector3(-12.0, 26.0, -11.0), 62.0, 1.0, 70.0],
+		[Vector3(12.0, 1.5, -22.0), Vector3(12.0, 26.0, -11.0), 62.0, 1.0, 70.0],
+		[Vector3(0.0, 1.5, 3.0), Vector3(0.0, 28.0, 0.0), 72.0, 0.9, 42.0],
+	])
 
 ## Louvre Pyramid (21.6 m): I. M. Pei's 35.4 m glass pyramid (1989) on
 ## the Louvre axis — 603 rhombic and 70 triangular panes on a diagonal
@@ -113,13 +123,16 @@ static func arc_de_triomphe(model: Node3D) -> void:
 ## round them in the Cour Napoléon.
 static func louvre_pyramid(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Glass", LandmarkMaterials.glass("#8FA4B0"))
+	lm.use("Glass", LandmarkMaterials.glass("#92AAB8"))
 	lm.use("Frame", LandmarkMaterials.paint("#D5D9DC", 0.35, 0.8))
-	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#B8AE9C", 4.0))
-	lm.use("Water", LandmarkMaterials.glass("#3E5560"))
+	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#C2B8A6", 4.0))
+	lm.use("Water", LandmarkMaterials.pool_water())
 	lm.use("Granite", LandmarkMaterials.pbr("stone", "#6C6A66", 2.0))
+	lm.use("CoreLamp", LandmarkMaterials.lit("#FFCE80", 1.35))
 	LandmarkWestKit.blk(lm, "Paving", 0, 0.0, 0, 100.0, 0.05, 100.0)
 	LandmarkWestKit.blk(lm, "Granite", 0, 0, 0, 36.2, 0.25, 36.2)
+	# Warm amber interior core glowing softly through Pei's glass panes at night.
+	lm.spire("CoreLamp", Vector3(0, 0.4, 0), 14.5, 17.4)
 	_pyramid(lm, Vector3(0, 0.25, 0), 17.71, 21.39, 18, true)
 	for p in [Vector3(0, 0.25, -29), Vector3(29, 0.25, 0), Vector3(0, 0.25, 29)]:
 		LandmarkWestKit.blk(lm, "Granite", p.x, 0, p.z, 8.4, 0.25, 8.4)

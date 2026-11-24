@@ -97,6 +97,11 @@ static func sainte_chapelle(model: Node3D) -> void:
 		LandmarkWestKit.cross(lm, "Gilt", tc + Vector3(0, 38.4, 0), 1.2)
 	_fleche(lm, Vector3(2.0, 41.0, 0))
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-28.0, 2.0, 0.0), Vector3(-12.0, 24.0, 0.0), 58.0, 0.95, 65.0],
+		[Vector3(0.0, 2.0, 18.0), Vector3(0.0, 32.0, 6.0), 64.0, 0.95, 75.0],
+		[Vector3(0.0, 2.0, -18.0), Vector3(0.0, 32.0, -6.0), 64.0, 0.95, 75.0],
+	])
 
 ## The semi-heptagonal apse on its chord at `c` (x = the nave's east
 ## end): seven faces of a 14-gon on the nave half-width, a two-light

@@ -13,7 +13,7 @@ extends RefCounted
 
 static func entries() -> Array:
 	return [
-		{"type": "gare_du_nord", "name": "Gare du Nord", "lat": 48.880218, "lon": 2.355021,
+		{"type": "gare_du_nord", "skyline_priority": 5, "name": "Gare du Nord", "lat": 48.880218, "lon": 2.355021,
 			"radius_m": 6000.0, "wiki_title": "Gare du Nord", "height_m": 39.4, "kind": "Station",
 			"secondary": true, "capital": "FR", "yaw_deg": 17.1, "clear_m": 16.0,
 			"clear_rect_m": [0.0, -89.0, 93.4, 112.3],

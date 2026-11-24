@@ -15,16 +15,30 @@ extends RefCounted
 ## sixteen copper apostles and evangelists. Nave along X, facade west (-X).
 static func notre_dame(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#C4B493", 3.0))
+	# Post-2024 restoration warm blond Lutetian limestone & luminous stained-glass roses.
+	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#D5C7A8", 3.0))
 	lm.use("Lead", LandmarkMaterials.pbr("slate", "#6F767A", 2.0))
 	lm.use("Glass", LandmarkMaterials.glass("#2A3338"))
 	lm.use("Gilt", LandmarkMaterials.gold())
 	lm.use("Copper", LandmarkMaterials.paint("#6E9C8A", 0.55, 0.4))
+	lm.use("RoseLamp", LandmarkMaterials.lit("#FFAE5C", 1.15))
 	var rot := Basis(Vector3.UP, PI * 0.5)
 	_nd_body(lm, rot)
 	_nd_facade(lm)
 	_nd_fleche(lm)
+	# Subtle stained-glass inner glow discs behind the three great roses at night.
+	lm.disc("RoseLamp", Vector3(-63.85, 30.5, 0.0), Vector3(-1, 0, 0), 4.4, 16)
+	lm.disc("RoseLamp", Vector3(4.0, 21.5, 23.85), Vector3(0, 0, 1), 5.8, 16)
+	lm.disc("RoseLamp", Vector3(4.0, 21.5, -23.85), Vector3(0, 0, -1), 5.8, 16)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-82.0, 2.0, -14.0), Vector3(-62.0, 36.0, -13.0), 62.0, 1.05, 95.0],
+		[Vector3(-82.0, 2.0, 14.0), Vector3(-62.0, 36.0, 13.0), 62.0, 1.05, 95.0],
+		[Vector3(-10.0, 2.0, 36.0), Vector3(-10.0, 26.0, 18.0), 64.0, 0.85, 75.0],
+		[Vector3(24.0, 2.0, 36.0), Vector3(16.0, 38.0, 10.0), 64.0, 0.90, 95.0],
+		[Vector3(-10.0, 2.0, -36.0), Vector3(-10.0, 26.0, -18.0), 64.0, 0.85, 75.0],
+		[Vector3(56.0, 2.0, 0.0), Vector3(36.0, 24.0, 0.0), 60.0, 0.85, 70.0],
+	])
 
 ## Nave, aisles, chapels, transept and chevet with their windows and
 ## buttressing.

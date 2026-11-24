@@ -93,6 +93,12 @@ static func pantheon(model: Node3D) -> void:
 	lm.lathe("Gilt", c + Vector3(0, 48.3, 0), LandmarkWestKit.ball(0.4), 8)
 	LandmarkWestKit.cross(lm, "Gilt", c + Vector3(0, 48.0, 0), 7.0)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-18.0, 2.0, -68.0), Vector3(-10.0, 24.0, -52.0), 62.0, 1.0, 75.0],
+		[Vector3(18.0, 2.0, -68.0), Vector3(10.0, 24.0, -52.0), 62.0, 1.0, 75.0],
+		[Vector3(-34.0, 26.0, 10.0), Vector3(0.0, 56.0, 10.0), 58.0, 1.0, 75.0],
+		[Vector3(34.0, 26.0, 10.0), Vector3(0.0, 56.0, 10.0), 58.0, 1.0, 75.0],
+	])
 
 ## Portico: stylobate steps, 18 free fluted Corinthian columns and 4
 ## engaged ones, entablature with dentils and the sculpted pediment.
@@ -149,6 +155,15 @@ static func invalides(model: Node3D) -> void:
 	_dome_church(lm)
 	_hotel(lm)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-28.0, 2.0, 48.0), Vector3(0.0, 56.0, 0.0), 66.0, 1.15, 110.0],
+		[Vector3(28.0, 2.0, 48.0), Vector3(0.0, 56.0, 0.0), 66.0, 1.15, 110.0],
+		[Vector3(-34.0, 28.0, -18.0), Vector3(0.0, 68.0, 0.0), 62.0, 1.15, 90.0],
+		[Vector3(34.0, 28.0, -18.0), Vector3(0.0, 68.0, 0.0), 62.0, 1.15, 90.0],
+		[Vector3(-56.0, 2.0, -230.0), Vector3(-56.0, 18.0, -212.0), 62.0, 0.90, 65.0],
+		[Vector3(0.0, 2.0, -232.0), Vector3(0.0, 22.0, -214.0), 62.0, 1.05, 70.0],
+		[Vector3(56.0, 2.0, -230.0), Vector3(56.0, 18.0, -212.0), 62.0, 0.90, 65.0],
+	])
 
 static func _dome_church(lm: LandmarkMesh) -> void:
 	var s := Vector3(0, 0, 1)

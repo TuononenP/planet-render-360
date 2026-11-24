@@ -11,8 +11,10 @@ const IN := {
 	"vuosaari": [60.2090, 25.1440, "helsinki"], "keilaniemi": [60.1755, 24.8310, "espoo"],
 	"tapiola": [60.1760, 24.8050, "espoo"], "turku": [60.4518, 22.2666, "turku"],
 	"stockholm": [59.3293, 18.0686, "stockholm"], "monteliusvagen": [59.3207, 18.0604, "stockholm"],
+	"bangkok": [13.75398, 100.50144, "bangkok"], "bangkok_river": [13.7455, 100.4905, "bangkok"],
+	"london": [51.5018, -0.1196, "london"], "paris": [48.8622, 2.2887, "paris"],
 }
-const OUT := {"tampere": [61.4978, 23.7610], "tallinn": [59.4370, 24.7536], "paris": [48.8566, 2.3522]}
+const OUT := {"tampere": [61.4978, 23.7610], "tallinn": [59.4370, 24.7536], "lyon": [45.7640, 4.8357]}
 
 func _init() -> void:
 	for k in IN:
@@ -46,9 +48,9 @@ func _init() -> void:
 	_check(CityDetail.near_radius(ultra, 700.0) > 700.0, "Ultra widens the roofline ring")
 	var inner := CityDetail.inner_imagery(P.ULTRA, 60.1755, 24.8310, true)
 	_check(inner.x == 19 and inner.y <= RenderSettings.SATELLITE_MAX_SPAN, "Ultra desktop: z19 inner orthophoto")
-	_check(CityDetail.inner_imagery(P.ULTRA, 48.8566, 2.3522, true) == Vector2i.ZERO, "Paris: no orthophoto")
-	var paris := _data(P.ULTRA, 48.8566, 2.3522)
-	_check(CityDetail.max_buildings(paris, true) == RenderSettings.max_buildings_for(P.ULTRA, true),
+	_check(CityDetail.inner_imagery(P.ULTRA, 45.7640, 4.8357, true) == Vector2i.ZERO, "Lyon: no orthophoto")
+	var lyon := _data(P.ULTRA, 45.7640, 4.8357)
+	_check(CityDetail.max_buildings(lyon, true) == RenderSettings.max_buildings_for(P.ULTRA, true),
 		"Other cities keep the shared cap")
 	if failures.is_empty():
 		print("CITY DETAIL OK: cities, Fast/Balanced unchanged, High/Ultra raised")

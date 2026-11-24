@@ -1,0 +1,90 @@
+class_name LandmarkPaConcordeBourbon
+extends RefCounted
+
+## Place de la Concorde & Palais Bourbon (Assemblée Nationale) (`PA-3`):
+## - Place de la Concorde (26.5 m): 23 m pink-granite Luxor Obelisk with gilded pyramidion,
+##   twin bronze & gilt Fontaine des Mers & Fontaine des Fleuves, rostral lamps, and the
+##   twin colonnaded Gabriel palaces (Hôtel de la Marine & Hôtel de Crillon) framing Rue Royale.
+## - Palais Bourbon (28 m): 12-column Corinthian Greek-temple riverfront overlooking the Seine.
+
+static func place_de_la_concorde(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#C89B86", 2.2))
+	lm.use("Plinth", LandmarkPaKit.ashlar("#B9B0A0", 3.0))
+	lm.use("Stone", LandmarkPaKit.lutetian("#DFD4BA", 3.4))
+	lm.use("Bronze", LandmarkPaKit.bronze("#353F38"))
+	lm.use("Gilt", LandmarkMaterials.gold())
+	lm.use("Water", LandmarkMaterials.pool_water())
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE4A6", 1.45))
+	# Central stepped octagonal terrace & Luxor Obelisk (pedestal 3.5 m + 23 m shaft = 26.5 m)
+	lm.frustum("Plinth", Vector3(0.0, 0.0, 0.0), 11.5, 10.8, 0.6, 8)
+	lm.box("Plinth", Vector3(0.0, 2.0, 0.0), Vector3(4.6, 3.0, 4.6))
+	lm.box("Gilt", Vector3(0.0, 2.2, 2.36), Vector3(3.0, 1.8, 0.1))
+	lm.box("Gilt", Vector3(0.0, 2.2, -2.36), Vector3(3.0, 1.8, 0.1))
+	# Pink Syene granite obelisk shaft (3.5..23.3 m) + gleaming gilded pyramidion (23.3..26.5 m)
+	lm.frustum("Granite", Vector3(0.0, 3.5, 0.0), 1.65, 1.05, 19.8, 4, PI * 0.25)
+	lm.frustum("Gilt", Vector3(0.0, 23.3, 0.0), 1.05, 0.03, 3.2, 4, PI * 0.25)
+	# Twin monumental fountains: Fontaine des Fleuves (-Z north) & Fontaine des Mers (+Z south)
+	for sz in [-1.0, 1.0]:
+		var fc := Vector3(0.0, 0.0, float(sz) * 58.0)
+		lm.frustum("Plinth", fc, 9.5, 9.5, 0.85, 24)
+		lm.frustum("Water", fc + Vector3(0.0, 0.8, 0.0), 8.8, 8.8, 0.12, 24)
+		lm.frustum("Bronze", fc + Vector3(0.0, 0.9, 0.0), 3.4, 2.8, 2.6, 12)
+		lm.frustum("Gilt", fc + Vector3(0.0, 3.5, 0.0), 4.6, 3.8, 0.75, 16)
+		lm.frustum("Bronze", fc + Vector3(0.0, 4.2, 0.0), 1.4, 1.1, 2.4, 10)
+		lm.frustum("Gilt", fc + Vector3(0.0, 6.6, 0.0), 2.2, 1.6, 0.55, 12)
+		lm.frustum("Water", fc + Vector3(0.0, 7.1, 0.0), 0.35, 0.05, 2.1, 8)
+	# Ornate black-and-gold rostral lamp columns ringing the square
+	for k in 8:
+		var a := TAU * (float(k) + 0.5) / 8.0
+		var lp := Vector3(cos(a) * 34.0, 0.0, sin(a) * 44.0)
+		LandmarkPaKit.candelabrum(lm, "Bronze", "Lamp", lp, 6.2)
+	# Four corner neoclassical city-statue stone pavilions framing the perimeter
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var pp := Vector3(float(sx) * 78.0, 0.0, float(sz) * 86.0)
+			lm.box("Stone", pp + Vector3(0.0, 3.0, 0.0), Vector3(7.0, 6.0, 7.0))
+			lm.frustum("Stone", pp + Vector3(0.0, 6.0, 0.0), 1.6, 1.2, 3.6, 8)
+	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(12.0, 1.5, 12.0), Vector3(0.0, 16.0, 0.0), 48.0, 1.1, 45.0],
+		[Vector3(-12.0, 1.5, -12.0), Vector3(0.0, 16.0, 0.0), 48.0, 1.1, 45.0],
+		[Vector3(0.0, 1.5, 72.0), Vector3(0.0, 6.0, 58.0), 58.0, 0.9, 32.0],
+		[Vector3(0.0, 1.5, -72.0), Vector3(0.0, 6.0, -58.0), 58.0, 0.9, 32.0],
+	])
+
+## Palais Bourbon / Assemblée Nationale (28 m; 96 x 78 m):
+## Poyet's 1806 12-column Corinthian temple front overlooking Quai d'Orsay & Pont de la Concorde,
+## broad ceremonial staircase flanked by seated statues, sculpted pediment, and classical wings.
+static func palais_bourbon(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	lm.use("Stone", LandmarkPaKit.lutetian("#DFD4BA", 3.4))
+	lm.use("Ashlar", LandmarkPaKit.ashlar("#C4B79C", 3.2))
+	lm.use("Slate", LandmarkPaKit.slate("#46505A", 2.4))
+	lm.use("Glass", LandmarkMaterials.glass("#263038"))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE4A8", 1.35))
+	# Main chamber block & flanking classical wings
+	lm.box("Ashlar", Vector3(0.0, 2.2, 0.0), Vector3(92.0, 4.4, 62.0))
+	lm.box("Stone", Vector3(0.0, 12.5, 6.0), Vector3(88.0, 17.5, 48.0))
+	LandmarkPaKit.mansard(lm, "Slate", "Stone", "Glass", Vector3(0.0, 21.2, 6.0), 86.0, 46.0, 5.2, 10)
+	# Iconic 12-column Corinthian Greek-temple portico facing North (-Z toward Place de la Concorde!)
+	for k in 8:
+		var t := float(k) / 7.0
+		lm.box("Ashlar", Vector3(0.0, 0.28 * float(k + 1), -38.0 + t * 9.0), Vector3(48.0 - t * 2.0, 0.56, 1.6))
+	lm.box("Ashlar", Vector3(0.0, 2.2, -24.0), Vector3(46.0, 4.4, 14.0))
+	LandmarkPaKit.colonnade_x(lm, "Stone", -21.0, 21.0, 4.4, -29.2, 12, 14.8, 0.62)
+	lm.box("Stone", Vector3(0.0, 20.4, -24.0), Vector3(46.0, 2.2, 14.0))
+	LandmarkPaKit.pediment_z(lm, "Stone", 0.0, 21.5, -29.4, 46.5, 4.6, 3.2)
+	# Seated allegorical statues (Sully, Colbert, L'Hôpital, d'Aguesseau) flanking the grand stairs
+	for sx in [-22.0, -14.0, 14.0, 22.0]:
+		lm.box("Ashlar", Vector3(float(sx), 2.0, -39.5), Vector3(2.8, 4.0, 2.8))
+		lm.frustum("Stone", Vector3(float(sx), 4.0, -39.5), 0.9, 0.65, 2.6, 8)
+	LandmarkPaKit.win_grid_z(lm, "Glass", -40.0, -24.0, -18.2, [8.0, 14.0], 3, 2.0, 3.6)
+	LandmarkPaKit.win_grid_z(lm, "Glass", 24.0, 40.0, -18.2, [8.0, 14.0], 3, 2.0, 3.6)
+	for lx in [-26.0, 26.0]:
+		LandmarkPaKit.paris_lamp(lm, "Slate", "Lamp", Vector3(float(lx), 0.0, -42.0), 4.2)
+	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-18.0, 2.0, -46.0), Vector3(-14.0, 16.0, -29.0), 58.0, 1.0, 58.0],
+		[Vector3(18.0, 2.0, -46.0), Vector3(14.0, 16.0, -29.0), 58.0, 1.0, 58.0],
+	])

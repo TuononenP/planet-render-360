@@ -6,11 +6,11 @@ extends RefCounted
 
 static func entries() -> Array:
 	return [
-		{"type": "sainte_chapelle", "name": "Sainte-Chapelle", "lat": 48.8554, "lon": 2.3450, "radius_m": 1500.0,
-			"wiki_title": "Sainte-Chapelle", "height_m": 75.5, "clear_m": 35.0, "yaw_deg": 10.0,
+		{"type": "sainte_chapelle", "skyline_priority": 5, "name": "Sainte-Chapelle", "lat": 48.8554, "lon": 2.3450,
+			"radius_m": 5500.0, "wiki_title": "Sainte-Chapelle", "height_m": 75.5, "clear_m": 35.0, "yaw_deg": 10.0,
 			"kind": "Chapel", "aliases": ["sainte-chapelle", "sainte chapelle", "holy chapel, paris"]},
-		{"type": "palais_garnier", "name": "Palais Garnier", "lat": 48.8719, "lon": 2.3317, "radius_m": 2000.0,
-			"wiki_title": "Palais Garnier", "height_m": 56.0, "clear_m": 100.0, "yaw_deg": -19.0,
+		{"type": "palais_garnier", "skyline_priority": 7, "name": "Palais Garnier", "lat": 48.8719, "lon": 2.3317,
+			"radius_m": 5500.0, "wiki_title": "Palais Garnier", "height_m": 56.0, "clear_m": 100.0, "yaw_deg": -19.0,
 			"kind": "Opera house", "aliases": ["palais garnier", "opéra garnier", "opera garnier",
 				"paris opera house", "opéra de paris"]},
 		{"type": "chartres_cathedral", "name": "Chartres Cathedral", "lat": 48.4477, "lon": 1.4876, "radius_m": 3500.0,

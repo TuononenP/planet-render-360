@@ -40,15 +40,22 @@ static func inner(y: float) -> float:
 	return maxf(LandmarkMesh.profile_at(INNER, y), 0.0)
 
 static func build(model: Node3D) -> void:
-	var iron := LandmarkMaterials.paint("#4A3A30", 0.55, 0.6)
-	var deck := LandmarkMaterials.paint("#58402A", 0.8, 0.15)
+	# Authentic 3-tone "Tour Eiffel Brown" vertical gradation (darker base -> lighter top to counter haze).
+	var iron := LandmarkMaterials.paint("#544234", 0.54, 0.58)
+	var iron_mid := LandmarkMaterials.paint("#655140", 0.52, 0.58)
+	var iron_top := LandmarkMaterials.paint("#796452", 0.50, 0.56)
+	var deck := LandmarkMaterials.paint("#5E4836", 0.76, 0.22)
 	var lm := LandmarkMesh.new()
-	for k in ["PierN", "PierE", "PierS", "PierW", "Arches", "Upper", "Top"]:
+	for k in ["PierN", "PierE", "PierS", "PierW", "Arches"]:
 		lm.use(k, iron)
+	lm.use("Upper", iron_mid)
+	lm.use("Top", iron_top)
 	lm.use("Decks", deck)
 	lm.use("Glass", LandmarkMaterials.glass("#3A4448"))
+	lm.use("Gilt", LandmarkMaterials.gold())
 	lm.use("Antenna", LandmarkMaterials.paint("#D9D6CF", 0.5, 0.3))
-	lm.use("Masonry", LandmarkMaterials.pbr("limestone", "#B9AE98", 3.0))
+	lm.use("Masonry", LandmarkMaterials.pbr("limestone", "#C4B89F", 3.0))
+	lm.use("BeaconLamp", LandmarkMaterials.lit("#FFF6DF", 2.2))
 	var levels := _levels()
 	var piers := {"PierS": Vector2(1, 1), "PierE": Vector2(1, -1),
 		"PierN": Vector2(-1, -1), "PierW": Vector2(-1, 1)}
@@ -61,6 +68,13 @@ static func build(model: Node3D) -> void:
 	_top(lm)
 	lm.commit(model)
 	model.rotation.y = -deg_to_rad(44.4)
+	# Dual summit searchlight halos at 300 m + red aviation warning beacon at 330 m.
+	model.set_meta(LandmarkLights.HALO_META, [
+		[Vector3(0.0, 299.5, 0.0), 4.2, Color(1.0, 0.96, 0.85)],
+		[Vector3(10.0, 299.5, 0.0), 2.8, Color(0.95, 0.97, 1.0)],
+		[Vector3(-10.0, 299.5, 0.0), 2.8, Color(0.95, 0.97, 1.0)],
+		[Vector3(0.0, ANTENNA_Y, 0.0), 2.6, Color(1.0, 0.10, 0.04)],
+	])
 
 ## Panel levels: 4 tall panels to the first floor, 5 to the second,
 ## then ~8 m panels up the shaft (keeps the X-bracing near 45°).
@@ -201,6 +215,10 @@ static func _floor1(lm: LandmarkMesh) -> void:
 			var x := -vi + 2.0 * vi * float(k) / 11.0
 			lm.beam("Decks", rot * Vector3(x, y0 + 1.8, vi), rot * Vector3(x, y0 + 2.9, vi), 0.08, 0.08)
 	_frieze(lm, hw, y0 + 1.8, 6.2, 15)
+	# Gilded frieze band carrying the 72 French scientists' names around all four sides.
+	for side in 4:
+		var rot := Basis(Vector3.UP, PI * 0.5 * float(side))
+		lm.box("Gilt", rot * Vector3(0.0, y0 + 1.15, hw + 0.18), Vector3(hw * 1.92, 0.55, 0.14), rot)
 
 static func _floor2(lm: LandmarkMesh) -> void:
 	var y0 := FLOOR2_Y
@@ -259,6 +277,8 @@ static func _top(lm: LandmarkMesh) -> void:
 		for s in 4:
 			lm.beam("Top", (ribs[s] as Array)[k], (ribs[(s + 1) % 4] as Array)[k], 0.45, 0.45)
 	lm.frustum("Top", Vector3(0, y + 23.6, 0), 2.2, 1.6, 3.0, 8)
+	# Summit searchlight lantern ring at 300 m.
+	lm.frustum("BeaconLamp", Vector3(0, y + 23.0, 0), 2.0, 2.0, 1.4, 8)
 	# Antenna mast with its stacked transmitter sections.
 	lm.frustum("Antenna", Vector3(0, y + 26.6, 0), 1.1, 0.75, 14.0, 8)
 	lm.frustum("Antenna", Vector3(0, y + 40.6, 0), 0.55, 0.3, ANTENNA_Y - y - 40.6, 8)

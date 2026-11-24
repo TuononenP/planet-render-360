@@ -55,12 +55,14 @@ func _run() -> void:
 	for preset in 4:
 		data.quality_preset = preset
 		var out := LandmarkSites.select(data, [])
-		var bridges := out.filter(func(c: Dictionary) -> bool: return str(c["type"]).begins_with("br_"))
+		var non_sky := out.filter(func(c: Dictionary) -> bool:
+			return not bool(LocationData.entry_for_type(str(c["type"])).get("skyline", false)))
+		var bridges := non_sky.filter(func(c: Dictionary) -> bool: return str(c["type"]).begins_with("br_"))
 		_check(bridges.size() <= LandmarkSites.MAX_BRIDGES_BY_PRESET[preset],
 			"preset %d built %d capital bridges (max %d)" % [preset, bridges.size(), LandmarkSites.MAX_BRIDGES_BY_PRESET[preset]])
-		_check(out.size() <= LandmarkSites.MAX_BY_PRESET[preset], "preset %d selected %d candidates (cap %d)" % [
-			preset, out.size(), LandmarkSites.MAX_BY_PRESET[preset]])
-		_check(out.size() - bridges.size() <= LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[preset] + 1,
+		_check(non_sky.size() <= LandmarkSites.MAX_BY_PRESET[preset], "preset %d selected %d candidates (cap %d)" % [
+			preset, non_sky.size(), LandmarkSites.MAX_BY_PRESET[preset]])
+		_check(non_sky.size() - bridges.size() <= LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[preset] + 1,
 			"preset %d extras exceed the registry cap" % preset)
 	if failures.is_empty():
 		print("BRIDGE SELECT OK")

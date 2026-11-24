@@ -23,6 +23,7 @@ static func palais_garnier(model: Node3D) -> void:
 	lm.use("Dome", LandmarkMaterials.pbr("slate", "#6F9A86", 2.5))
 	lm.use("Glass", LandmarkMaterials.glass("#2A3338"))
 	lm.use("Gilt", LandmarkMaterials.gold())
+	lm.use("LoggiaLamp", LandmarkMaterials.lit("#FFD996", 1.5))
 	var fz := 64.0
 	var fn := Vector3(0, 0, 1)
 	for k in 3:
@@ -75,8 +76,18 @@ static func palais_garnier(model: Node3D) -> void:
 		lm.box("Gilt", Vector3(cos(a) * 1.9, 48.6, 6.0 + sin(a) * 1.9), Vector3(0.3, 1.0, 0.3), Basis(), 0.0)
 	lm.lathe("Gilt", Vector3(0, 50.1, 6.0), LandmarkWestKit.ball(0.4), 8)
 	_stage_house(lm)
+	# Warm glowing loggia lanterns along the Place de l'Opéra front.
+	for k in 7:
+		var lx := -24.0 + 8.0 * float(k)
+		lm.frustum("LoggiaLamp", Vector3(lx, 17.6, 61.5), 0.35, 0.28, 0.75, 8)
 	LandmarkWhKit.shift(lm, Vector3(0, 0, 13.0))
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-26.0, 2.0, 92.0), Vector3(-24.0, 24.0, 77.0), 60.0, 1.05, 75.0],
+		[Vector3(0.0, 2.0, 94.0), Vector3(0.0, 28.0, 77.0), 64.0, 1.15, 85.0],
+		[Vector3(26.0, 2.0, 92.0), Vector3(24.0, 24.0, 77.0), 60.0, 1.05, 75.0],
+		[Vector3(0.0, 26.0, 40.0), Vector3(0.0, 48.0, 6.0), 62.0, 0.95, 75.0],
+	])
 
 ## The arcade storey: seven arches with voussoirs and keystones between
 ## rusticated piers, and the four sculpture groups on pedestals before

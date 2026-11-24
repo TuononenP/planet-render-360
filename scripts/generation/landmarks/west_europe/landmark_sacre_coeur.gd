@@ -13,8 +13,9 @@ extends RefCounted
 ## campanile behind it (north, -Z).
 static func sacre_coeur(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("White", LandmarkMaterials.pbr("limestone", "#E6E1D3", 3.0))
-	lm.use("Steps", LandmarkMaterials.pbr("stone", "#B5AE9F", 3.0))
+	# Luminous self-cleaning white Château-Landon travertine.
+	lm.use("White", LandmarkMaterials.pbr("limestone", "#EFEBE0", 3.0))
+	lm.use("Steps", LandmarkMaterials.pbr("stone", "#C4BEB0", 3.0))
 	lm.use("Glass", LandmarkMaterials.glass("#2A3338"))
 	lm.use("Gilt", LandmarkMaterials.gold())
 	lm.use("Bronze", LandmarkMaterials.paint("#4E5A4C", 0.5, 0.6))
@@ -23,6 +24,13 @@ static func sacre_coeur(model: Node3D) -> void:
 	_porch(lm)
 	_campanile(lm, Vector3(0, 0, -54.0))
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-22.0, 2.0, 48.0), Vector3(-10.0, 40.0, 14.0), 64.0, 1.15, 105.0],
+		[Vector3(22.0, 2.0, 48.0), Vector3(10.0, 40.0, 14.0), 64.0, 1.15, 105.0],
+		[Vector3(-38.0, 2.0, 3.0), Vector3(-8.0, 46.0, 3.0), 60.0, 0.95, 95.0],
+		[Vector3(38.0, 2.0, 3.0), Vector3(8.0, 46.0, 3.0), 60.0, 0.95, 95.0],
+		[Vector3(0.0, 2.0, -76.0), Vector3(0.0, 48.0, -54.0), 56.0, 0.90, 95.0],
+	])
 
 ## Latin-cross body, apse and radiating chapels with arched windows.
 static func _body(lm: LandmarkMesh) -> void:

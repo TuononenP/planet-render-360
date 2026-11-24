@@ -45,12 +45,14 @@ const OUT_OF_BAND := 0.12
 const CITY_ERAS := {
 	"paris": [
 		["haussmann", ACC, 1850, 1914, ["haussmann", "haussmannian", "haussmannien",
-			"second_empire", "napoleon_iii", "neoclassicism", "neoclassical"], 6.0, 0.0, 6.0],
+			"second_empire", "napoleon_iii", "neoclassicism", "neoclassical"], 6.0, 0.0, 6.5],
 		["paris_post_haussmann", AC, 1895, 1914, ["post_haussmannian", "art_nouveau",
 			"belle_epoque", "jugendstil"], 1.5, 0.0, 9.0],
-		["paris_faubourg", HAC, 1000, 1849, ["classicism", "classical", "baroque", "medieval",
-			"gothic", "renaissance", "louis_xiii", "louis_xiv", "louis_xv", "louis_xvi",
-			"vernacular", "directoire", "restauration"], 2.0, 0.0, 9.0],
+		["paris_royal", AC, 1650, 1740, ["louis_xiv", "louis_xv", "classicism", "classical"],
+			0.25, 0.0, 4.5],
+		["paris_marais", APT, 1590, 1690, ["louis_xiii", "renaissance", "baroque"], 0.25, 0.0, 4.0],
+		["paris_faubourg", HAC, 1000, 1849, ["medieval", "gothic", "louis_xvi", "vernacular", "directoire", "restauration"],
+			2.0, 0.0, 9.0],
 		["paris_hbm", APT, 1915, 1949, ["art_deco", "hbm", "habitation_bon_marche",
 			"interwar"], 1.0, 4.0, 99.0],
 		["paris_modern", ALL, 1950, 2100, MODERN, 0.8, 0.0, 99.0],

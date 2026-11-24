@@ -7,38 +7,7 @@ extends RefCounted
 
 static func rows() -> Array:
 	return [
-		{"id": "br_paris_pont_alexandre_iii", "cc": "FR", "name": "Pont Alexandre III", "wiki": "Pont Alexandre III",
-			"aliases": ["pont alexandre-iii", "alexandre iii bridge", "pont alexandre 3"], "lat": 48.8636,
-			"lon": 2.3136, "bearing": 4.5, "st": "arch_deck", "spans": [107.5], "width": 40.0, "clear": 8.0,
-			"rise": 6.3, "material": "steel", "base": "water", "tier": 1, "conf": 2,
-			"src": "en+fr Wikipedia (107.5 m span, 160 m total, 40 m wide, rise 1/17), OSM way bearing; clear " +
-				"estimated | verified: fr Wikipedia (single 3-hinge steel arch 107.5 m, 160 m total, deck 40 " +
-				"m by design (45 m incl. cornices), flèche 1/17), en Wikipedia (107.5 m, 40 m); OSM way " +
-				"17067006 (bridge=yes, 149 m incl. abutments, brg 4.5, mid 48.86364,2.31354) agrees with row " +
-				"centre within 25 m; clear 8 m and rise 6.3 m (=107.5/17) remain estimates"},
-		{"id": "br_paris_pont_d_iena", "cc": "FR", "name": "Pont d'Iéna", "wiki": "Pont d'Iéna",
-			"aliases": ["pont d'iena", "jena bridge", "pont de jena"], "lat": 48.8598, "lon": 2.2922, "bearing": 134.2,
-			"st": "masonry", "spans": [31.0, 31.0, 31.0, 31.0, 31.0], "width": 35.0, "clear": 8.0, "rise": 3.35,
-			"material": "stone", "base": "water", "tier": 2, "conf": 2,
-			"src": "en+fr Wikipedia (5 arches of 28 m, 155 m, 35 m after 1935), Paris street dictionary rise " +
-				"3.30 m / Structurae 3.40 m, OSM bearing; clear estimated, pier 3 m assumed | verified: fr " +
-				"Wikipedia (155 m, 5 equal arches of 28 m clear, 4 piers, 35 m wide since 1935); OSM ways " +
-				"986589650/1322092757 (156 m, brg 134.0-134.3, mid 48.85976,2.29201) agree with row centre " +
-				"(15 m) and bearing; equal arches stated by source so 5x31 m pier-centre spans (3 m piers " +
-				"assumed) stay"},
-		{"id": "br_paris_pont_neuf", "cc": "FR", "name": "Pont Neuf", "wiki": "Pont Neuf",
-			"aliases": ["pont neuf paris", "new bridge paris"], "lat": 48.8578, "lon": 2.3419, "bearing": 208.4,
-			"st": "masonry", "spans": [20.7, 21.8, 22.8, 23.4, 22.8, 21.8, 20.7], "width": 20.5, "clear": 9.5,
-			"rise": 6.0, "material": "stone", "base": "water", "tier": 1, "conf": 1,
-			"src": "fr Wikipedia (right-bank arm: 7 arches 16.4-19.4 m, 154 m; width 20.5 m), OSM ways; modelled " +
-				"ONLY the longer right-bank arm (7 arches), not the 5-arch left arm; piers ~4.3 m added to " +
-				"arch openings; clear and rise estimated | verified: fr Wikipedia + web search: grand bras 7 " +
-				"arches with openings 16.40-19.40 m (154 m), petit bras 5 arches 9-16.70 m (78 m), width " +
-				"20.50 m; per-arch openings and pier thicknesses are not published in any source reachable, " +
-				"so the 7-span list stays a derived estimate; OSM ways 53574163+557297166 (right arm, brg " +
-				"208.0, mid 48.85785,2.34195) agree with row centre/bearing; also Structurae notes the grand- " +
-				"bras arches were rebuilt 1870 as basket-handle profiles | round 2: round 2: fr Wikipedia " +
-				"only: arch openings 16.4-19.4 m, pier thicknesses unpublished"},
+		# Pont Alexandre III, Pont d'Iéna and Pont Neuf are built by bespoke builders in LandmarkSetParis.
 		{"id": "br_paris_pont_des_arts", "cc": "FR", "name": "Pont des Arts", "wiki": "Pont des Arts",
 			"aliases": ["passerelle des arts", "pont des arts paris"], "lat": 48.8584, "lon": 2.3376, "bearing": 18.5,
 			"st": "arch_deck", "spans": [22.15, 22.15, 22.15, 22.15, 22.15, 22.15, 22.15], "width": 11.0, "clear": 8.0,
