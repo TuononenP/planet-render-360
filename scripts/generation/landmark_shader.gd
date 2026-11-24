@@ -249,11 +249,15 @@ static func upgrade(root: Node3D) -> int:
 			if mi.get_surface_override_material(s) != null:
 				continue
 			var m := mi.mesh.surface_get_material(s) as StandardMaterial3D
-			if m == null or not m.has_meta(META) or m.emission_enabled:
+			if m == null or m.emission_enabled:
 				continue
-			mi.set_surface_override_material(s, swap(m))
-			used = true
-			count += 1
+			if m.has_meta(META):
+				mi.set_surface_override_material(s, swap(m))
+				used = true
+				count += 1
+			elif m.has_meta("landmark_glass"):
+				mi.set_surface_override_material(s, LandmarkMaterials.window_glass_shader(str(m.get_meta("landmark_glass"))))
+				count += 1
 		if used and absf(lift) > 0.001:
 			mi.set_instance_shader_parameter("lift", lift)
 	return count

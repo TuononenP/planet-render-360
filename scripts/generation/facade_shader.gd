@@ -86,16 +86,16 @@ varying flat float bld;
 // @SNOW
 // @CLOUD_SHADOW
 
-// Near panes. Head-on reflectance of double glazing (four surfaces); the
-// high metallic over a dark albedo gives it with almost no diffuse.
-const float GLASS_F0 = 0.13;
-const float GLASS_METALLIC = 0.8;
-const float GLASS_ALBEDO = 0.14;
-// Daytime room brightness behind a near pane (emission, so it ignores the
-// shade the wall is in: brighter reads as a lit room, not as glass), and
-// the glass's own tint.
-const float DAY_ROOM_NEAR = 0.035;
-const vec3 GLASS_TINT = vec3(0.90, 0.97, 0.94);
+// Near panes. Double-glazing Fresnel over a dim shaded interior: crisp sky
+// and sun reflections at oblique angles, subtle interior depth head-on
+// without alpha see-through (building shells are hollow).
+const float GLASS_F0 = 0.08;
+const float GLASS_METALLIC = 0.18;
+const float GLASS_ALBEDO = 0.045;
+// Daytime room brightness behind a near pane (dim shaded interior behind
+// tinted glazing, never glowing or see-through), and the glass's own tint.
+const float DAY_ROOM_NEAR = 0.068;
+const vec3 GLASS_TINT = vec3(0.82, 0.93, 0.96);
 
 float h12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -296,7 +296,8 @@ void fragment() {
 		rough = mix(rough, max(rough * 0.62, 0.26), wet);
 	}
 	// Drifting cloud shadows across sunlit facade faces.
-	float csh = cloud_shadow_at(wpos / units_per_m) * smoothstep(0.0, 0.4, dot(normalize(wnrm), cloud_sun_dir));
+	float raw_csh = cloud_shadow_at(wpos / max(units_per_m, 0.001));
+	float csh = raw_csh * smoothstep(0.0, 0.4, dot(normalize(wnrm), cloud_sun_dir));
 	wall *= 1.0 - 0.30 * csh;
 
 	vec2 cg = uv * cells;
@@ -373,24 +374,70 @@ void fragment() {
 	// floors behind them read strongly.
 	float transmit = curtain_wall ? mix(0.35, 0.8, night) : 0.85;
 	vec3 glass_e = inside * transmit * mix(vec3(1.0), lamp * night_energy * 1.4, step(0.001, lit));
+	// Per-pane float-glass micro-tilt (~1.2 deg), plus raindrop streaks in rain.
+	vec3 view_w = normalize(CAMERA_POSITION_WORLD - wpos);
+	vec3 nw = normalize(wnrm);
+	vec3 gt1 = normalize(cross(abs(nw.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), nw));
+	vec3 gt2 = cross(nw, gt1);
+	vec2 tilt = (vec2(h12(vec2(seed, 31.0)), h12(vec2(seed, 37.0))) - 0.5) * 0.022 * (1.0 - pane_mean);
+	if (climate_rain > 0.01 && near_glass > 0.05 && pane > 0.1) {
+		float col_x = (wm.x + wm.z) * 14.0;
+		float trail = vnoise(vec2(col_x, wm.y * 2.2 + TIME * 1.4));
+		float drop = smoothstep(0.68, 0.95, trail) * climate_rain * near_glass;
+		tilt += vec2((vnoise(vec2(col_x * 2.1, wm.y * 5.0 + TIME * 1.8)) - 0.5) * 0.06, -0.04) * drop;
+	}
+	vec3 nw_glass = normalize(nw + gt1 * tilt.x + gt2 * tilt.y);
+
+	// Double-glazing Schlick Fresnel: deep shaded interior straight-on, crisp
+	// sky/horizon mirror at oblique angles (never alpha see-through).
+	float ndv = clamp(dot(nw_glass, view_w), 0.0, 1.0);
+	float f0 = curtain_wall ? 0.12 : GLASS_F0;
+	float fresnel = clamp(f0 + (0.90 - f0) * pow(1.0 - ndv, 4.2), f0, 0.90);
+	float edge_d = min(min(cuv.x, 1.0 - cuv.x), min(cuv.y, 1.0 - cuv.y));
+	float edge_rim = (1.0 - smoothstep(0.0, 0.08, edge_d)) * near_glass;
+
 	// What the glass reflects it does not let through: the room gives way
-	// to the mirror as the view gets shallow.
-	float fresnel = GLASS_F0 + (1.0 - GLASS_F0) * pow(1.0 - clamp(vts.z, 0.0, 1.0), 5.0);
-	glass_e *= mix(vec3(1.0), GLASS_TINT * (1.0 - fresnel), near_glass);
+	// to the mirror as the view gets shallow; lit night rooms still punch through.
+	float room_vis = mix(0.65, 1.0, near_glass) * (1.0 - fresnel * (1.0 - 0.45 * night));
+	glass_e *= GLASS_TINT * room_vis;
+
+	// Analytic sky/horizon/ground reflection & crisp sun glint (matching the
+	// Louvre glass pyramid's reflective character, gated by cloud shadow, night,
+	// sub-pixel distance and Stockholm's glass_cap).
+	vec3 sun_d = normalize(cloud_sun_dir);
+	float sun_up = smoothstep(-0.04, 0.24, sun_d.y);
+	float direct = sun_up * (1.0 - raw_csh);
+	vec3 refl_w = reflect(-view_w, nw_glass);
+	vec3 sky_zen = vec3(0.26, 0.48, 0.80);
+	vec3 sky_hor = vec3(0.72, 0.82, 0.92);
+	vec3 gnd_ref = vec3(0.36, 0.40, 0.43);
+	vec3 env_ref = refl_w.y >= 0.0
+		? mix(sky_hor, sky_zen, pow(clamp(refl_w.y, 0.0, 1.0), 0.55))
+		: mix(sky_hor * 0.72, gnd_ref, clamp(-refl_w.y * 2.4, 0.0, 1.0));
+	env_ref = mix(env_ref, vec3(dot(env_ref, vec3(0.3, 0.55, 0.15))) * 0.82, wet * 0.45);
+	env_ref *= (0.06 + 0.94 * sun_up) * (1.0 - 0.28 * raw_csh) * (1.0 - 0.82 * night);
+	float rds = max(dot(refl_w, sun_d), 0.0);
+	float sun_spec = (pow(rds, 220.0) * 2.8 + pow(rds, 26.0) * 0.34) * direct * (1.0 - sub * 0.75);
+	vec3 sun_col = mix(vec3(1.0, 0.80, 0.54), vec3(1.0, 0.98, 0.94), smoothstep(0.10, 0.45, sun_d.y));
+	float glare_k = clamp(glass_cap.y, 0.0, 1.0);
+	float refl_fade = 1.0 - sub * 0.65;
+	float env_gain = (curtain_wall ? 0.56 : 0.48) * mix(0.28, 1.0, glare_k) * refl_fade;
+	vec3 glass_refl = env_ref * (fresnel * env_gain)
+		+ sun_col * (sun_spec * (0.30 + 0.70 * fresnel) * 0.36 * glare_k);
 
 	// A curtain wall's floors differ a little: no two batches of glass match.
-	vec3 glass_alb = curtain_wall ? base * 0.8 * (0.97 + 0.06 * h12(vec2(cell.y, bld)))
-		: mix(mix(vec3(0.015), fabric * 0.18, drape), vec3(GLASS_ALBEDO), near_glass);
+	vec3 glass_tint_base = vec3(GLASS_ALBEDO) * GLASS_TINT;
+	vec3 glass_alb = curtain_wall ? base * 0.45 * (0.97 + 0.06 * h12(vec2(cell.y, bld)))
+		: mix(mix(vec3(0.018, 0.026, 0.032), fabric * 0.10, drape), glass_tint_base, mix(0.45, 1.0, near_glass));
+	glass_alb *= 1.0 - 0.18 * edge_rim;
 	ALBEDO = mix(wall, glass_alb, pane);
-	// Below ~0.12 the indirect reflections render as salt-and-pepper noise.
+	// Below ~0.11 the indirect reflections render as salt-and-pepper noise.
 	// Sub-pixel panes share one value: picked per pane they alias to speckle.
-	// Distant panes (no glass treatment) are rougher still: a mirror a few
-	// pixels wide sparkles as screen-space reflections find and lose it.
-	float pane_rough = mix(0.12, 0.18, mix(h12(vec2(seed, 29.0)), 0.5, pane_mean));
-	pane_rough = mix(pane_rough, 0.11, wet * 0.5);
-	ROUGHNESS = mix(rough, mix(0.3, pane_rough, near_glass), pane);
-	METALLIC = mix(metallic_wall, curtain_wall ? 0.6 : GLASS_METALLIC * near_glass, pane);
-	SPECULAR = mix(mix(0.5, 0.6, wet), 0.65, pane);
+	float pane_rough = mix(0.11, 0.16, mix(h12(vec2(seed, 29.0)), 0.5, pane_mean));
+	pane_rough = mix(pane_rough, 0.09, wet * 0.5);
+	ROUGHNESS = mix(rough, mix(0.24, pane_rough, near_glass), pane);
+	METALLIC = mix(metallic_wall, curtain_wall ? 0.32 : GLASS_METALLIC * mix(0.4, 1.0, near_glass), pane);
+	SPECULAR = mix(mix(0.5, 0.6, wet), 0.88, pane);
 	ROUGHNESS = max(ROUGHNESS, glass_cap.z * pane);
 	METALLIC = min(METALLIC, mix(1.0, glass_cap.x, pane));
 	SPECULAR = min(SPECULAR, mix(1.0, glass_cap.y, pane));
@@ -405,7 +452,7 @@ void fragment() {
 		vec3 up_lamp = mix(lamp_colour(h13(vec3(up_lc, bld + 3.7)), TIME), vec3(1.0, 0.80, 0.58), sub);
 		spill_e = wall * up_lamp * up_lit * sill_band * night_energy * 0.28;
 	}
-	EMISSION = glass_e * pane + spill_e * (1.0 - pane);
+	EMISSION = (glass_e + glass_refl) * pane + spill_e * (1.0 - pane);
 	if (warm_bounce > 0.0) {
 		EMISSION += (1.0 - pane) * ground_bounce(wall, wnrm, warm_bounce);
 	}
@@ -415,14 +462,6 @@ void fragment() {
 	vec2 nxy = nm.xy * 2.0 - 1.0 + photo_n;
 	nxy *= min(1.0, 0.92 / max(length(nxy), 1e-4));
 	nm.xy = nxy * 0.5 + 0.5;
-	// About 0.3 degrees of tilt per pane, plus raindrop streaks in rain.
-	vec2 tilt = (vec2(h12(vec2(seed, 31.0)), h12(vec2(seed, 37.0))) - 0.5) * 0.012 * (1.0 - pane_mean);
-	if (climate_rain > 0.01 && near_glass > 0.05 && pane > 0.1) {
-		float col_x = (wm.x + wm.z) * 14.0;
-		float trail = vnoise(vec2(col_x, wm.y * 2.2 + TIME * 1.4));
-		float drop = smoothstep(0.68, 0.95, trail) * climate_rain * near_glass;
-		tilt += vec2((vnoise(vec2(col_x * 2.1, wm.y * 5.0 + TIME * 1.8)) - 0.5) * 0.06, -0.04) * drop;
-	}
 	NORMAL_MAP = mix(nm, vec3(0.5 + tilt, 1.0), pane);
 }
 """

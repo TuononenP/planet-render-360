@@ -12,6 +12,7 @@ extends RefCounted
 static var _cache: Dictionary = {}
 static var _texs: Dictionary = {}
 static var _glass_shaders: Dictionary = {}
+static var _window_glass_shaders: Dictionary = {}
 ## Landmarks build beside the buildings (WorldBuildGraph), and HeroLook
 ## reaches these caches from the buildings task. Recursive, so pbr() can
 ## call tex() while holding it.
@@ -90,6 +91,93 @@ void fragment() {
 	ROUGHNESS = mix(0.032, 0.18, edge_frost);
 	SPECULAR = 0.92;
 	METALLIC = 0.08;
+}
+"""
+
+## Opaque architectural window glazing for landmark buildings (Desktop Ultra):
+## Fresnel sky/horizon reflection, sun specular glint, per-pane float-glass tilt
+## and subtle shaded interior depth without alpha see-through.
+const WINDOW_GLASS_CODE := """
+shader_type spatial;
+render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
+
+uniform vec4 glass_tint : source_color = vec4(0.24, 0.34, 0.40, 1.0);
+uniform float units_per_metre = 1.0;
+
+// @CLOUD_SHADOW
+
+varying vec3 wpos;
+varying vec3 wnrm;
+
+float wg_hash(vec2 p) {
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
+}
+
+void vertex() {
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+}
+
+void fragment() {
+	vec3 view_w = normalize(CAMERA_POSITION_WORLD - wpos);
+	vec3 nw = normalize(wnrm);
+	vec3 t1 = normalize(cross(abs(nw.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), nw));
+	vec3 t2 = cross(nw, t1);
+
+	// Metre-scaled pane cells (~1.3 m x 1.8 m) with anti-aliased micro-tilt.
+	vec3 pm = wpos / max(units_per_metre, 0.001);
+	vec2 p_uv = vec2(dot(pm, t1) / 1.35, dot(pm, t2) / 1.85);
+	vec2 fw = max(fwidth(p_uv), vec2(1e-4));
+	float fade = 1.0 - smoothstep(0.06, 0.28, max(fw.x, fw.y));
+	vec2 cell = floor(p_uv);
+	vec2 f = fract(p_uv);
+	float j1 = wg_hash(cell + vec2(1.7, 3.1)) - 0.5;
+	float j2 = wg_hash(cell + vec2(8.3, 5.9)) - 0.5;
+	nw = normalize(nw + (t1 * (j1 * 0.020) + t2 * (j2 * 0.020)) * fade);
+	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
+
+	float d_edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
+	float edge_rim = (1.0 - smoothstep(0.0, 0.065, d_edge)) * fade;
+
+	// Architectural double-glazing Schlick Fresnel: deep shaded interior straight-on,
+	// crisp sky & horizon mirror at oblique angles.
+	float ndv = clamp(dot(nw, view_w), 0.0, 1.0);
+	float fresnel = clamp(0.09 + 0.82 * pow(1.0 - ndv, 4.2), 0.09, 0.91);
+
+	vec3 sun_d = normalize(cloud_sun_dir);
+	float sun_up = smoothstep(-0.04, 0.24, sun_d.y);
+	float csh = cloud_shadow_at(pm);
+	float direct = sun_up * (1.0 - csh);
+
+	vec3 refl_w = reflect(-view_w, nw);
+	vec3 sky_zen = vec3(0.26, 0.48, 0.80);
+	vec3 sky_hor = vec3(0.72, 0.82, 0.92);
+	vec3 gnd_ref = vec3(0.36, 0.40, 0.43);
+	vec3 env_ref = refl_w.y >= 0.0
+		? mix(sky_hor, sky_zen, pow(clamp(refl_w.y, 0.0, 1.0), 0.55))
+		: mix(sky_hor * 0.72, gnd_ref, clamp(-refl_w.y * 2.4, 0.0, 1.0));
+	env_ref *= (0.06 + 0.94 * sun_up) * (1.0 - 0.28 * csh);
+
+	float rds = max(dot(refl_w, sun_d), 0.0);
+	float sun_spec = (pow(rds, 220.0) * 2.8 + pow(rds, 26.0) * 0.34) * direct;
+	vec3 sun_col = mix(vec3(1.0, 0.80, 0.54), vec3(1.0, 0.98, 0.94), smoothstep(0.10, 0.45, sun_d.y));
+
+	// Subtle shaded interior behind the glazing (never see-through alpha).
+	float seed = wg_hash(cell + vec2(4.1, 9.7));
+	float drape = step(mix(0.18, 0.46, wg_hash(cell + vec2(2.3, 6.1))), abs(f.x - 0.5)) * fade;
+	vec3 room_c = mix(vec3(0.42, 0.40, 0.36), vec3(0.68, 0.64, 0.58), drape * 0.6 + seed * 0.25);
+	vec3 interior_e = room_c * glass_tint.rgb * (0.12 * (1.0 - fresnel) * (0.25 + 0.75 * sun_up));
+
+	vec3 refl_e = env_ref * (fresnel * 0.48) + sun_col * (sun_spec * (0.30 + 0.70 * fresnel) * 0.36);
+
+	vec3 deep_tint = glass_tint.rgb * 0.16;
+	ALBEDO = deep_tint * (1.0 - 0.22 * edge_rim);
+	EMISSION = interior_e + refl_e;
+	ROUGHNESS = mix(0.08, 0.18, edge_rim);
+	SPECULAR = 0.90;
+	METALLIC = 0.14;
 }
 """
 
@@ -202,10 +290,25 @@ static func glass(hex: String = "#2E3A40") -> StandardMaterial3D:
 	m.roughness = 0.12
 	m.metallic = 0.2
 	m.uv1_scale = Vector3(0.05, 0.05, 0.05)
+	m.set_meta("landmark_glass", hex)
 	_cache[key] = m
 	var ret: StandardMaterial3D = m
 	_mutex.unlock()
 	return ret
+
+static func window_glass_shader(hex: String = "#2E3A40") -> ShaderMaterial:
+	var m2u := WorldScale.metres_to_units()
+	var key := "%s|%.3f" % [hex, m2u]
+	_mutex.lock()
+	var sm: ShaderMaterial = _window_glass_shaders.get(key)
+	if sm == null:
+		sm = ShaderMaterial.new()
+		sm.shader = SharedShader.of(WINDOW_GLASS_CODE.replace("// @CLOUD_SHADOW", TerrainGlsl.CLOUD_SHADOW_GLSL))
+		sm.set_shader_parameter("glass_tint", Color(hex).lerp(Color("#6E90A4"), 0.55))
+		sm.set_shader_parameter("units_per_metre", m2u)
+		_window_glass_shaders[key] = sm
+	_mutex.unlock()
+	return sm
 
 ## Clear architectural structural glazing (e.g. I. M. Pei's Louvre Pyramid):
 ## textured translucent StandardMaterial3D base + Fresnel reflective shader override.
