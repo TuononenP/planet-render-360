@@ -208,20 +208,20 @@ static func add(root: Node3D, ring: PackedVector2Array, top: float,
 	# A dome, onion or spire carries no stacks, dormers or roof terraces.
 	if near and shape not in RoofDomes.SHAPES:
 		var area_m2 := lu * lv * 4.0 / (m2u * m2u)
+		var floor_y := top if is_nan(deck) else minf(top, deck)
 		# Bell-capped stacks are drawn by _chimneys, so a Venetian terrace
 		# skips the plain party-wall stacks.
 		var bell := str((look.get("relief", {}) as Dictionary).get("chimney_cap", "")) == "bell"
-		var stacks := not bell and RooflineDetail.party_stacks(batch, ring, c, top, roof_h, party, look, holes)
+		var stacks := not bell and RooflineDetail.party_stacks(batch, ring, c, top, roof_h, party, look, holes, floor_y)
 		var mansard_stacks := not bell and RooflineDetail.mansard_roof_details(batch, ring, holes,
 			top, roof_h, shape, party, look, seed_v, area_m2, ultra or clutter)
 		if not stacks and not mansard_stacks:
-			_chimneys(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2, holes)
+			_chimneys(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2, holes, floor_y)
 		if not RooflineDetail.bay_dormers(batch, ring, top, roof_h, shape, party,
 				gable_front, look, roof_mat, seed_v):
 			_dormers(batch, c, u, v, lu, lv, top, roof_h, shape, basis, look, roof_mat, seed_v)
 		_altana(batch, ring, c, u, v, lu, lv, top, roof_h, shape, basis, look, seed_v, area_m2)
 		if shape == "flat":
-			var floor_y := top if is_nan(deck) else deck
 			_plant(batch, ring, c, u, v, lu, lv, floor_y, basis, look, seed_v, area_m2)
 			# The city's own rooftop clutter, on the desktop tiers.
 			if ultra or clutter:
@@ -248,30 +248,32 @@ static func _at(c: Vector2, u: Vector2, v: Vector2, du: float, dv: float, y: flo
 
 static func _chimneys(batch: Batch, ring: PackedVector2Array, c: Vector2,
 		u: Vector2, v: Vector2, lu: float, lv: float, top: float,
-		roof_h: float, shape: String, basis: Basis, look: Dictionary,
-		seed_v: float, area_m2: float, holes: Array = []) -> void:
+		roof_h: float, _shape: String, basis: Basis, look: Dictionary,
+		seed_v: float, area_m2: float, holes: Array = [], floor_y: float = NAN) -> void:
 	if ArchitectureStyle._h(seed_v, 21) >= float(look["chimney"]):
 		return
 	var m2u := WorldScale.metres_to_units()
 	var count := 2 if area_m2 > 160.0 else 1
 	var wall_mat := _mat("brick")
+	var seat := (top if is_nan(floor_y) else minf(top, floor_y)) - 0.25 * m2u
+	var size := 0.9 * m2u
 	for i in count:
 		var du := lu * (0.45 - 0.9 * float(i) if count == 2 else 0.35)
 		var dv := lv * 0.30 * (1.0 if ArchitectureStyle._h(seed_v, 22 + i) < 0.5 else -1.0)
 		var p := c + u * du + v * dv
-		if not RooflineDetail._clear_of_holes(p, ring, holes, 0.5 * m2u):
+		if not RooflineDetail.box_fits(p, u, v, size, size, ring, holes, 0.2 * m2u):
 			continue
-		var surface := _roof_y(shape, du, dv, lu, lv, roof_h)
-		var ridge := roof_h
-		# Rises 0.9 m above the ridge line, buried 0.4 m into the roof.
-		var h := (ridge - surface) + 0.9 * m2u + 0.4 * m2u
-		batch.add("box", _xf(basis, _at(c, u, v, du, dv, top + surface - 0.4 * m2u + h * 0.5),
-			Vector3(0.9 * m2u, h, 0.9 * m2u)), wall_mat)
+		# Extends from inside the building top/deck up to 0.9 m above the
+		# ridge so the shaft never hovers above any roof pitch, rotated ridge,
+		# irregular footprint, inset skeleton or sunk parapet deck.
+		var y_top := top + roof_h + 0.9 * m2u
+		var h := y_top - seat
+		batch.add("box", _xf(basis, _at(c, u, v, du, dv, seat + h * 0.5),
+			Vector3(size, h, size)), wall_mat)
 		if str((look.get("relief", {}) as Dictionary).get("chimney_cap", "")) == "bell":
 			# Venetian camino a fumaiolo: a collar on the stack, the flared
 			# bell widening above it (an inverted cone, its point hidden in
 			# the collar) and a tiled hat on the rim.
-			var y_top := top + surface - 0.4 * m2u + h
 			batch.add("cyl", _xf(basis, _at(c, u, v, du, dv, y_top + 0.15 * m2u),
 				Vector3(1.15 * m2u, 0.3 * m2u, 1.15 * m2u)), _mat("cream"))
 			batch.add("cone", _xf(basis * Basis(Vector3.RIGHT, PI),

@@ -89,5 +89,6 @@ static func building(root: Node3D, pos: Vector3, size_x: float, size_z: float,
 			var dx := (float(di) - float(n_d - 1) / 2.0) * 6.0
 			_box_mat(root, pos + Vector3(dx, height_world + rh * 0.52, size_z * 0.30),
 				Vector3(1.68, 2.08, 1.2), roof_mat)
-		_box_mat(root, pos + Vector3(size_x * 0.28, height_world + rh + 0.88, 0),
-			Vector3(1.36, 2.2, 1.36), MaterialLibrary.pbr_material("brick"))
+		var ch_h := rh + 2.18
+		_box_mat(root, pos + Vector3(size_x * 0.28, height_world - 0.2 + ch_h * 0.5, 0),
+			Vector3(1.36, ch_h, 1.36), MaterialLibrary.pbr_material("brick"))

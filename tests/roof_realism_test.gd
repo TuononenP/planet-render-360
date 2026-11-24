@@ -19,8 +19,9 @@ func _init() -> void:
 	_check_skeleton_bands()
 	_check_materials_and_hero_look()
 	_check_courtyard_chimneys()
+	_check_chimney_seating()
 	if failures.is_empty():
-		print("ROOF REALISM OK: skylight glass, concentric-band skeleton (GDScript+native), matte slate/HeroLook, courtyard chimneys")
+		print("ROOF REALISM OK: skylight glass, concentric-band skeleton (GDScript+native), matte slate/HeroLook, courtyard chimneys, chimney seating")
 		quit(0)
 	else:
 		for f in failures:
@@ -179,3 +180,70 @@ func _check_courtyard_chimneys() -> void:
 	_check(pots > 0, "Haussmann courtyard mansard block should carry chimney stacks with terracotta pots")
 	_check(in_hole == 0, "Zero chimney/detail vertices may fall inside the courtyard hole, got %d" % in_hole)
 	root.free()
+
+func _check_chimney_seating() -> void:
+	var m := WorldScale.metres_to_units()
+	var slate := MaterialLibrary.slate()
+	var brick_mat := BuildingDetail._mat("brick")
+	var top := 15.0 * m
+	var rh := 4.0 * m
+	var look := {"kind": "residential", "region": "nordic", "tower": "",
+		"chimney": 1.0, "dormer": 0.0, "equip": 0.0, "relief": {}, "wall_set": "brick"}
+	# 1. Every pitched shape (including skillion, saltbox, gabled, hipped, round)
+	# and an L-shaped irregular footprint: chimneys must seat below `top` and stay
+	# strictly inside `ring`.
+	var rect := _rect(0, 0, 20.0 * m, 12.0 * m)
+	var l_ring := PackedVector2Array([
+		Vector2(0, 0), Vector2(22.0 * m, 0), Vector2(22.0 * m, 7.0 * m),
+		Vector2(7.0 * m, 7.0 * m), Vector2(7.0 * m, 22.0 * m), Vector2(0, 22.0 * m)])
+	for case_pair in [["gabled", rect], ["hipped", rect], ["skillion", rect],
+			["saltbox", rect], ["round", rect], ["gabled_L", l_ring]]:
+		var label: String = case_pair[0]
+		var shape: String = "gabled" if label == "gabled_L" else label
+		var ring: PackedVector2Array = case_pair[1]
+		var root := Node3D.new()
+		BuildingDetail.add(root, ring, top, top, shape, rh, look, slate, slate,
+			0.11, true, PackedByteArray(), false, true, "FI", false, top, [])
+		var min_y := INF
+		var outside := 0
+		var count := 0
+		for c in root.get_children():
+			if not (c is MeshInstance3D):
+				continue
+			var mesh := (c as MeshInstance3D).mesh as ArrayMesh
+			for s in mesh.get_surface_count():
+				if mesh.surface_get_material(s) != brick_mat:
+					continue
+				var verts: PackedVector3Array = mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]
+				count += verts.size()
+				for v in verts:
+					min_y = minf(min_y, v.y)
+					if not RingGeometry.point_in_ring(Vector2(v.x, v.z), ring):
+						outside += 1
+		if label != "gabled_L":
+			_check(count > 0, "%s should build chimney geometry" % label)
+		if count > 0:
+			_check(min_y < top - 0.1 * m, "%s chimney bottom %.2f must seat below eave %.2f" % [label, min_y, top])
+			_check(outside == 0, "%s chimney has %d vertices outside footprint" % [label, outside])
+		root.free()
+	# 2. Flat roof with sunken parapet deck: both regular chimneys and party-wall
+	# stacks must reach below `deck` (not hover at `top`).
+	var sunk := BuildingTrim.deck(top, BuildingTrim.PARAPET)
+	for with_party in [false, true]:
+		var party := PackedByteArray([0, 1, 0, 1]) if with_party else PackedByteArray()
+		var root := Node3D.new()
+		BuildingDetail.add(root, rect, top, top, "flat", 0.0, look, slate, slate,
+			0.11, true, party, false, true, "FI", false, sunk, [])
+		var min_y := INF
+		for c in root.get_children():
+			if not (c is MeshInstance3D):
+				continue
+			var mesh := (c as MeshInstance3D).mesh as ArrayMesh
+			for s in mesh.get_surface_count():
+				if mesh.surface_get_material(s) != brick_mat:
+					continue
+				var verts: PackedVector3Array = mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]
+				for v in verts:
+					min_y = minf(min_y, v.y)
+		_check(min_y < sunk - 0.1 * m, "flat parapet chimney (party=%s) bottom %.2f must seat below sunk deck %.2f" % [with_party, min_y, sunk])
+		root.free()

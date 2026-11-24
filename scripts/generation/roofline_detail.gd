@@ -51,10 +51,11 @@ static func _basis(dir: Vector2, n: Vector2) -> Basis:
 ## boxy parcels, checking that each stack stays inside `ring` and clear of `holes`.
 static func party_stacks(batch: BuildingDetail.Batch, ring: PackedVector2Array,
 		c: Vector2, top: float, roof_h: float, party: PackedByteArray,
-		look: Dictionary, holes: Array = []) -> bool:
+		look: Dictionary, holes: Array = [], base_y: float = NAN) -> bool:
 	if party.size() != ring.size() or not party.has(1) or float(look.get("chimney", 0.0)) < 0.3:
 		return false
 	var m := WorldScale.metres_to_units()
+	var seat := top if is_nan(base_y) else minf(top, base_y)
 	var masonry := BuildingDetail._mat("brick")
 	if str(look.get("wall_set", "")) in ["limestone", "render", "stone"]:
 		masonry = _mat("render")
@@ -78,13 +79,13 @@ static func party_stacks(batch: BuildingDetail.Batch, ring: PackedVector2Array,
 			ts.append(clampf((c - a).dot(dir), L * 0.25, L * 0.75))
 		var w := clampf(L * 0.24, 1.2 * m, 3.6 * m)
 		var d := 0.6 * m
-		var h := roof_h + 1.1 * m
+		var h := (top - seat) + roof_h + 1.1 * m
 		var basis := _basis(dir, n)
 		for t in ts:
 			var p := a + dir * t - n * (d * 0.5 + 0.04 * m)
-			if not _clear_of_holes(p, ring, holes, 0.3 * m):
+			if not box_fits(p, dir, n, w, d, ring, holes, 0.2 * m):
 				continue
-			_add_stack(batch, basis, p, dir, n, top, h, w, d, masonry, true)
+			_add_stack(batch, basis, p, dir, n, seat, h, w, d, masonry, true)
 			placed = true
 	return placed
 
@@ -127,10 +128,10 @@ static func mansard_roof_details(batch: BuildingDetail.Batch, ring: PackedVector
 				continue
 			var inset := lerpf(2.3, 3.2, ArchitectureStyle._h(seed_v + float(i), 95 + k)) * m
 			var p := a + dir * along - n * inset
-			if not _clear_of_holes(p, ring, holes, 1.4 * m):
-				continue
 			var w := lerpf(1.6, 2.8, ArchitectureStyle._h(seed_v + float(i), 110 + k)) * m
 			var d := 0.56 * m
+			if not box_fits(p, dir, n, w, d, ring, holes, 0.25 * m):
+				continue
 			var h := roof_h + lerpf(0.85, 1.25, ArchitectureStyle._h(seed_v + float(i), 125 + k)) * m
 			_add_stack(batch, basis, p, dir, n, top, h, w, d, masonry, false)
 			placed = true
@@ -181,6 +182,37 @@ static func _clear_of_holes(p: Vector2, ring: PackedVector2Array, holes: Array, 
 				if p.distance_to(q) < margin:
 					return false
 	return true
+
+## True when the entire w×d footprint centred at `p` (axes `dir`, `n`) sits
+## strictly inside `ring` and clear of `holes` by `hole_margin`: no corner
+## overhangs an eave or courtyard, and no boundary cuts across the base.
+static func box_fits(p: Vector2, dir: Vector2, n: Vector2, w: float, d: float,
+		ring: PackedVector2Array, holes: Array, hole_margin: float = 0.0) -> bool:
+	var hw := dir * (w * 0.5)
+	var hd := n * (d * 0.5)
+	var c0 := p - hw - hd
+	var c1 := p + hw - hd
+	var c2 := p + hw + hd
+	var c3 := p - hw + hd
+	for q in [p, c0, c1, c2, c3]:
+		if not _clear_of_holes(q, ring, holes, hole_margin):
+			return false
+	for edge in [[c0, c1], [c1, c2], [c2, c3], [c3, c0]]:
+		var a: Vector2 = edge[0]
+		var b: Vector2 = edge[1]
+		if _seg_hits_ring(a, b, ring):
+			return false
+		for h in holes:
+			var hr := h as PackedVector2Array
+			if hr.size() >= 3 and _seg_hits_ring(a, b, hr):
+				return false
+	return true
+
+static func _seg_hits_ring(a: Vector2, b: Vector2, r: PackedVector2Array) -> bool:
+	for i in r.size():
+		if Geometry2D.segment_intersects_segment(a, b, r[i], r[(i + 1) % r.size()]) != null:
+			return true
+	return false
 
 ## Dormers on the window axes of exposed eave edges. True when this rule
 ## decided (dormers placed or rolled out); false leaves BuildingDetail's

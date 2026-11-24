@@ -665,7 +665,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 			look, facade, roof_mat, seed_v, eye_d < BuildingDetail.near_radius(preset, data),
 			party, gable_front, RenderQuality.ultra_desktop(preset), data.country if data != null else "",
 			RenderQuality.is_forward_plus() and preset >= RenderSettings.Preset.HIGH,
-			BuildingTrim.deck(top, trim) if RenderQuality.ultra_desktop(preset) else top, holes)
+			BuildingTrim.deck(top, trim), holes)
 		# Roofline detail is the near LOD ring (LodRing.DETAIL_M); church
 		# towers are skyline and stay in every ring.
 		if str(look.get("kind", "")) != "religious":
