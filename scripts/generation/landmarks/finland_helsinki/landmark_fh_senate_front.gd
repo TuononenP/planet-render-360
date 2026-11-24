@@ -46,22 +46,11 @@ static func build(lm: LandmarkMesh, plat: float, found: float) -> void:
 		_wing(lm, sx, found)
 		_pavilion(lm, sx, found)
 
-## The monument as the model's child "Monument" at STATUE, marked to stand
-## on its own ground; `granite` and `iron` are the front's own materials.
-static func monument(model: Node3D, granite: Material, iron: Material) -> void:
-	var lm := LandmarkMesh.new()
-	lm.use("Granite", granite)
-	lm.use("Iron", iron)
-	lm.use("Bronze", LandmarkMaterials.pbr("copper", "#3F6B5A", 1.5, 0.45, 0.5))
-	lm.use("RedGranite", LandmarkMaterials.pbr("stone", "#7A4A42", 2.0, 0.35))
-	lm.use("Lamp", LandmarkMaterials.glass("#E8E2C8"))
-	_monument(lm)
-	var node := Node3D.new()
-	node.name = "Monument"
-	node.position = STATUE
-	node.set_meta(LandmarkTerrain.SEAT_META, true)
-	model.add_child(node)
-	lm.commit(node)
+## Alexander II is now a first-class standalone landmark (`alexander_ii_monument`
+## in `landmark_fh_alexander_ii.gd`) so it renders with its full 38k-triangle
+## museum-scan bronze ensemble without competing with Helsinki Cathedral's budget.
+static func monument(_model: Node3D, _granite: Material, _iron: Material) -> void:
+	pass
 
 ## A 1 m landing flush with the terrace paving, then the risers; every step
 ## stands on the walls' `found` footing so the square never opens under it.

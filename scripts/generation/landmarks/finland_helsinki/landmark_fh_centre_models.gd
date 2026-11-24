@@ -113,6 +113,7 @@ const MODELS: Array = [
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_kustaanmiekka.gd"),
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_swedish_embassy.gd"),
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_supreme_court.gd"),
+	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_alexander_ii.gd"),
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_runeberg_statue.gd"),
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_three_smiths.gd"),
 	preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_mannerheim_statue.gd"),

@@ -119,21 +119,17 @@ static func build(model: Node3D) -> void:
 	# Stone balustrade along the front eave between the towers and the gable.
 	for s in [-1.0, 1.0]:
 		lm.box("Trim", Vector3(s * 8.0, EAVE + 0.6, ZF - 0.1), Vector3(5.4, 1.1, 0.5))
-	# Granite lamp piers at the stair and Aleksis Kivi's statue (Helsinki 3D+ Reality Mesh, CC BY 4.0).
+	# Granite lamp piers at the stair and Wäinö Aaltonen's brooding seated Aleksis Kivi memorial (1939).
 	for s in [-1.0, 1.0]:
 		lm.box("Base", Vector3(s * 8.7, 2.1, ZF + 1.6), Vector3(1.8, 4.2, 1.8))
 		lm.frustum("Lamp", Vector3(s * 8.7, 4.2, ZF + 1.6), 0.34, 0.2, 1.0, 8)
+	var kz := ZF + 17.0
+	lm.box("Base", Vector3(0.0, 0.16, kz), Vector3(4.6, 0.32, 4.8))
+	lm.box("Trim", Vector3(0.0, 1.25, kz), Vector3(2.7, 1.86, 3.1))
+	lm.box("Trim", Vector3(0.0, 2.28, kz), Vector3(2.95, 0.24, 3.35))
+	SculptureKit.stamp_path(lm, "Bronze", "res://assets/landmarks/helsinki_3d/aleksis_kivi_seated.glb",
+		Vector3(0.0, 2.40, kz), Vector3.ONE, 0.0)
 	lm.commit(model)
-	var rm := preload("res://scripts/generation/reality_mesh_kit.gd")
-	if rm.add_textured_glb(model, "AleksisKivi",
-			"res://assets/landmarks/helsinki_3d/aleksis_kivi.glb",
-			Vector3(0.0, 0.0, ZF + 17.0), Vector3(0.95, 0.95, 0.95), 0.0, 0.72, 0.12) == null:
-		var fb := LandmarkMesh.new()
-		fb.use("Trim", LandmarkMaterials.pbr("stone", "#9E9A90", 2.5))
-		fb.use("Bronze", LandmarkMaterials.paint("#3E584A", 0.45, 0.65))
-		fb.box("Trim", Vector3(0.0, 1.6, ZF + 17.0), Vector3(3.2, 3.2, 3.2))
-		LandmarkKits.statue_figure(fb, "Bronze", Vector3(0.0, 3.6, ZF + 17.0), 2.8, false)
-		fb.commit(model)
 	var warm := Color(1.0, 0.86, 0.66)
 	model.set_meta(LandmarkLights.FLOOD_META, [
 		[Vector3(-12.0, 2.5, ZF + 22.0), Vector3(-6.0, 9.0, ZF), 40.0, 0.9, 50.0, warm],
