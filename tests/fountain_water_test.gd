@@ -113,6 +113,14 @@ func _test_flagship_landmarks() -> void:
 		var foam := _find_by_name(hero, "FountainFoam") as MeshInstance3D
 		_check(flow != null and flow.mesh != null, "%s should have FountainFlow geometry" % t)
 		_check(foam != null and foam.mesh != null, "%s should have FountainFoam geometry" % t)
+		if t == "louvre_pyramid":
+			var flow_aabb := flow.mesh.get_aabb()
+			_check(flow_aabb.end.y >= 8.0 and maxf(flow_aabb.size.x, flow_aabb.size.z) >= 70.0,
+				"louvre_pyramid fountains span Cour Napoleon (>=70 m) with tall jets (>=8 m), got %s" % [flow_aabb])
+		if t == "havis_amanda":
+			var bronze := _find_by_name(hero, "Bronze") as MeshInstance3D
+			_check(bronze != null and bronze.mesh != null and bronze.mesh.get_faces().size() >= 1800,
+				"havis_amanda bronze sculpture has detailed lofted anatomy (>=1800 tris)")
 		hero.free()
 
 func _test_impostor_skips_spray_and_keeps_water_color() -> void:

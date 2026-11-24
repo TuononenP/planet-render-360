@@ -26,18 +26,19 @@ static func bethesda_fountain(model: Node3D) -> void:
 	lm.disc("Water", Vector3(0, 0.42, 0), Vector3.UP, 13.72, 48)
 	# Lower pedestal, the lower bowl, the column, the upper bowl, the plinth.
 	lm.lathe("Stone", Vector3.ZERO, PackedVector2Array([Vector2(2.6, -0.2), Vector2(2.4, 1.1),
-		Vector2(0.8, 1.3), Vector2(0.9, 1.5), Vector2(3.3, 1.9), Vector2(3.4, 2.15), Vector2(0.75, 2.2),
-		Vector2(0.6, 3.4), Vector2(1.7, 3.8), Vector2(1.8, 4.0), Vector2(0.55, 4.05), Vector2(0.5, 4.6),
-		Vector2(0.7, 4.7), Vector2(0.0, 4.75)]), 20)
-	lm.disc("Water", Vector3(0, 2.1, 0), Vector3.UP, 3.2, 20)
-	lm.disc("Water", Vector3(0, 3.95, 0), Vector3.UP, 1.6, 16)
-	# The angel: robe, torso, head, raised arm and spread wings.
-	lm.lathe("Bronze", Vector3(0, 4.75, 0), PackedVector2Array([Vector2(0.55, 0.0), Vector2(0.42, 0.9),
-		Vector2(0.28, 1.6), Vector2(0.24, 2.0), Vector2(0.14, 2.1), Vector2(0.16, 2.35), Vector2(0.0, 2.5)]), 10)
-	lm.beam("Bronze", Vector3(0.15, 6.6, 0), Vector3(0.55, 7.6, 0.1), 0.14, 0.14)
-	for side in [-1.0, 1.0]:
-		lm.quad("Bronze", Vector3(0, 6.5, side * 0.15), Vector3(-0.4, 6.4, side * 1.3),
-			Vector3(-0.7, 7.9, side * 1.1), Vector3(-0.1, 7.0, side * 0.2), Vector3(0, 0, side))
+		Vector2(0.8, 1.3), Vector2(0.9, 1.5), Vector2(3.3, 1.9), Vector2(3.4, 2.15), Vector2(0.75, 2.22),
+		Vector2(0.6, 3.4), Vector2(1.7, 3.8), Vector2(1.8, 4.0), Vector2(0.55, 4.08), Vector2(0.50, 4.56),
+		Vector2(0.66, 4.65), Vector2(0.70, 4.71), Vector2(0.66, 4.75), Vector2(0.0, 4.75)]), 48)
+	lm.disc("Water", Vector3(0, 2.1, 0), Vector3.UP, 3.2, 48)
+	lm.disc("Water", Vector3(0, 3.95, 0), Vector3.UP, 1.6, 48)
+	# Four bronze cherubs (Temperance, Purity, Health, Peace) standing round the central stem
+	for k in 4:
+		var a := PI * 0.25 + PI * 0.5 * float(k)
+		var d := Vector3(cos(a), 0.0, sin(a))
+		SculptureKit.classical_figure(lm, "Bronze", d * 0.92 + Vector3(0.0, 2.15, 0.0),
+			1.25, false, atan2(d.x, d.z))
+	# Emma Stebbins' bronze Angel of the Waters (4.75 m .. 7.90 m exact): draped figure & feathered wings
+	SculptureKit.winged_angel(lm, "Bronze", Vector3(0.0, 4.75, 0.0), 3.15, 0.0)
 	lm.commit(model)
 	var fk := FountainKit.new()
 	fk.bowl_curtain(Vector3.ZERO, 1.75, 3.96, 2.12, 0.52, 20)

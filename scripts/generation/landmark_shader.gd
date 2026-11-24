@@ -283,10 +283,12 @@ static func from_standard(m: StandardMaterial3D) -> ShaderMaterial:
 	s.set_shader_parameter("uv_scale", m.uv1_scale.x)
 	s.set_shader_parameter("anti_tile", set_name in ANTI_TILE)
 	var colour := Color(str(m.get_meta("landmark_hex", "#808080")))
-	var kind := kind_for(set_name, m.metallic)
+	var is_marble := bool(m.get_meta("landmark_marble", false))
+	var kind := Kind.BUILT if is_marble else kind_for(set_name, m.metallic)
 	s.set_shader_parameter("kind", kind)
-	# Gilding and polished metal stay bright; the rest weathers fully.
-	s.set_shader_parameter("grime", 0.3 if m.metallic > 0.6 else 1.0)
+	# Gilding, polished metal and carved statuary marble stay bright.
+	var grime := 0.22 if is_marble else (0.3 if m.metallic > 0.6 else 1.0)
+	s.set_shader_parameter("grime", grime)
 	s.set_shader_parameter("runs", _runs(colour))
 	s.set_meta(META, set_name)
 	return s

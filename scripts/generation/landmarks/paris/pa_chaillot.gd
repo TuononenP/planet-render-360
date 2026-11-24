@@ -309,25 +309,21 @@ static func _bronze_animal_group(lm: LandmarkMesh, mat: String, base: Vector3,
 	var b := Basis(Vector3.UP, yaw)
 	var p := func(v: Vector3) -> Vector3:
 		return base + b * v
-	var body_h := 1.55 if bull_variant else 1.75
-	lm.beam(mat, p.call(Vector3(-0.35, body_h, -0.95)), p.call(Vector3(-0.35, body_h + 0.25, 0.95)),
-		0.95 if bull_variant else 0.78, 1.05 if bull_variant else 0.88)
-	lm.beam(mat, p.call(Vector3(-0.35, body_h + 0.20, 0.85)),
-		p.call(Vector3(-0.35, body_h + (0.75 if bull_variant else 1.15), 1.55)), 0.62, 0.68)
-	lm.box(mat, p.call(Vector3(-0.35, body_h + (0.82 if bull_variant else 1.22), 1.88)),
-		Vector3(0.46, 0.48, 0.78), b)
-	if bull_variant:
-		for hs in [-1.0, 1.0]:
-			lm.beam(mat, p.call(Vector3(-0.35 + float(hs) * 0.22, body_h + 1.02, 1.85)),
-				p.call(Vector3(-0.35 + float(hs) * 0.62, body_h + 1.38, 2.05)), 0.10, 0.10)
-	for lx in [-0.65, -0.05]:
-		lm.beam(mat, p.call(Vector3(float(lx), body_h - 0.1, -0.85)),
-			p.call(Vector3(float(lx), 0.0, -0.98)), 0.22, 0.22)
-		lm.beam(mat, p.call(Vector3(float(lx), body_h + 0.1, 0.82)),
-			p.call(Vector3(float(lx), 0.25 if lx > -0.3 else 0.0, 1.12)), 0.20, 0.20)
-	lm.beam(mat, p.call(Vector3(0.75, 1.05, -0.35)), p.call(Vector3(0.75, 1.25, 0.75)), 0.42, 0.46)
-	lm.beam(mat, p.call(Vector3(0.75, 1.22, 0.68)), p.call(Vector3(0.75, 1.88, 1.12)), 0.26, 0.28)
-	for lx in [0.58, 0.92]:
-		lm.beam(mat, p.call(Vector3(float(lx), 1.0, -0.30)), p.call(Vector3(float(lx), 0.0, -0.52)), 0.12, 0.12)
-		lm.beam(mat, p.call(Vector3(float(lx), 1.18, 0.68)), p.call(Vector3(float(lx), 0.15, 0.95)), 0.11, 0.11)
 	lm.box(mat, base + Vector3(0.0, 0.10, 0.0), Vector3(3.2, 0.20, 4.2), b)
+	if bull_variant:
+		# Paul Jouve's striding gilded bull with curved horns + leaping fallow deer beside it
+		SculptureKit.rearing_horse(lm, mat, p.call(Vector3(-0.35, 0.20, -0.10)), 1.15, yaw, 0.06)
+		for hs in [-1.0, 1.0]:
+			var horn := PackedVector3Array([
+				p.call(Vector3(-0.35 + float(hs) * 0.16, 2.52, 1.52)),
+				p.call(Vector3(-0.35 + float(hs) * 0.48, 2.75, 1.72)),
+				p.call(Vector3(-0.35 + float(hs) * 0.58, 3.05, 1.88)),
+			])
+			SculptureKit.loft_tube(lm, mat, horn, PackedVector2Array([
+				Vector2(0.065, 0.065), Vector2(0.045, 0.045), Vector2(0.015, 0.015),
+			]), 8)
+		SculptureKit.rearing_horse(lm, mat, p.call(Vector3(0.78, 0.20, 0.20)), 0.72, yaw + 0.12, 0.24)
+	else:
+		# Georges Guyot's rearing gilded horses & hound
+		SculptureKit.rearing_horse(lm, mat, p.call(Vector3(-0.35, 0.20, -0.10)), 1.18, yaw, 0.28)
+		SculptureKit.rearing_horse(lm, mat, p.call(Vector3(0.75, 0.20, 0.15)), 0.78, yaw - 0.10, 0.14)

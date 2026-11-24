@@ -242,7 +242,7 @@ static func trevi(model: Node3D) -> void:
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#51493C", 3.0))
 	lm.use("Rock", LandmarkMaterials.pbr("rock", "#B7AA8E", 4.0))
 	lm.use("Water", LandmarkMaterials.pool_water("#2C8A96", 0.06))
-	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#EFEADF", 2.0))
+	lm.use("Marble", LandmarkMaterials.marble("#E2DDD2", 0.38))
 	var f := -10.0
 	var nz := Vector3(0, 0, 1)
 	# Palazzo Poli: body, rusticated ground storey, giant pilasters,
@@ -292,28 +292,56 @@ static func trevi(model: Node3D) -> void:
 	for s in [-1.0, 1.0]:
 		SEuParts.col(lm, "Trim", Vector3(s * 3.2, 3.0, f + 3.6), 0.4, 9.6, "corinthian", 10)
 		SEuParts.niche(lm, "Trim", "Shadow", Vector3(s * 8.8, 4.2, f + 3.05), nz, 2.6, 5.4, SEuParts.ROUND, 0.35)
-		SEuParts.figure(lm, "Marble", Vector3(s * 8.8, 4.4, f + 3.3), 3.4, s > 0.0)
+		SculptureKit.classical_figure(lm, "Marble", Vector3(float(s) * 8.8, 4.4, f + 3.3), 3.4, float(s) > 0.0, -float(s) * 0.18)
 		lm.box("Marble", Vector3(s * 8.8, 12.2, f + 3.1), Vector3(3.6, 2.4, 0.3))
 		SEuParts.figure(lm, "Marble", Vector3(s * 9.4, 11.2, f + 3.3), 1.6)
 		SEuParts.figure(lm, "Marble", Vector3(s * 8.2, 11.2, f + 3.3), 1.6)
-	# The reef across the front, Oceanus on his shell, sea-horses, tritons.
-	SEuUtil.blob(lm, "Rock", Vector3(0, 0, f + 5.0), 23.0, 4.2, 6.5, Vector3.ZERO, true, 8, 28)
-	for p in [Vector3(-14.0, 0, f + 6.0), Vector3(14.0, 0, f + 6.0), Vector3(-6.0, 0, f + 8.0), Vector3(6.0, 0, f + 8.0)]:
-		SEuUtil.blob(lm, "Rock", p, 4.0, 2.6, 3.0, Vector3.ZERO, true, 5, 12)
-	lm.lathe("Marble", Vector3(0, 4.0, f + 5.2), PackedVector2Array([Vector2(0.0, 0), Vector2(1.6, 0.2),
-		Vector2(2.4, 0.9), Vector2(2.2, 1.4)]), 12, 1.0, 0.7)
-	lm.box("Marble", Vector3(0, 5.3, f + 4.2), Vector3(1.8, 0.8, 1.6))
-	LandmarkKits.statue_figure(lm, "Marble", Vector3(0, 5.7, f + 4.4), 5.8, true)
+	# Stratified craggy Baroque travertine reef shelves across the front, Oceanus's shell chariot, sea-horses & Tritons.
+	SEuUtil.blob(lm, "Rock", Vector3(0, 0, f + 5.0), 23.0, 4.0, 6.2, Vector3.ZERO, true, 10, 32)
+	var crags := [
+		[-18.5, 0.0, 5.8, 5.2, 2.4, 3.2], [18.5, 0.0, 5.8, 5.2, 2.4, 3.2],
+		[-12.5, 0.0, 7.2, 4.8, 2.9, 3.6], [12.5, 0.0, 7.2, 4.8, 2.9, 3.6],
+		[-6.8, 0.0, 8.6, 4.4, 3.1, 3.8], [6.8, 0.0, 8.6, 4.4, 3.1, 3.8],
+		[0.0, 1.4, 6.8, 5.0, 2.4, 3.2], [0.0, 0.2, 9.2, 5.6, 2.0, 3.0],
+		[-9.6, 0.3, 9.4, 3.4, 1.8, 2.6], [9.6, 0.3, 9.4, 3.4, 1.8, 2.6],
+		[-15.8, 0.2, 8.2, 3.2, 1.6, 2.4], [15.8, 0.2, 8.2, 3.2, 1.6, 2.4],
+	]
+	for cr in crags:
+		SEuUtil.blob(lm, "Rock", Vector3(float(cr[0]), float(cr[1]), f + float(cr[2])),
+			float(cr[3]), float(cr[4]), float(cr[5]), Vector3.ZERO, true, 6, 14)
+	# Solid travertine rock pedestal & sculpted Baroque scalloped shell chariot cradling Oceanus
+	SEuUtil.blob(lm, "Rock", Vector3(0.0, 2.7, f + 4.8), 3.5, 2.7, 2.8, Vector3.ZERO, true, 6, 16)
+	var sh_centers := PackedVector3Array()
+	var sh_rows: Array = []
+	for j in 6:
+		var t := float(j) / 5.0
+		var y_sh := 4.15 + t * 1.30
+		var r_x := 0.01 if (j == 0 or j == 5) else lerpf(1.25, 2.55, sin(t * PI * 0.72))
+		var r_z := 0.01 if (j == 0 or j == 5) else lerpf(0.95, 1.65, sin(t * PI * 0.72))
+		sh_centers.append(Vector3(0.0, y_sh, f + 4.65))
+		var row := PackedVector3Array()
+		for i in 29:
+			var a := TAU * float(i) / 28.0 if i < 28 else 0.0
+			var flute := (1.0 + 0.08 * sin(a * 12.0) * sin(t * PI)) if (j > 0 and j < 5) else 1.0
+			row.append(Vector3(cos(a) * r_x * flute, y_sh, f + 4.65 + sin(a) * r_z * flute))
+		sh_rows.append(row)
+	SculptureKit.emit_rings(lm, "Marble", sh_centers, sh_rows)
+	# Upright scalloped shell backrest rising behind Oceanus's calves
+	for k in 7:
+		var u := (float(k) / 6.0) * 2.0 - 1.0
+		var ang := u * 1.05
+		var top_y := 6.85 + 0.45 * cos(u * PI * 0.5)
+		SculptureKit.loft_tube(lm, "Marble", PackedVector3Array([
+			Vector3(sin(ang) * 1.45, 5.15, f + 4.45 - cos(ang) * 0.65),
+			Vector3(sin(ang) * 2.35, top_y, f + 4.30 - cos(ang) * 1.05),
+		]), PackedVector2Array([Vector2(0.24, 0.16), Vector2(0.32, 0.14)]), 10)
+	SculptureKit.classical_figure(lm, "Marble", Vector3(0, 5.42, f + 4.65), 5.8, true, 0.0)
 	for s in [-1.0, 1.0]:
-		var hc := Vector3(s * 4.4, 1.6, f + 9.4)
-		SEuUtil.blob(lm, "Marble", hc, 1.2, 1.2, 2.2, Vector3.ZERO, false, 6, 10)
-		lm.beam("Marble", hc + Vector3(0, 0.6, 1.4), hc + Vector3(0, 2.6, 2.4), 0.8, 0.6)
-		lm.box("Marble", hc + Vector3(0, 2.9, 2.9), Vector3(0.6, 0.7, 1.2), Basis(Vector3.RIGHT, -0.4))
-		for k in 2:
-			lm.beam("Marble", hc + Vector3(s * 0.4 * (float(k) * 2.0 - 1.0), 0.3, 1.6),
-				hc + Vector3(s * 0.4 * (float(k) * 2.0 - 1.0), 1.4 + float(k) * 0.6, 2.8), 0.3, 0.3)
-		lm.beam("Marble", hc + Vector3(0, -0.4, -1.8), hc + Vector3(s * 1.6, 0.4, -3.6), 0.6, 0.5)
-		SEuParts.figure(lm, "Marble", Vector3(s * 6.6, 2.4, f + 8.4), 2.6, true)
+		var sf := float(s)
+		var yaw_out := sf * 0.38
+		var rear := 0.38 if sf < 0.0 else 0.18
+		SculptureKit.rearing_horse(lm, "Marble", Vector3(sf * 4.2, 1.55, f + 8.6), 1.32, yaw_out, rear)
+		SculptureKit.triton_figure(lm, "Marble", Vector3(sf * 6.8, 2.05, f + 8.4), 3.0, sf * 0.52, sf > 0.0)
 	# Basin: rim, water, the steps down from the piazza.
 	lm.box("Water", Vector3(0, 0.55, f + 15.0), Vector3(48.0, 0.1, 22.0))
 	lm.box("Travertine", Vector3(0, 0.6, f + 26.2), Vector3(50.0, 1.2, 0.8))

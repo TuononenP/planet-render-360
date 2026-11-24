@@ -123,63 +123,129 @@ static func arc_de_triomphe(model: Node3D) -> void:
 ## round them in the Cour Napoléon.
 static func louvre_pyramid(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Glass", LandmarkMaterials.glass("#92AAB8"))
-	lm.use("Frame", LandmarkMaterials.paint("#D5D9DC", 0.35, 0.8))
-	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#C2B8A6", 4.0))
-	lm.use("Water", LandmarkMaterials.pool_water())
-	lm.use("Granite", LandmarkMaterials.pbr("stone", "#6C6A66", 2.0))
-	lm.use("CoreLamp", LandmarkMaterials.night_lit("#FFCE80", 1.35, "#344048"))
-	LandmarkWestKit.blk(lm, "Paving", 0, 0.0, 0, 100.0, 0.05, 100.0)
-	LandmarkWestKit.blk(lm, "Granite", 0, 0, 0, 36.2, 0.25, 36.2)
-	# Warm amber interior core glowing softly through Pei's glass panes at night.
-	lm.spire("CoreLamp", Vector3(0, 0.4, 0), 14.5, 17.4)
-	_pyramid(lm, Vector3(0, 0.25, 0), 17.71, 21.39, 18, true)
-	for p in [Vector3(0, 0.25, -29), Vector3(29, 0.25, 0), Vector3(0, 0.25, 29)]:
-		LandmarkWestKit.blk(lm, "Granite", p.x, 0, p.z, 8.4, 0.25, 8.4)
+	lm.use("Glass", LandmarkMaterials.clear_glass("#D2EAF2", 0.20))
+	lm.use("Frame", LandmarkMaterials.paint("#DCE2E6", 0.24, 0.85))
+	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#C8BFA9", 4.0))
+	lm.use("HallStone", LandmarkMaterials.marble("#DFD5BE", 0.40))
+	lm.use("Water", LandmarkMaterials.pool_water("#2A6878", 0.05))
+	lm.use("Granite", LandmarkMaterials.pbr("stone", "#4F5256", 2.0, 0.28))
+	lm.use("CoreLamp", LandmarkMaterials.night_lit("#FFCE80", 1.45, "#CFC4AC"))
+	LandmarkWestKit.blk(lm, "Paving", 0, 0.0, 0, 108.0, 0.06, 108.0)
+	# Perimeter dark-granite curb around the Grand Pyramid opening into the sunlit Hall Napoléon atrium
+	for s in [-1.0, 1.0]:
+		var sf := float(s)
+		LandmarkWestKit.blk(lm, "Granite", sf * 17.65, 0.0, 0.0, 1.15, 0.34, 36.4)
+		LandmarkWestKit.blk(lm, "Granite", 0.0, 0.0, sf * 17.65, 34.2, 0.34, 1.15)
+	LandmarkWestKit.blk(lm, "HallStone", 0.0, 0.05, 0.0, 34.2, 0.08, 34.2)
+	# Sunken Hall Napoléon central oculus well, cylindrical glass lift & Pei's helical limestone staircase
+	lm.lathe("HallStone", Vector3(0.0, 0.12, 0.0), PackedVector2Array([
+		Vector2(5.2, 0.0), Vector2(5.2, 0.42), Vector2(4.5, 0.42), Vector2(4.5, 0.05),
+	]), 36, 1.0, 1.0, 0.0, true, false)
+	lm.lathe("CoreLamp", Vector3(0.0, 0.13, 0.0), PackedVector2Array([
+		Vector2(4.45, 0.0), Vector2(4.45, 0.12), Vector2(3.6, 0.12), Vector2(3.6, 0.0),
+	]), 32, 1.0, 1.0, 0.0, true, false)
+	lm.frustum("Frame", Vector3(0.0, 0.12, 0.0), 1.05, 1.05, 3.15, 20)
+	for st in 18:
+		var a := TAU * 0.82 * float(st) / 17.0
+		var r_mid := 2.65
+		var sx := cos(a) * r_mid
+		var sz := sin(a) * r_mid
+		lm.box("HallStone", Vector3(sx, 0.22 + 0.15 * float(st), sz),
+			Vector3(1.55, 0.14, 0.62), Basis(Vector3.UP, -a), 0.0)
+	_pyramid(lm, Vector3(0, 0.32, 0), 17.71, 21.32, 18, true)
+	# Three 5 m satellite pyramids: Pyramide Nord (-Z), Pyramide Est (+X), Pyramide Sud (+Z)
+	for p in [Vector3(0, 0.32, -31.5), Vector3(31.5, 0.32, 0), Vector3(0, 0.32, 31.5)]:
+		for s in [-1.0, 1.0]:
+			var sf := float(s)
+			LandmarkWestKit.blk(lm, "Granite", p.x + sf * 4.0, 0.0, p.z, 0.65, 0.34, 8.6)
+			LandmarkWestKit.blk(lm, "Granite", p.x, 0.0, p.z + sf * 4.0, 7.4, 0.34, 0.65)
+		LandmarkWestKit.blk(lm, "HallStone", p.x, 0.05, p.z, 7.4, 0.08, 7.4)
 		_pyramid(lm, p, 3.9, 4.95, 5, false)
-	# Triangular basins in polished granite, two flanking each small pyramid.
+	# True I. M. Pei Cour Napoléon fountain complex (~5,120 m² of non-overlapping dark-granite
+	# triangular reflecting basins framing the Grand Pyramid & three satellite pyramids, leaving
+	# the West (-X) visitor entrance forecourt open).
 	var fk := FountainKit.new()
-	for side in 3:
-		var b := Basis(Vector3.UP, -PI * 0.5 * float(side))
-		for sgn in [-1.0, 1.0]:
-			var tri := [Vector2(sgn * 8.0, -21.0), Vector2(sgn * 40.0, -21.0), Vector2(sgn * 8.0, -45.0)]
-			var poly := PackedVector2Array()
-			for q in tri:
-				var v2: Vector2 = q
-				var w: Vector3 = b * Vector3(v2.x, 0, v2.y)
-				poly.append(Vector2(w.x, w.z))
-			lm.poly_prism("Granite", poly, 0.05, 0.45)
-			var inner := PackedVector2Array()
-			var cen := (poly[0] + poly[1] + poly[2]) / 3.0
-			for q in poly:
-				inner.append(cen + (q - cen) * 0.9)
-			lm.poly_prism("Water", inner, 0.45, 0.5)
-			for k in 4:
-				var jp := cen + (poly[0] - cen) * (0.2 * float(k) - 0.2)
-				fk.jet_plume(Vector3(jp.x, 0.5, jp.y), 2.35, 0.08, 0.24)
-				fk.splash_ring(Vector3(jp.x, 0.5, jp.y), 1.15, 0.78)
-	# Glazed entrance canopy on the west face.
-	lm.box("Frame", Vector3(-18.6, 1.6, 0), Vector3(1.6, 0.25, 5.0))
+	var basins := [
+		# Two huge East-quadrant right-triangle fountain basins flanking Pyramide Est (+X)
+		[PackedVector2Array([Vector2(19.2, -5.6), Vector2(48.5, -5.6), Vector2(19.2, -34.9)]), true],
+		[PackedVector2Array([Vector2(19.2, 5.6), Vector2(19.2, 34.9), Vector2(48.5, 5.6)]), true],
+		# Two large North-quadrant right-triangle fountain basins flanking Pyramide Nord (-Z)
+		[PackedVector2Array([Vector2(5.6, -19.2), Vector2(34.9, -19.2), Vector2(5.6, -48.5)]), true],
+		[PackedVector2Array([Vector2(-5.6, -19.2), Vector2(-5.6, -48.5), Vector2(-34.9, -19.2)]), false],
+		# Two large South-quadrant right-triangle fountain basins flanking Pyramide Sud (+Z)
+		[PackedVector2Array([Vector2(5.6, 19.2), Vector2(5.6, 48.5), Vector2(34.9, 19.2)]), true],
+		[PackedVector2Array([Vector2(-5.6, 19.2), Vector2(-34.9, 19.2), Vector2(-5.6, 48.5)]), false],
+		# Diagonal NE & SE mirror triangles filling the square courtyard between the walkways
+		[PackedVector2Array([Vector2(21.2, -36.9), Vector2(48.5, -9.6), Vector2(48.5, -36.9)]), true],
+		[PackedVector2Array([Vector2(21.2, 36.9), Vector2(48.5, 36.9), Vector2(48.5, 9.6)]), true],
+	]
+	var wat_y := 0.54
+	for entry in basins:
+		var poly: PackedVector2Array = entry[0]
+		var tall_gerbes: bool = entry[1]
+		# Granite basin plinth below water + raised 0.55 m wide polished granite coping kerb around perimeter
+		lm.poly_prism("Granite", poly, 0.06, 0.44)
+		for e_i in poly.size():
+			var pa := poly[e_i]
+			var pb := poly[(e_i + 1) % poly.size()]
+			lm.beam("Granite", Vector3(pa.x, 0.52, pa.y), Vector3(pb.x, 0.52, pb.y), 0.55, 0.20, Vector3.UP)
+		var cen := (poly[0] + poly[1] + poly[2]) / 3.0
+		var inner := PackedVector2Array()
+		for q in poly:
+			inner.append(q + (cen - q).normalized() * 0.48)
+		lm.poly_prism("Water", inner, 0.44, wat_y)
+		# Volumetric rows of tall pressurized Cour Napoléon water columns (5.5 m - 9.2 m high!)
+		if tall_gerbes:
+			var p_main := poly[0].lerp(cen, 0.72)
+			fk.jet_plume(Vector3(p_main.x, wat_y, p_main.y), 9.2, 0.22, 0.68)
+			fk.splash_ring(Vector3(p_main.x, wat_y, p_main.y), 3.2, 0.92)
+			fk.mist_emitter(Vector3(p_main.x, wat_y + 0.6, p_main.y), 3.4, 2.2, 3)
+			for k in 7:
+				var u := 0.12 + 0.125 * float(k)
+				var row_a := poly[0].lerp(poly[1], u)
+				var row_b := poly[0].lerp(poly[2], u)
+				var pt := row_a.lerp(row_b, 0.5)
+				var h_jet := lerpf(7.6, 4.8, absf(float(k) - 3.0) / 3.5)
+				fk.jet_plume(Vector3(pt.x, wat_y, pt.y), h_jet, 0.16, 0.48)
+				fk.splash_ring(Vector3(pt.x, wat_y, pt.y), 2.1, 0.84)
+		else:
+			# NW / SW basins flanking the entrance parvis: graceful stepped 4.8 - 6.8 m plumes
+			for k in 6:
+				var u := 0.15 + 0.14 * float(k)
+				var pt := poly[1].lerp(poly[2], u).lerp(poly[0], 0.38)
+				var h_jet := lerpf(6.8, 4.6, absf(float(k) - 2.5) / 3.0)
+				fk.jet_plume(Vector3(pt.x, wat_y, pt.y), h_jet, 0.15, 0.45)
+				fk.splash_ring(Vector3(pt.x, wat_y, pt.y), 1.9, 0.82)
+			fk.mist_emitter(Vector3(cen.x, wat_y + 0.5, cen.y), 2.6, 1.8, 2)
+	# Glazed entrance canopy on the west (-X) face.
+	lm.box("Frame", Vector3(-18.6, 1.65, 0), Vector3(1.6, 0.25, 5.0))
 	for sz in [-2.4, 2.4]:
-		lm.box("Frame", Vector3(-19.2, 0.85, sz), Vector3(0.18, 1.6, 0.18), Basis(), 0.0)
-	lm.box("Glass", Vector3(-17.9, 1.3, 0), Vector3(0.05, 2.5, 4.4), Basis(), 0.0)
-	lm.commit(model)
+		lm.box("Frame", Vector3(-19.2, 0.90, sz), Vector3(0.18, 1.6, 0.18), Basis(), 0.0)
+	lm.box("Glass", Vector3(-17.9, 1.35, 0), Vector3(0.05, 2.5, 4.4), Basis(), 0.0)
+	var parts := lm.commit(model)
+	var glass_sh := LandmarkMaterials.clear_glass_shader("#D8EEF5", 0.14)
+	for mi in parts:
+		if mi.name == "Glass":
+			mi.set_surface_override_material(0, glass_sh)
+			# Let real sunlight pour through the clear glass so the steel lattice casts shadows inside!
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	fk.commit(model)
 
-## Glass pyramid on `c`: glass skin, the diagonal lattice of n courses a
-## face (members parallel to the hip edges), hips and base frame; with
-## `truss`, the inner space truss — a second lattice 1.2 m inside joined
-## by a strut at every node.
+## Glass pyramid on `c`: glass skin with lattice-aligned rhombic pane UVs,
+## the diagonal lattice of n courses a face (members parallel to the hip edges),
+## hips and base frame; with `truss`, the inner space truss — a second lattice
+## 1.2 m inside joined by a strut at every node.
 static func _pyramid(lm: LandmarkMesh, c: Vector3, hw: float, h: float, n: int, truss: bool) -> void:
-	lm.spire("Glass", c, hw, h)
 	var apex := c + Vector3(0, h, 0)
 	var w := hw * 0.006 + 0.08
 	var corners := [Vector3(-hw, 0, -hw), Vector3(hw, 0, -hw), Vector3(hw, 0, hw), Vector3(-hw, 0, hw)]
+	var nf := float(n)
 	for i in 4:
 		var a: Vector3 = c + corners[i]
 		var b: Vector3 = c + corners[(i + 1) % 4]
 		var fo := ((a + b) * 0.5 - c).normalized()
 		var fn := (fo * h + Vector3.UP * hw).normalized()
+		lm.tri("Glass", a, b, apex, fn, fn, fn, Vector2(0.0, 0.0), Vector2(nf, 0.0), Vector2(0.0, nf))
 		var out := fn * 0.05
 		lm.beam("Frame", a, b, w * 3.0, w * 2.0)
 		lm.beam("Frame", a, apex, w * 2.2)

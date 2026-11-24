@@ -108,47 +108,9 @@ static func minaret(lm: LandmarkMesh, shaft: String, cap: String, base: Vector3,
 	lm.frustum(cap, tip - Vector3(0, r * 0.3, 0), r * 0.05, r * 0.05, r * 0.7, 6)
 	lm.lathe(cap, tip + Vector3(0, r * 0.2, 0), _dome_profile(r * 0.12, r * 0.12, 4), 8)
 
-## Standing robed figure of height h, feet at `base`: plinth-height
-## feet, a draped skirt with folds, torso, shoulders, neck, head and
-## two jointed arms (the right raised when `arm_up`, holding up a torch
-## or wreath). The statue kit for monuments on a pedestal.
+## Standing robed figure of height h, feet at `base`: fluted classical
+## drapery folds, contrapposto torso, sculpted facial profile & hair, and
+## smooth anatomical multi-jointed arms via SculptureKit.
 static func statue_figure(lm: LandmarkMesh, key: String, base: Vector3, h: float,
-		arm_up: bool = false) -> void:
-	# Robe: lathed, slightly deeper than wide, with folds from a few
-	# narrow lathes laid round it.
-	var robe := PackedVector2Array([Vector2(h * 0.15, 0), Vector2(h * 0.16, h * 0.04),
-		Vector2(h * 0.13, h * 0.2), Vector2(h * 0.115, h * 0.38), Vector2(h * 0.1, h * 0.5)])
-	lm.lathe(key, base, robe, 20, 1.0, 0.8)
-	for i in 7:
-		var a := TAU * float(i) / 7.0 + 0.3
-		var d := Vector3(cos(a), 0, sin(a) * 0.8)
-		lm.frustum(key, base + d * h * 0.125, h * 0.018, h * 0.01, h * 0.42, 6)
-	# Torso, waist to shoulders.
-	var tb := base + Vector3(0, h * 0.5, 0)
-	lm.lathe(key, tb, PackedVector2Array([Vector2(h * 0.1, 0), Vector2(h * 0.095, h * 0.08),
-		Vector2(h * 0.11, h * 0.18), Vector2(h * 0.115, h * 0.25), Vector2(h * 0.07, h * 0.3)]), 16, 1.0, 0.7)
-	var sh := base + Vector3(0, h * 0.77, 0)
-	lm.box(key, sh, Vector3(h * 0.26, h * 0.05, h * 0.12), Basis(), 0.0)
-	lm.frustum(key, base + Vector3(0, h * 0.79, 0), h * 0.035, h * 0.032, h * 0.05, 10)
-	# Head: a lathed ovoid with a chin and the crown of the skull.
-	var hb := base + Vector3(0, h * 0.835, 0)
-	lm.lathe(key, hb, PackedVector2Array([Vector2(h * 0.0, 0), Vector2(h * 0.035, h * 0.01),
-		Vector2(h * 0.05, h * 0.04), Vector2(h * 0.055, h * 0.08), Vector2(h * 0.048, h * 0.12),
-		Vector2(h * 0.03, h * 0.15), Vector2(0.0, h * 0.165)]), 14, 0.9, 1.0)
-	# Arms: upper arm and forearm as tapered beams, a hand at the end.
-	for side in [-1.0, 1.0]:
-		var s: float = side
-		var shoulder := sh + Vector3(s * h * 0.12, 0, 0)
-		var elbow: Vector3
-		var hand: Vector3
-		if arm_up and s > 0.0:
-			elbow = shoulder + Vector3(s * h * 0.05, h * 0.1, 0)
-			hand = elbow + Vector3(s * h * 0.02, h * 0.1, 0)
-			lm.frustum(key, hand, h * 0.02, h * 0.028, h * 0.025, 8)
-			lm.lathe(key, hand + Vector3(0, h * 0.025, 0), _dome_profile(h * 0.03, h * 0.02, 4), 8)
-		else:
-			elbow = shoulder + Vector3(s * h * 0.035, -h * 0.15, h * 0.02)
-			hand = elbow + Vector3(-s * h * 0.03, -h * 0.03, h * 0.12)
-		lm.beam(key, shoulder, elbow, h * 0.055, h * 0.05)
-		lm.beam(key, elbow, hand, h * 0.045, h * 0.04)
-		lm.box(key, hand, Vector3(h * 0.035, h * 0.04, h * 0.035), Basis(), 0.0)
+		arm_up: bool = false, yaw: float = 0.0) -> void:
+	SculptureKit.classical_figure(lm, key, base, h, arm_up, yaw)

@@ -177,7 +177,7 @@ uniform float units_per_metre = 1.0;
 // @CLOUD_SHADOW
 
 varying vec3 wpos;
-varying vec3 vcol;
+varying vec4 vcol;
 
 float fl_hash(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -194,13 +194,13 @@ float fl_noise(vec2 x) {
 }
 
 void vertex() {
-	vcol = COLOR.rgb;
+	vcol = COLOR;
 	vec3 pos = VERTEX;
 	float flow_m = UV.y;
 	float aero = COLOR.r;
 	// Gentle aerodynamic flutter along the falling/rising stream.
-	float flutter = sin(flow_m * 3.8 - TIME * 7.2 + pos.x * 2.1 + pos.z * 1.9) * 0.022
-		+ cos(flow_m * 7.5 - TIME * 11.4 + pos.z * 3.3) * 0.011;
+	float flutter = sin(flow_m * 3.8 - TIME * 7.2 + pos.x * 2.1 + pos.z * 1.9) * 0.018
+		+ cos(flow_m * 7.5 - TIME * 11.4 + pos.z * 3.3) * 0.009;
 	pos += NORMAL * flutter * smoothstep(0.0, 0.45, flow_m) * (0.4 + 0.6 * aero);
 	VERTEX = pos;
 	wpos = (MODEL_MATRIX * vec4(pos, 1.0)).xyz;
@@ -218,23 +218,36 @@ void fragment() {
 	float aero = clamp(vcol.r, 0.0, 1.0);
 	float spd = max(vcol.g * 6.0, 1.2);
 	float mask_end = clamp(vcol.b, 0.0, 1.0);
-
-	// Soft ribbon edge feathering so crossed planes never show sharp cuts.
-	float edge = smoothstep(0.0, 0.24, across) * (1.0 - smoothstep(0.76, 1.0, across));
-	float core = exp(-pow((across - 0.5) * 2.5, 2.0));
-
-	// Dual-octave elongated flowing water filaments scrolling with gravity.
+	bool is_sheet = vcol.a > 0.5;
 	float t = TIME;
-	vec2 uv1 = vec2(across * 4.2 + sin(along * 1.4 - t * 2.4) * 0.18, along * 1.35 - t * spd * 0.75);
-	vec2 uv2 = vec2(across * 10.5 - sin(along * 2.6 - t * 3.5) * 0.22, along * 3.1 - t * spd * 1.25);
-	float n1 = fl_noise(uv1);
-	float n2 = fl_noise(uv2);
-	float streak = smoothstep(0.24, 0.84, n1 * 0.62 + n2 * 0.38);
-	// Fine broken droplets appear as aeration rises.
-	float drops = smoothstep(0.42, 0.88, fl_noise(vec2(across * 18.0, along * 5.8 - t * spd * 1.65)));
 
-	float body = mix(0.45 + 0.55 * streak, streak * 0.75 + drops * 0.45, aero);
-	float alpha = clamp((edge * 0.72 + core * 0.38) * body * mask_end * mix(0.68, 0.86, aero), 0.0, 0.88) * dfade;
+	float streak = 0.0;
+	float drops = 0.0;
+	float alpha = 0.0;
+	if (!is_sheet) {
+		// Narrow pressurized ribbon (jet_plume & arc_stream): soft 0..1 edge feathering.
+		float edge = smoothstep(0.0, 0.24, across) * (1.0 - smoothstep(0.76, 1.0, across));
+		float core = exp(-pow((across - 0.5) * 2.5, 2.0));
+		vec2 uv1 = vec2(across * 5.2 + sin(along * 1.6 - t * 2.4) * 0.16, along * 1.45 - t * spd * 0.78);
+		vec2 uv2 = vec2(across * 14.0 - sin(along * 2.8 - t * 3.6) * 0.20, along * 3.4 - t * spd * 1.30);
+		streak = smoothstep(0.22, 0.84, fl_noise(uv1) * 0.56 + fl_noise(uv2) * 0.44);
+		float threads = smoothstep(0.32, 0.86, fl_noise(vec2(across * 28.0, along * 4.6 - t * spd * 1.55)));
+		drops = smoothstep(0.46, 0.90, fl_noise(vec2(across * 36.0 + 3.7, along * 11.5 - t * spd * 1.95)));
+		float body = mix(0.42 + 0.58 * streak, streak * 0.52 + threads * 0.34 + drops * 0.36, aero);
+		alpha = clamp((edge * 0.68 + core * 0.42) * body * mask_end * mix(0.66, 0.88, aero), 0.0, 0.90) * dfade;
+	} else {
+		// Continuous metre-scaled curtain / cascade sheet: glassy rim lip breaking into
+		// hundreds of fine gravity-stretched vertical water threads & translucent gaps.
+		float lip_glass = 1.0 - smoothstep(0.04, 0.42, along);
+		float fold = fl_noise(vec2(across * 3.5, along * 0.50 - t * spd * 0.48));
+		float riv = fl_noise(vec2(across * 12.5 + (fold - 0.5) * 0.55, along * 0.90 - t * spd * 0.92));
+		float thr = fl_noise(vec2(across * 28.0, along * 1.55 - t * spd * 1.35));
+		drops = smoothstep(0.50, 0.92, fl_noise(vec2(across * 44.0 + 3.1, along * 4.8 - t * spd * 1.80)));
+		streak = smoothstep(0.28, 0.80, riv);
+		float strands = streak * 0.46 + smoothstep(0.35, 0.86, thr) * 0.44 + drops * 0.30;
+		float veil = mix(strands, 0.52 + 0.34 * riv, lip_glass * 0.65);
+		alpha = clamp((0.12 + 0.72 * veil) * (0.80 + 0.20 * fold) * mask_end * mix(0.56, 0.82, aero), 0.0, 0.80) * dfade;
+	}
 	if (alpha < 0.015) {
 		discard;
 	}
@@ -243,8 +256,9 @@ void fragment() {
 	float sun_up = smoothstep(0.04, 0.28, cloud_sun_dir.y);
 	vec3 view_d = normalize(CAMERA_POSITION_WORLD - wpos);
 	float fres = pow(1.0 - abs(dot(NORMAL, view_d)), 2.2);
-	float foam_w = clamp(aero * 0.75 + streak * 0.35 + drops * 0.25, 0.0, 1.0);
-	vec3 col = mix(water_tint.rgb, foam_tint.rgb, foam_w);
+	float foam_w = clamp((is_sheet ? 0.32 : 0.0) + aero * 0.68 + streak * 0.36 + drops * 0.26, 0.0, 1.0);
+	vec3 base_aqua = is_sheet ? mix(water_tint.rgb, vec3(0.84, 0.93, 0.96), 0.55) : water_tint.rgb;
+	vec3 col = mix(base_aqua, foam_tint.rgb, foam_w);
 	// Subtle sunlit forward/rim scatter on water droplets (no night self-glow).
 	float fwd = pow(max(dot(-view_d, normalize(cloud_sun_dir)), 0.0), 3.0) * sun_up * (1.0 - csh);
 	col = mix(col, vec3(1.0, 0.99, 0.96), clamp(fres * 0.35 + fwd * 0.28, 0.0, 0.55));

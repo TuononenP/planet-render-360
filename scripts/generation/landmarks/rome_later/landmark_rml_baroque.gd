@@ -25,7 +25,7 @@ static func navona(model: Node3D) -> void:
 	lm.use("Dome", LandmarkMaterials.pbr("concrete", "#8E9291", 3.0, 0.55, 0.3))
 	lm.use("Gold", LandmarkMaterials.gold())
 	lm.use("Rock", LandmarkMaterials.pbr("rock", "#B7AA8E", 4.0))
-	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#EDE8DC", 2.0))
+	lm.use("Marble", LandmarkMaterials.marble("#E2DDD2", 0.38))
 	lm.use("Water", LandmarkMaterials.pool_water("#2E7884", 0.07))
 	lm.use("Ochre", LandmarkMaterials.pbr("render", "#C9965F", 4.0))
 	lm.use("Rose", LandmarkMaterials.pbr("render", "#C58468", 4.0))
@@ -101,9 +101,9 @@ static func _four_rivers(lm: LandmarkMesh) -> void:
 		SEuUtil.blob(lm, "Rock", Vector3(cos(a) * 8.4, 0.7, sin(a) * 8.4), 1.8, 1.6, 1.5, Vector3.ZERO, true, 4, 8)
 	for k in 4:
 		var a := PI * 0.25 + PI * 0.5 * float(k)
-		var p := Vector3(cos(a) * 8.0, 2.8, sin(a) * 8.0)
-		lm.box("Rock", p + Vector3(0, -0.6, 0), Vector3(3.2, 1.2, 3.2), Basis(Vector3.UP, -a))
-		LandmarkKits.statue_figure(lm, "Marble", p, 4.4, k % 2 == 0)
+		var p := Vector3(cos(a) * 8.6, 3.25, sin(a) * 8.6)
+		lm.box("Rock", p + Vector3(0, -0.65, 0), Vector3(3.2, 1.3, 3.2), Basis(Vector3.UP, -a))
+		SculptureKit.triton_figure(lm, "Marble", p, 4.3, atan2(cos(a), sin(a)), false)
 	# The grotto: arched openings through the rock on the four axes.
 	for k in 4:
 		var g := PI * 0.5 * float(k)
@@ -117,9 +117,8 @@ static func _four_rivers(lm: LandmarkMesh) -> void:
 		var a := TAU * float(k) / 7.0
 		var t := palm + Vector3(0.8, 7.5, 0.4)
 		lm.beam("Marble", t, t + Vector3(cos(a) * 2.4, -0.9, sin(a) * 2.4), 0.6, 0.08, Vector3.UP)
-	lm.box("Marble", Vector3(5.6, 3.2, -2.5), Vector3(1.0, 1.1, 2.4))
-	lm.box("Marble", Vector3(5.6, 3.9, -1.2), Vector3(1.0, 1.0, 0.9))
-	LandmarkRmLUtil.horse(lm, "Marble", Vector3(2.0, 2.4, 5.6))
+	SculptureKit.couchant_lion(lm, "Marble", Vector3(6.2, 2.3, -2.2), 2.8, PI * 0.35)
+	SculptureKit.rearing_horse(lm, "Marble", Vector3(1.8, 2.1, 6.2), 1.05, 0.2, 0.28)
 	# Pedestal, obelisk and dove.
 	lm.box("Rock", Vector3(0, 9.85, 0), Vector3(4.4, 2.3, 4.4))
 	lm.box("Trim", Vector3(0, 11.2, 0), Vector3(3.6, 0.6, 3.6))
@@ -152,7 +151,7 @@ static func _side_fountain(lm: LandmarkMesh, c: Vector3, moro: bool) -> void:
 		var a := PI * 0.25 + PI * 0.5 * float(k)
 		var p := c + Vector3(cos(a) * 7.0 * 1.3, 1.0, sin(a) * 5.6)
 		lm.box("Marble", p + Vector3(0, 0.4, 0), Vector3(1.2, 0.8, 1.2))
-		LandmarkKits.statue_figure(lm, "Marble", p + Vector3(0, 0.8, 0), 2.2)
+		SculptureKit.triton_figure(lm, "Marble", p + Vector3(0, 0.8, 0), 2.15, atan2(-cos(a), -sin(a)), true)
 
 ## Sant'Agnese in Agone: concave facade on an arc between the towers
 ## (front of the towers at z = -21.5), church body and dome behind.

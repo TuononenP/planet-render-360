@@ -177,7 +177,7 @@ static func popolo(model: Node3D) -> void:
 	lm.use("Ochre", LandmarkMaterials.pbr("render", "#C9965F", 4.0))
 	lm.use("Water", LandmarkMaterials.pool_water("#2E7480", 0.07))
 	lm.use("Gold", LandmarkMaterials.gold())
-	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#EDE8DC", 2.0))
+	lm.use("Marble", LandmarkMaterials.marble("#E2DDD2", 0.38))
 	_church(lm, 21.0, 8.4, 8.4, 6.0, 9.0, 4.5, 22.0, 8)
 	_church(lm, -21.0, 7.4, 9.4, 6.5, 8.0, 4.5, 21.5, 12)
 	for s in [-1.0, 1.0]:
@@ -230,14 +230,9 @@ static func _popolo_flow(model: Node3D, o: Vector3) -> void:
 			fk.splash_ring(ld, 0.9, 0.72)
 	fk.commit(model)
 
-## A seated Egyptian-style lion facing d on its plinth top `p`.
+## A seated Egyptian-style couchant lion facing `d` on its plinth top `p`.
 static func _lion(lm: LandmarkMesh, p: Vector3, d: Vector3) -> void:
-	var b := Basis(Vector3.UP.cross(d), Vector3.UP, d)
-	lm.box("Marble", p + d * -0.3 + Vector3(0, 0.45, 0), Vector3(0.9, 0.9, 2.0), b)
-	lm.box("Marble", p + d * 0.6 + Vector3(0, 0.25, 0), Vector3(0.8, 0.5, 0.6), b)
-	lm.lathe("Marble", p + d * 0.55 + Vector3(0, 0.8, 0), PackedVector2Array([Vector2(0.55, 0.0),
-		Vector2(0.6, 0.35), Vector2(0.45, 0.7), Vector2(0.0, 0.85)]), 10)
-	lm.box("Marble", p + d * 0.9 + Vector3(0, 1.05, 0), Vector3(0.4, 0.35, 0.4), b)
+	SculptureKit.couchant_lion(lm, "Marble", p, 2.5, atan2(d.x, d.z))
 
 ## Hemicycle on the east or west side of the piazza: a curved wall with
 ## statues on its parapet and a fountain with a figure group, opening

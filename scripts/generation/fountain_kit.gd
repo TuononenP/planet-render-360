@@ -45,14 +45,16 @@ func _foam_quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3,
 	_bc.append_array([col, col, col, col, col, col])
 
 ## Multi-fin vertical rising & feathering fountain jet plume.
-## `fins` crossed vertical ribbons taper slightly through the waist, flare softly
-## toward the aerated crest and curtain downward at the tip.
+## Combines a tight, high-velocity rising core with a delicate, wider outer
+## falling droplet sheath (no solid barrel), so tall jets read as slender
+## pressurized water columns showering mist & droplets.
 func jet_plume(base: Vector3, height: float, r_base: float = 0.14,
 		r_apex: float = 0.34, wind_lean: Vector2 = Vector2.ZERO, fins: int = 4) -> void:
 	if height <= 0.05:
 		return
-	var segs := 8
-	var spd := clampf((2.8 + sqrt(height) * 1.4) / 6.0, 0.25, 1.0)
+	var segs := 10
+	var spd := clampf((3.2 + sqrt(height) * 1.5) / 6.0, 0.35, 1.0)
+	var core_top_r := minf(r_apex * 0.52, r_base * 2.1)
 	for f in fins:
 		var ang := PI * float(f) / float(fins)
 		var side := Vector3(cos(ang), 0.0, sin(ang))
@@ -63,16 +65,15 @@ func jet_plume(base: Vector3, height: float, r_base: float = 0.14,
 		var prev_c := Color.WHITE
 		for i in segs + 1:
 			var t := float(i) / float(segs)
-			# Profile: tight coherent jet near nozzle, swelling into aerated plume near apex.
-			var flare := sin(t * PI * 0.82)
-			var w := lerpf(r_base, r_apex, clampf(flare * 0.85 + t * 0.35, 0.0, 1.0)) * (1.0 - 0.32 * pow(t, 4.0))
+			# Slender pressurized spear: tight at nozzle, graceful feathering near crest.
+			var w := lerpf(r_base, core_top_r, pow(t, 0.72)) * (1.0 - 0.55 * pow(t, 5.0))
 			var drift := Vector3(wind_lean.x, 0.0, wind_lean.y) * (t * t)
 			var p := base + Vector3(0.0, height * t, 0.0) + drift
 			var pl := p - side * w
 			var pr := p + side * w
-			var aero := clampf(0.28 + t * 0.72, 0.0, 1.0)
-			var end_fade := smoothstep(0.0, 0.08, t) * (1.0 - smoothstep(0.76, 1.0, t))
-			var col := Color(aero, spd, clampf(end_fade, 0.05, 1.0), 1.0)
+			var aero := clampf(0.24 + t * 0.76, 0.0, 1.0)
+			var end_fade := smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.78, 1.0, t))
+			var col := Color(aero, spd, clampf(end_fade, 0.06, 1.0), 0.0)
 			var v := t * height
 			if i > 0:
 				_flow_quad(prev_l, prev_r, pr, pl, norm, norm, norm, norm,
@@ -82,10 +83,41 @@ func jet_plume(base: Vector3, height: float, r_base: float = 0.14,
 			prev_r = pr
 			prev_v = v
 			prev_c = col
-	# Outer falling curtain veil around tall plumes (> 2.2 m).
-	if height >= 2.2:
-		var veil_r := maxf(r_apex * 1.15, r_base * 2.2)
-		bowl_curtain(base, veil_r * 0.45, height * 0.86, 0.0, veil_r * 1.1, 10, 1.0, 1.0, 0.65)
+	# Delicate translucent falling droplet sheath around plumes >= 2.0 m (angled fins, downward UV flow).
+	if height >= 2.0:
+		var sheath_fins := 5
+		var r_top := core_top_r * 0.85
+		var r_bot := maxf(r_apex * 0.92, r_base * 2.4)
+		var h_top := height * 0.92
+		var fall_spd := clampf((2.6 + sqrt(height) * 1.2) / 6.0, 0.35, 0.95)
+		for f in sheath_fins:
+			var ang := TAU * (float(f) + 0.5) / float(sheath_fins)
+			var dir := Vector3(cos(ang), 0.0, sin(ang))
+			var tang := Vector3(-dir.z, 0.0, dir.x)
+			var prev_l := Vector3.ZERO
+			var prev_r := Vector3.ZERO
+			var prev_v := 0.0
+			var prev_c := Color.WHITE
+			for i in 7:
+				var t := float(i) / 6.0 # 0 = apex crest -> 1 = splash base
+				var y := h_top * (1.0 - t * t * 0.65 - t * 0.35)
+				var rad := lerpf(r_top, r_bot, sqrt(t))
+				var rib_w := lerpf(r_top * 0.55, r_bot * 0.48, t)
+				var drift := Vector3(wind_lean.x, 0.0, wind_lean.y) * (1.0 - t * 0.35)
+				var c_pt := base + dir * rad + Vector3(0.0, y, 0.0) + drift
+				var pl := c_pt - tang * rib_w
+				var pr := c_pt + tang * rib_w
+				var fade := smoothstep(0.0, 0.18, t) * (1.0 - smoothstep(0.75, 1.0, t)) * 0.48
+				var col := Color(0.92, fall_spd, clampf(fade, 0.02, 0.52), 0.0)
+				var v := t * h_top
+				if i > 0:
+					_flow_quad(prev_l, prev_r, pr, pl, dir, dir, dir, dir,
+						Vector2(0.0, prev_v), Vector2(1.0, prev_v), Vector2(1.0, v), Vector2(0.0, v),
+						prev_c, prev_c, col, col)
+				prev_l = pl
+				prev_r = pr
+				prev_v = v
+				prev_c = col
 
 ## Smooth parabolic water arc spouting from `start` to `end` with extra `apex_lift`.
 ## Built as two orthogonal crossed ribbons along the true gravity parabola so it
@@ -132,7 +164,7 @@ func arc_stream(start: Vector3, end: Vector3, apex_lift: float = 0.6,
 			var pr := pts[i] + side * hw
 			var aero := clampf(lerpf(0.22, aeration_end, pow(t, 0.75)), 0.0, 1.0)
 			var end_fade := smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.90, 1.0, t))
-			var col := Color(aero, spd, clampf(end_fade, 0.12, 1.0), 1.0)
+			var col := Color(aero, spd, clampf(end_fade, 0.12, 1.0), 0.0)
 			var v := lens[i]
 			if i > 0:
 				_flow_quad(prev_l, prev_r, pr, pl, prev_n, prev_n, norm, norm,
@@ -148,12 +180,15 @@ func arc_stream(start: Vector3, end: Vector3, apex_lift: float = 0.6,
 ## `center` is at y = 0 reference; sheet falls from `y_top` to `y_bottom`, curving
 ## outward from `radius` to `radius + flare_out`.
 func bowl_curtain(center: Vector3, radius: float, y_top: float, y_bottom: float,
-		flare_out: float = 0.45, segs: int = 24, sx: float = 1.0, sz: float = 1.0,
+		flare_out: float = 0.45, segs: int = 48, sx: float = 1.0, sz: float = 1.0,
 		aero_base: float = 0.30) -> void:
 	var drop := y_top - y_bottom
 	if drop <= 0.05 or radius <= 0.05:
 		return
-	var v_segs := 6
+	var seg_n := maxi(segs, 48)
+	if seg_n % 2 != 0:
+		seg_n += 1
+	var v_segs := 8
 	var spd := clampf((2.4 + sqrt(drop) * 1.5) / 6.0, 0.35, 1.0)
 	var rows: Array = []
 	var norms: Array = []
@@ -171,21 +206,21 @@ func bowl_curtain(center: Vector3, radius: float, y_top: float, y_bottom: float,
 			var py := y_top - drop * (pt * pt * 0.72 + pt * 0.28)
 			acc += Vector2(r_off - pr_off, y - py).length()
 		vs.append(acc)
-		var aero := clampf(lerpf(aero_base, 0.94, pow(t, 0.7)), 0.0, 1.0)
-		var fade := smoothstep(0.0, 0.08, t) * (1.0 - smoothstep(0.92, 1.0, t))
-		cols.append(Color(aero, spd, clampf(fade, 0.18, 1.0), 1.0))
+		var aero := clampf(lerpf(aero_base, 0.92, pow(t, 0.7)), 0.0, 1.0)
+		var fade := smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.92, 1.0, t))
+		cols.append(Color(aero, spd, clampf(fade, 0.24, 1.0), 1.0))
 		var ring := PackedVector3Array()
 		var nring := PackedVector3Array()
-		for i in segs + 1:
-			var a := TAU * float(i) / float(segs)
+		for i in seg_n + 1:
+			var a := TAU * float(i) / float(seg_n)
 			var dir := Vector3(cos(a), 0.0, sin(a))
 			ring.append(Vector3(center.x + dir.x * (radius + r_off) * sx,
 				center.y + y, center.z + dir.z * (radius + r_off) * sz))
 			nring.append(Vector3(dir.x / sx, 0.25 * (1.0 - t), dir.z / sz).normalized())
 		rows.append(ring)
 		norms.append(nring)
-	var circ := TAU * (radius + flare_out * 0.5) * (sx + sz) * 0.5
-	var tiles := maxf(roundf(circ / 1.8), 2.0)
+	var circ := TAU * (radius + flare_out * 0.45) * (sx + sz) * 0.5
+	var half_span := maxf(circ * 0.75, 3.0)
 	for j in v_segs:
 		var r0: PackedVector3Array = rows[j]
 		var r1: PackedVector3Array = rows[j + 1]
@@ -195,12 +230,10 @@ func bowl_curtain(center: Vector3, radius: float, y_top: float, y_bottom: float,
 		var v1 := vs[j + 1]
 		var c0 := cols[j]
 		var c1 := cols[j + 1]
-		for i in segs:
-			# Wrap U across 0.2..0.8 per tile so continuous curtain has no hard edge gaps.
-			var u0 := fposmod(float(i) / float(segs) * tiles, 1.0) * 0.52 + 0.24
-			var u1 := fposmod(float(i + 1) / float(segs) * tiles, 1.0) * 0.52 + 0.24
-			if u1 < u0:
-				u1 = 0.76
+		for i in seg_n:
+			# Continuous metre-scaled U mirrored cleanly at PI so 0 and TAU share the exact same UV.
+			var u0 := absf(float(i) / float(seg_n) * 2.0 - 1.0) * half_span
+			var u1 := absf(float(i + 1) / float(seg_n) * 2.0 - 1.0) * half_span
 			_flow_quad(r0[i], r0[i + 1], r1[i + 1], r1[i],
 				n0[i], n0[i + 1], n1[i + 1], n1[i],
 				Vector2(u0, v0), Vector2(u1, v0), Vector2(u1, v1), Vector2(u0, v1),
@@ -217,13 +250,14 @@ func cascade_sheet(p0: Vector3, p1: Vector3, y_top: float, y_bottom: float,
 	var fwd := Vector3(forward_dir.x, 0.0, forward_dir.z).normalized()
 	if fwd.length_squared() < 0.01:
 		fwd = Vector3(0.0, 0.0, 1.0)
-	var v_segs := 6
-	var u_segs := clampi(int(ceil(width / 1.4)), 2, 16)
+	var v_segs := 8
+	var u_segs := clampi(int(ceil(width / 0.65)), 6, 32)
 	var spd := clampf((2.8 + sqrt(drop) * 1.6) / 6.0, 0.4, 1.0)
 	var rows: Array = []
 	var norms: Array = []
 	var vs := PackedFloat32Array()
-	var cols: Array[Color] = []
+	var aero_row := PackedFloat32Array()
+	var fade_row := PackedFloat32Array()
 	var acc := 0.0
 	for j in v_segs + 1:
 		var t := float(j) / float(v_segs)
@@ -235,9 +269,8 @@ func cascade_sheet(p0: Vector3, p1: Vector3, y_top: float, y_bottom: float,
 			var py := y_top - drop * (pt * pt * 0.74 + pt * 0.26)
 			acc += Vector2(out_d - pout, y - py).length()
 		vs.append(acc)
-		var aero := clampf(lerpf(aeration * 0.55, minf(aeration + 0.28, 1.0), t), 0.0, 1.0)
-		var fade := smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.94, 1.0, t))
-		cols.append(Color(aero, spd, clampf(fade, 0.22, 1.0), 1.0))
+		aero_row.append(clampf(lerpf(aeration * 0.55, minf(aeration + 0.28, 1.0), t), 0.0, 1.0))
+		fade_row.append(clampf(smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.94, 1.0, t)), 0.24, 1.0))
 		var row := PackedVector3Array()
 		var nrow := PackedVector3Array()
 		var n := (fwd + Vector3(0.0, 0.35 * (1.0 - t), 0.0)).normalized()
@@ -248,18 +281,26 @@ func cascade_sheet(p0: Vector3, p1: Vector3, y_top: float, y_bottom: float,
 			nrow.append(n)
 		rows.append(row)
 		norms.append(nrow)
+	var u_span := maxf(width * 1.5, 1.5)
 	for j in v_segs:
 		var r0: PackedVector3Array = rows[j]
 		var r1: PackedVector3Array = rows[j + 1]
 		var n0: PackedVector3Array = norms[j]
 		var n1: PackedVector3Array = norms[j + 1]
 		for i in u_segs:
-			var u0 := float(i) / float(u_segs)
-			var u1 := float(i + 1) / float(u_segs)
+			var s0 := float(i) / float(u_segs)
+			var s1 := float(i + 1) / float(u_segs)
+			var lat0 := 0.25 + 0.75 * smoothstep(0.0, 0.12, s0) * (1.0 - smoothstep(0.88, 1.0, s0))
+			var lat1 := 0.25 + 0.75 * smoothstep(0.0, 0.12, s1) * (1.0 - smoothstep(0.88, 1.0, s1))
+			var c00 := Color(aero_row[j], spd, fade_row[j] * lat0, 1.0)
+			var c10 := Color(aero_row[j], spd, fade_row[j] * lat1, 1.0)
+			var c11 := Color(aero_row[j + 1], spd, fade_row[j + 1] * lat1, 1.0)
+			var c01 := Color(aero_row[j + 1], spd, fade_row[j + 1] * lat0, 1.0)
 			_flow_quad(r0[i], r0[i + 1], r1[i + 1], r1[i],
 				n0[i], n0[i + 1], n1[i + 1], n1[i],
-				Vector2(u0, vs[j]), Vector2(u1, vs[j]), Vector2(u1, vs[j + 1]), Vector2(u0, vs[j + 1]),
-				cols[j], cols[j], cols[j + 1], cols[j + 1])
+				Vector2(s0 * u_span, vs[j]), Vector2(s1 * u_span, vs[j]),
+				Vector2(s1 * u_span, vs[j + 1]), Vector2(s0 * u_span, vs[j + 1]),
+				c00, c10, c11, c01)
 
 ## Circular basin splash boil + expanding concentric ripple ring just above water.
 func splash_ring(center: Vector3, radius: float, intensity: float = 0.85,

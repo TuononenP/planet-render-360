@@ -101,26 +101,10 @@ static func mesh(b: Dictionary, y: float) -> LandmarkMesh:
 	lm.merge(part, Transform3D(basis, Vector3(c.x, y, c.y)))
 	return lm
 
-## A bronze horse walking along +z on `base`, scaled by `s`: a rounded
-## barrel, arched neck, tapered head, tail and four tapered legs, the
-## off fore leg striding.
+## A bronze horse standing/striding along +z on `base`, scaled by `s`,
+## using smooth lofted equine anatomy via SculptureKit.
 static func _horse(lm: LandmarkMesh, base: Vector3, s: float) -> void:
-	# Barrel: a lathed spindle laid along z, narrower than it is deep.
-	var barrel := PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.3, 0.12), Vector2(0.46, 0.5),
-		Vector2(0.5, 1.1), Vector2(0.47, 1.7), Vector2(0.34, 2.1), Vector2(0.0, 2.3)])
-	for i in barrel.size():
-		barrel[i] *= s
-	var body := LandmarkMesh.new()
-	body.use("Bronze", null)  # lm carries the material
-	body.lathe("Bronze", Vector3.ZERO, barrel, 14, 0.8, 1.0)
-	lm.merge(body, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), base + Vector3(0, 1.8, -1.15) * s))
-	_limb(lm, base + Vector3(0, 2.0, 0.85) * s, base + Vector3(0, 3.05, 1.3) * s, 0.3 * s, 0.17 * s)
-	_limb(lm, base + Vector3(0, 3.15, 1.25) * s, base + Vector3(0, 2.6, 1.85) * s, 0.17 * s, 0.1 * s)
-	_limb(lm, base + Vector3(0, 2.0, -1.1) * s, base + Vector3(0, 0.9, -1.4) * s, 0.12 * s, 0.05 * s)
-	for lz in [-0.8, 0.8]:
-		for lx in [-0.24, 0.24]:
-			var stride := 0.35 if lz > 0.0 and lx > 0.0 else 0.0
-			_limb(lm, base + Vector3(lx, 1.6, lz) * s, base + Vector3(lx, 0.0, lz + stride) * s, 0.13 * s, 0.07 * s)
+	SculptureKit.rearing_horse(lm, "Bronze", base, s * 1.15, 0.0, 0.05)
 
 ## A tapered round member from `a` (radius r0) to `b` (radius r1).
 static func _limb(lm: LandmarkMesh, a: Vector3, b: Vector3, r0: float, r1: float) -> void:
