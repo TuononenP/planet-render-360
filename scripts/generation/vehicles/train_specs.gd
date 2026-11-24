@@ -63,10 +63,6 @@ const LIVERIES := {
 	# Paris RATP / IDFM elevated Métro Line 6 (MP 73 / MP 89): crisp white body, RATP jade-green & sky-blue band.
 	"paris_metro": {"lower": Color(0.18, 0.58, 0.76), "band": Color(0.24, 0.64, 0.54),
 		"upper": WHITE, "door": WHITE, "pillar": TramSpecs.DARK, "roof": ROOF, "inner": WHITE, "gauge": 1.435},
-	# Paris RER C / Transilien commuter EMU (IDFM blue & silver-white).
-	"paris_rer": {"lower": Color(0.14, 0.42, 0.72), "band": Color(0.76, 0.12, 0.32),
-		"upper": Color(0.86, 0.87, 0.89), "door": Color(0.14, 0.42, 0.72), "pillar": TramSpecs.DARK,
-		"roof": ROOF, "inner": WHITE, "gauge": 1.435},
 	# Miami's Metromover: crisp white automated pod, cyan-blue band and doors, pale roof.
 	"miami_metromover": {"lower": WHITE, "band": Color(0.06, 0.56, 0.82), "upper": WHITE,
 		"door": Color(0.06, 0.56, 0.82), "pillar": TramSpecs.DARK, "roof": Color(0.8, 0.8, 0.78),
@@ -78,6 +74,10 @@ const LIVERIES := {
 	# South Florida's commuter line (Tri-Rail): ocean-blue lower, palm-green waist band, white upper.
 	"tri_rail": {"lower": Color(0.08, 0.46, 0.76), "band": Color(0.16, 0.62, 0.36), "upper": WHITE,
 		"door": Color(0.08, 0.46, 0.76), "pillar": TramSpecs.DARK, "roof": ROOF, "inner": WHITE, "gauge": 1.435},
+	# Dutch Railways (NS Intercity / Sprinter): iconic bright yellow body with dark navy-blue window band.
+	"ns_yellow": {"lower": Color(0.98, 0.78, 0.08), "band": Color(0.0, 0.19, 0.51), "upper": Color(0.98, 0.78, 0.08),
+		"door": WHITE, "cab": Color(0.98, 0.78, 0.08), "pillar": TramSpecs.DARK, "roof": ROOF,
+		"inner": WHITE, "gauge": 1.435},
 }
 const LONDON_LIVERIES: Array[String] = ["london_blue", "london_grey", "london_white"]
 ## Share of Helsinki's trains that are the long-distance unit.
@@ -216,6 +216,8 @@ static func pick(region: String, country: String, rail: Dictionary, h: float) ->
 	if country.to_upper() == "GB":
 		return {"kind": "emu_uk", "livery": LONDON_LIVERIES[mini(int(h * LONDON_LIVERIES.size()), LONDON_LIVERIES.size() - 1)],
 			"cars": cars, "panto": wired}
+	if region == "amsterdam" or country.to_upper() == "NL":
+		return {"kind": "intercity" if h < 0.55 else "emu", "livery": "ns_yellow", "cars": cars, "panto": wired}
 	# One band colour per country, not per train.
 	var band := absi(hash(country.to_upper())) % TramSpecs.GENERIC_BANDS.size()
 	return {"kind": "emu", "livery": "rail%d" % band, "cars": cars, "panto": wired}

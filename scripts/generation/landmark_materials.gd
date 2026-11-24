@@ -168,6 +168,25 @@ static func lit(hex: String, energy: float = 0.6) -> StandardMaterial3D:
 	_mutex.unlock()
 	return ret
 
+## Night-only lamp / interior glow: dark albedo and zero emission by day,
+## ramped up at dusk/night by `LandmarkLights._night_lamps` via `NIGHT_GLOW_META`.
+static func night_lit(hex: String, energy: float = 1.0, day_hex: String = "#2B3238") -> StandardMaterial3D:
+	_mutex.lock()
+	var key := "night_lit|%s|%.2f|%s" % [hex, energy, day_hex]
+	if _cache.has(key):
+		var ret: StandardMaterial3D = _cache[key] as StandardMaterial3D
+		_mutex.unlock()
+		return ret
+	var m := pbr("render", day_hex, 3.0, 0.45).duplicate() as StandardMaterial3D
+	m.emission_enabled = true
+	m.emission = Color(hex)
+	m.emission_energy_multiplier = 0.0
+	m.set_meta(LandmarkLights.NIGHT_GLOW_META, energy)
+	_cache[key] = m
+	var ret: StandardMaterial3D = m
+	_mutex.unlock()
+	return ret
+
 ## Sydney Opera House roof: 1.06 million glossy-white and matte-cream
 ## Swedish tiles in a chevron pattern, 120 mm grid.
 static func opera_tile() -> StandardMaterial3D:

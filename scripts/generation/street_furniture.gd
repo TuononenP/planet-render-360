@@ -519,7 +519,7 @@ static func mesh(key: String) -> ArrayMesh:
 				TreeMeshLibrary._tube(buf.call("green"), [Vector3(0, 0, sz * 1.35), Vector3(0, 3.6, sz * 1.35)],
 					[0.08, 0.05], 8, 1.0, 1.0)
 				StreetProps._box(buf.call("green"), Vector3(-0.9, 0.55, sz * 1.35), Vector3(1.9, 0.95, 0.08))
-				StreetProps._box(buf.call("lens_r"), Vector3(0.08, 3.55, sz * 1.42), Vector3(0.26, 0.34, 0.26))
+				StreetProps._box(buf.call("globe_amber"), Vector3(0.08, 3.55, sz * 1.42), Vector3(0.26, 0.34, 0.26))
 			StreetProps._box(buf.call("green"), Vector3(0, 3.1, 0), Vector3(0.10, 0.42, 2.85))
 			StreetProps._box(buf.call("sign"), Vector3(0.06, 3.1, 0), Vector3(0.02, 0.26, 2.4))
 		"bikeshare":
@@ -594,7 +594,7 @@ static func _material(name: String) -> Material:
 		m.emission = lc
 		m.emission_energy_multiplier = 3.0
 	if name.begins_with("globe_"):
-		m.albedo_color = Color(0.035, 0.32, 0.09) if name == "globe_green" else Color(0.75, 0.77, 0.72)
+		m.albedo_color = Color(0.035, 0.32, 0.09) if name == "globe_green" else (Color(0.92, 0.34, 0.14) if name == "globe_amber" else Color(0.75, 0.77, 0.72))
 		m.emission_enabled = true
 		m.emission = m.albedo_color
 		m.emission_energy_multiplier = 0.25

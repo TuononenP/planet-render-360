@@ -14,7 +14,7 @@ static func grand_palais(model: Node3D) -> void:
 	lm.use("Glass", LandmarkMaterials.glass("#8BAAB2"))
 	lm.use("Bronze", LandmarkPaKit.verdigris("#4A6E60"))
 	lm.use("Gilt", LandmarkMaterials.gold())
-	lm.use("VaultLamp", LandmarkMaterials.lit("#FFE4A8", 1.15))
+	lm.use("VaultLamp", LandmarkMaterials.night_lit("#FFE4A8", 1.15, "#2A363C"))
 	# Monumental 232 m Beaux-Arts limestone perimeter walls (+X east front faces Avenue Winston-Churchill)
 	lm.box("Ashlar", Vector3(0.0, 2.0, 0.0), Vector3(92.0, 4.0, 232.0))
 	# East & West long facades + North & South end pavilions (leaving central nave volume for the glass vault)

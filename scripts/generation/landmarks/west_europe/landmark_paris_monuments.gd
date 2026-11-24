@@ -128,7 +128,7 @@ static func louvre_pyramid(model: Node3D) -> void:
 	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#C2B8A6", 4.0))
 	lm.use("Water", LandmarkMaterials.pool_water())
 	lm.use("Granite", LandmarkMaterials.pbr("stone", "#6C6A66", 2.0))
-	lm.use("CoreLamp", LandmarkMaterials.lit("#FFCE80", 1.35))
+	lm.use("CoreLamp", LandmarkMaterials.night_lit("#FFCE80", 1.35, "#344048"))
 	LandmarkWestKit.blk(lm, "Paving", 0, 0.0, 0, 100.0, 0.05, 100.0)
 	LandmarkWestKit.blk(lm, "Granite", 0, 0, 0, 36.2, 0.25, 36.2)
 	# Warm amber interior core glowing softly through Pei's glass panes at night.

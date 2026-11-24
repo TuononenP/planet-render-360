@@ -38,7 +38,7 @@ OSM base `2026-11-04`).
 | `louvre_pyramid` | Louvre Pyramid | `48.8610, 2.3358` | 21.6 | `19.0°` | `LandmarkRegistryWestEurope` |
 | `notre_dame` | Notre-Dame de Paris | `48.8530, 2.3499` | 96.0 | `15.0°` | `LandmarkRegistryWestEurope` |
 | `sacre_coeur` | Sacré-Cœur | `48.8867, 2.3431` | 83.0 | `0.0°` | `LandmarkRegistryWestEurope` |
-| `pantheon_paris` | Panthéon, Paris | `48.8462, 2.3464` | 83.0 | `90.0°` (fixed west portico) | `LandmarkRegistryWestEurope` |
+| `pantheon_paris` | Panthéon, Paris | `48.8462, 2.3464` | 83.0 | `-84.0°` (fixed west portico) | `LandmarkRegistryWestEurope` |
 | `sainte_chapelle` | Sainte-Chapelle | `48.8554, 2.3450` | 75.5 | `10.0°` | `LandmarkRegistryWesternHistoric` |
 | `palais_garnier` | Palais Garnier | `48.8719, 2.3317` | 56.0 | `-19.0°` | `LandmarkRegistryWesternHistoric` |
 | `gare_du_nord` | Gare du Nord | `48.880218, 2.355021` | 39.4 | `17.1°` | `LandmarkRegistryCapitalStations` |
@@ -47,9 +47,9 @@ OSM base `2026-11-04`).
 
 | Type | Name | Lat, Lon | Height (m) | Yaw | Priority |
 | --- | --- | --- | ---: | ---: | ---: |
-| `palais_de_chaillot` | Palais de Chaillot | `48.8620, 2.2883` | 28.0 | `-44.0°` | 9 |
-| `ecole_militaire` | École Militaire | `48.8526, 2.3036` | 38.0 | `-44.4°` | 7 |
-| `palais_de_tokyo` | Palais de Tokyo | `48.8643, 2.2971` | 20.0 | `-20.0°` | 3 |
+| `palais_de_chaillot` | Palais de Chaillot | `48.86225, 2.28858` | 28.0 | `-44.2°` | 9 |
+| `ecole_militaire` | École Militaire | `48.8526, 2.3036` | 38.0 | `-44.2°` | 7 |
+| `palais_de_tokyo` | Palais de Tokyo | `48.8643, 2.2971` | 20.0 | `-26.0°` | 3 |
 | `musee_quai_branly` | Musée du Quai Branly | `48.8609, 2.2979` | 22.0 | `-18.0°` | 3 |
 | `cathedrale_sainte_trinite` | Cathédrale de la Sainte-Trinité | `48.86188, 2.30101` | 37.0 | `0.0°` | 3 |
 | `maison_de_la_radio` | Maison de la Radio et de la Musique | `48.8524, 2.2782` | 68.0 | `0.0°` | 3 |
@@ -79,7 +79,7 @@ OSM base `2026-11-04`).
 | `bnf_mitterrand` | Bibliothèque François-Mitterrand | `48.8336, 2.3758` | 79.0 | `-42.0°` | 3 |
 | `pont_de_bir_hakeim` | Pont de Bir-Hakeim | `48.85571, 2.28757` | 20.5 | `53.1°` | 7 |
 | `pont_alexandre_iii` | Pont Alexandre III | `48.86360, 2.31360` | 24.5 | `94.5°` | 7 |
-| `pont_d_iena` | Pont d'Iéna | `48.85980, 2.29220` | 13.5 | `-44.2°` | 5 |
+| `pont_d_iena` | Pont d'Iéna | `48.85980, 2.29220` | 13.5 | `44.2°` | 5 |
 | `pont_neuf` | Pont Neuf | `48.85780, 2.34190` | 14.5 | `-61.6°` | 3 |
 | `passerelle_debilly` | Passerelle Debilly | `48.86256, 2.29693` | 16.0 | `62.4°` | 3 |
 

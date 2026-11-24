@@ -303,7 +303,7 @@ static func entries() -> Array:
 					["slope", 134.0, 142.0, 38.0, 26.0],
 				]}),
 
-		_row("tour_europlaza", "Tour Europlaza", 48.89162, 2.24513, 135.0, 26.0, 22.0, 8000.0,
+		_row("tour_europlaza", "Tour Europlaza", 48.89205, 2.24545, 135.0, 26.0, 22.0, 8000.0,
 			"Tour Europlaza", 2, ["tour europlaza", "europlaza la defense"], {
 				"finish": "clear_fin", "bay": 2.8, "floor": 4.0, "trim": "#C2CAD0",
 				"ops": [
