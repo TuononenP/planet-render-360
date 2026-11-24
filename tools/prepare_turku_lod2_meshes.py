@@ -14,12 +14,9 @@ RoofMetalMaps, plus sampled roof/wall attributes.
 """
 
 import gzip
-import hashlib
 import json
 import math
 import os
-import shutil
-import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
@@ -35,7 +32,6 @@ OUT_DIR = os.path.join(ROOT, "assets", "city_models", "turku_lod2_meshes")
 ROOFS_PATH = os.path.join(ROOT, "build", "turku_aurajoki_roofs.json")
 FACADES_PATH = os.path.join(ROOT, "build", "turku_aurajoki_facades.json")
 CELL_M = 1000
-ZSTD_LEVEL = 19
 
 
 def newell_normal(pts):
@@ -216,15 +212,6 @@ def add_polygon(pts_closed, is_roof, ce, cn, z0, verts, uvs, indices):
             indices.extend((base + i0, base + i2, base + i1))
         else:
             indices.extend((base + i0, base + i1, base + i2))
-
-
-def zstd_compress(payload):
-    if shutil.which("zstd") is None:
-        raise RuntimeError("zstd CLI is required")
-    return subprocess.run(
-        ["zstd", "-q", "-c", f"-{ZSTD_LEVEL}"],
-        input=payload, capture_output=True, check=True,
-    ).stdout
 
 
 def main():

@@ -320,7 +320,7 @@ def main():
         pgrid.setdefault(ck, []).append(p)
 
     bldgs = collect_building_walls()
-    print(f"Buildings with vertical walls within {CORRIDOR_M:.0f} m: {len(bldgs)}")
+    print(f"Buildings with vertical walls in Turku Extended Inner City: {len(bldgs)}")
 
     matches = {}
     needed_photos = {}

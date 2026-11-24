@@ -249,6 +249,10 @@ static func merge(data: LocationData, reg: Array, trees: Array, car: Array, walk
 		log.append("LOD2: %d rows / %d matched / %d filled" % [st["rows"], st["matched"], st["filled"]])
 		if int(st["matched"]) > 0:
 			credits.append_array(HelsinkiLod2.credits_for(data.latitude, data.longitude))
+	if not data.buildings.is_empty() and TurkuLod2Meshes.covers(data.latitude, data.longitude):
+		for c: String in TurkuLod2Meshes.credits_for(data.latitude, data.longitude):
+			if not credits.has(c):
+				credits.append(c)
 	if not reg.is_empty() and not data.buildings.is_empty():
 		var st := HelsinkiRegister.apply(data.buildings, data.latitude, data.longitude, reg)
 		log.append("REGISTER: %d rows / %d matched / %d filled" % [st["rows"], st["matched"], st["filled"]])

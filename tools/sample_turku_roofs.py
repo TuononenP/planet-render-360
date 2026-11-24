@@ -254,7 +254,7 @@ def collect_corridor_buildings():
 
 def main():
     bldgs = collect_corridor_buildings()
-    print(f"Found {len(bldgs)} buildings within {CORRIDOR_M:.0f} m of Aurajoki")
+    print(f"Found {len(bldgs)} buildings in Turku Extended Inner City ({INNER_RADIUS_M:.0f} m + {CORRIDOR_M:.0f} m Aurajoki)")
     tile_m = 800.0
     needed_tiles = set()
     bldg_3857 = []

@@ -294,6 +294,7 @@ func _classify(abort: BuildAbort) -> void:
 			for value in values:
 				sum += float(value)
 			segment[item[1]] = sum / float(values.size())
+	_unify_small_hard_bodies()
 	_make_transitions()
 
 ## _classify through ShoreClassifier, the same segments, cells and
@@ -311,8 +312,65 @@ func _classify_native(abort: BuildAbort) -> bool:
 	segments = out["segments"]
 	_segment_cells = out["cells"]
 	diagnostics.append_array(out["diagnostics"])
+	_unify_small_hard_bodies()
 	_make_transitions()
 	return true
+
+## A small walled urban basin (reflecting pool, fountain, courtyard pond)
+## whose edges alternate hard/natural (often because nearby buildings or an
+## adjacent pool deny _bank_top_at 3 dry samples) tears its surrounding plaza
+## with hard<->natural transition ramps. Promote the whole small basin to a
+## continuous hard rim and average its shared endpoint tops.
+const SMALL_BASIN_PERIM_M := 180.0
+const SMALL_BASIN_HARD_SHARE := 0.20
+
+func _unify_small_hard_bodies() -> void:
+	if segments.is_empty():
+		return
+	var m2u := WorldScale.metres_to_units()
+	var total_len := {}
+	var hard_len := {}
+	for seg in segments:
+		var bid: int = int(seg["body"])
+		var ln := (seg["a"] as Vector2).distance_to(seg["b"] as Vector2)
+		total_len[bid] = float(total_len.get(bid, 0.0)) + ln
+		if str(seg["kind"]) == "hard":
+			hard_len[bid] = float(hard_len.get(bid, 0.0)) + ln
+	var promote := {}
+	for bid: int in total_len:
+		var tl := float(total_len[bid])
+		var hl := float(hard_len.get(bid, 0.0))
+		if hl > 0.0 and tl <= SMALL_BASIN_PERIM_M * m2u and hl >= tl * SMALL_BASIN_HARD_SHARE:
+			promote[bid] = true
+	if promote.is_empty():
+		return
+	var changed := false
+	for seg in segments:
+		var bid: int = int(seg["body"])
+		if promote.has(bid) and str(seg["kind"]) != "hard":
+			seg["kind"] = "hard"
+			seg["reason"] = "unified_basin"
+			changed = true
+	if not changed:
+		return
+	var endpoint_tops := {}
+	for seg in segments:
+		if str(seg["kind"]) != "hard" or not promote.has(int(seg["body"])):
+			continue
+		for item in [["a", "top_a"], ["b", "top_b"]]:
+			var p: Vector2 = seg[item[0]]
+			if not endpoint_tops.has(p):
+				endpoint_tops[p] = []
+			(endpoint_tops[p] as Array).append(float(seg[item[1]]))
+	for seg in segments:
+		if str(seg["kind"]) != "hard" or not promote.has(int(seg["body"])):
+			continue
+		for item in [["a", "top_a"], ["b", "top_b"]]:
+			var values: Array = endpoint_tops[seg[item[0]]]
+			var sum := 0.0
+			for v in values:
+				sum += float(v)
+			seg[item[1]] = sum / float(values.size())
 
 ## Per body: level, level_end, has_end, axis start, axis end.
 func _levels() -> PackedFloat64Array:

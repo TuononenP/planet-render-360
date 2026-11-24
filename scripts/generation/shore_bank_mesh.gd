@@ -113,7 +113,7 @@ static func _abutment(segment: Dictionary) -> bool:
 	return false
 
 ## Damp darkened waterline base and dressed granite coping capstone tints (sRGB).
-const WATERLINE_DAMP := Color(0.42, 0.43, 0.40)
+const WATERLINE_DAMP := Color(0.70, 0.71, 0.68)
 const COPING_TOP := Color(1.15, 1.14, 1.11)
 const COPING_FRONT := Color(1.09, 1.08, 1.06)
 const COPING_UNDER := Color(0.62, 0.62, 0.60)

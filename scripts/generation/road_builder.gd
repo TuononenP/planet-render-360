@@ -379,8 +379,10 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	if pts.size() < 2:
 		return
 	if line is Dictionary and bool((line as Dictionary).get("area", false)):
-		_area(_batch(batches, str(r["finish"])), pts, (line as Dictionary).get("holes", []),
-			surf, AREA_LIFT_M * m2u, m2u, AREA_LAYER, _square_axis_rg(pts, str(r.get("class", "")), m2u))
+		var af := str(r["finish"])
+		var al := _area_layer(str(r.get("class", "")), af, step)
+		_area(_batch(batches, af), pts, (line as Dictionary).get("holes", []),
+			surf, _area_lift(al) * m2u, m2u, al, _square_axis_rg(pts, str(r.get("class", "")), m2u))
 		return
 	var dense := _resample(pts, surf.step * 0.34)
 	var finish := str(r["finish"])
@@ -461,7 +463,7 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 	# square's thin triangles showed through it as pale streaks. Aprons
 	# and glyphs are laid through here too, on their own layers.
 	var pieces: Array = [ring]
-	if layer == AREA_LAYER and not surf.apron_rings.is_empty():
+	if layer < 1.0 and not surf.apron_rings.is_empty():
 		holes = holes.duplicate()
 		var box := RingGeometry.aabb(ring)
 		for apron: Array in surf.apron_rings:
@@ -483,8 +485,12 @@ static func _area(b: _Batch, ring: PackedVector2Array, holes: Array, surf: _Surf
 			var c := (tri[0] + tri[1] + tri[2]) / 3.0
 			if not (surf.inside(tri[0]) and surf.inside(tri[1]) and surf.inside(tri[2])):
 				continue
+			var shore_ready: bool = surf.ground.shoreline != null and bool(surf.ground.shoreline.ready)
 			if surf.ground.water_at(c.x, c.y) > 0.0:
-				continue
+				if not shore_ready or (surf.ground.water_at(tri[0].x, tri[0].y) > 0.0
+						and surf.ground.water_at(tri[1].x, tri[1].y) > 0.0
+						and surf.ground.water_at(tri[2].x, tri[2].y) > 0.0):
+					continue
 			var in_hole := false
 			for h in holes:
 				if h is PackedVector2Array and Geometry2D.is_point_in_polygon(c, h):
@@ -537,6 +543,16 @@ static func depth_layer(rank: int, finish: String, step: int) -> float:
 	if finish.begins_with("crossing"):
 		return CROSSING_LAYER + float(step) * 0.11  # above every carriageway
 	return 1.0 + float(rank) * 2.0 + (1.0 if finish == "asphalt" else 0.0) + float(step) * 0.11
+
+## Depth layer and lift for a paved area (stays strictly below every ribbon
+## at layer >= 1.0 / LIFT_MIN_M, while parking/asphalt areas sit cleanly
+## above enclosing pedestrian squares and overlapping areas never tie).
+static func _area_layer(cls: String, finish: String, step: int) -> float:
+	return AREA_LAYER + (0.25 if cls == "parking" or finish == "asphalt" else 0.0) \
+		+ float(step % RoadSurface.DEPTH_STEPS) * 0.025
+
+static func _area_lift(layer: float) -> float:
+	return lerpf(AREA_LIFT_M, LIFT_MIN_M - 0.002, clampf((layer - AREA_LAYER) / (1.0 - AREA_LAYER), 0.0, 1.0))
 
 ## Lift above the surface (m) for a depth layer.
 static func lift_for_layer(layer: float) -> float:

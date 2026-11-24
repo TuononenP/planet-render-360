@@ -31,9 +31,11 @@ const BUNDLES := {
 
 const ROOF_MATS: Array[String] = ["", "metal", "terracotta", "copper", "bitumen"]
 const WALL_MATS: Array[String] = ["", "render", "brick", "concrete", "wood", "stone", "glass"]
+const MAX_CACHED_CELLS := 64
 
 static var _manifest: Dictionary = {}
 static var _decoded: Dictionary = {}
+static var _decoded_order: Array[String] = []
 static var _lock := Mutex.new()
 
 static func _cells() -> Dictionary:
@@ -84,6 +86,15 @@ static func _prefix(key: String) -> String:
 	var i := key.find(":")
 	return key.substr(0, i + 1) if i >= 0 else ""
 
+## The credits of the bundles whose cells meet the window.
+static func credits_for(lat: float, lon: float) -> Array:
+	var out: Array = []
+	for key: String in cell_keys(lat, lon):
+		var credit := str(BUNDLES[_prefix(key)][1])
+		if not out.has(credit):
+			out.append(credit)
+	return out
+
 ## Returns Array[PackedInt32Array] of binary v2 cell buffers for the window.
 static func cells_for(lat: float, lon: float) -> Array[PackedInt32Array]:
 	var out: Array[PackedInt32Array] = []
@@ -94,6 +105,10 @@ static func cells_for(lat: float, lon: float) -> Array[PackedInt32Array]:
 		if cached == null:
 			cached = read_cell(key)
 			_lock.lock()
+			if not _decoded.has(key):
+				if _decoded_order.size() >= MAX_CACHED_CELLS:
+					_decoded.erase(_decoded_order.pop_front())
+				_decoded_order.append(key)
 			_decoded[key] = cached
 			_lock.unlock()
 		var arr := cached as PackedInt32Array
