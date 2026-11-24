@@ -278,6 +278,19 @@ func _check_fori() -> void:
 			and mat_on.emission_energy_multiplier == 0.0 and deck_light != null and not deck_light.visible,
 			"Föri winter 21:15 night: moored at dock with ALL vessel lights OFF")
 	root.free()
+	# Föri must be selected from the Turku preset on High and Ultra (not dropped by registry cap).
+	for preset in [2, 3]:
+		var d := LocationData.new()
+		d.latitude = 60.4518
+		d.longitude = 22.2666
+		d.quality_preset = preset
+		d.landmark_type = LocationData.landmark_for(d.latitude, d.longitude, "")
+		var has_fori := false
+		for c in LandmarkSites.select(d, []):
+			if str((c as Dictionary).get("type", "")) == "fori_ferry":
+				has_fori = true
+				break
+		_check(has_fori, "Föri selected from Turku preset at quality %d" % preset)
 
 func _check(ok: bool, msg: String) -> void:
 	if not ok:
