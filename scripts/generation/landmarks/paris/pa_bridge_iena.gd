@@ -7,8 +7,10 @@ extends RefCounted
 ## (Gallic, Roman, Arab, Greek) on abutment pedestals, and dark-green Parisian balustrade lamps.
 ## Built along +X with y = 0 at Seine datum (`base: sea`), deck 8.0 m, equestrian tops 13.5 m.
 
-const SPAN_TOTAL := 155.0
+const SPAN_TOTAL := 178.0
+const ARCH_SPAN_TOTAL := 155.0
 const HALF_L := SPAN_TOTAL * 0.5
+const HALF_ARCH := ARCH_SPAN_TOTAL * 0.5
 const HALF_W := 17.5
 const DECK_Y := 8.0
 
@@ -55,7 +57,7 @@ static func _deck_and_arches(lm: LandmarkMesh, deck_y: float) -> void:
 	var y_spring := maxf(1.2, y_crown - 3.6)
 	var pier_h := maxf(deck_y + 0.3, 2.0)
 	for i in 5:
-		var x0 := -HALF_L + float(i) * span + 1.5
+		var x0 := -HALF_ARCH + float(i) * span + 1.5
 		var x1 := x0 + 28.0
 		for z in [-HALF_W + 0.25, -8.5, 0.0, 8.5, HALF_W - 0.25]:
 			LandmarkPaKit.arch_rib(lm, "Stone", x0, x1, y_spring, y_crown, float(z), 10, 1.15, 0.9)
@@ -66,7 +68,7 @@ static func _deck_and_arches(lm: LandmarkMesh, deck_y: float) -> void:
 				var sx := (x0 + x1) * 0.5 + float(side) * 10.2
 				lm.box("Stone", Vector3(sx, (y_spring + y_crown) * 0.5 + 0.35, ez), Vector3(7.2, 2.6, 0.7))
 		if i < 4:
-			var px := -HALF_L + float(i + 1) * span
+			var px := -HALF_ARCH + float(i + 1) * span
 			lm.box("Ashlar", Vector3(px, -1.2 + pier_h * 0.5, 0.0), Vector3(3.2, pier_h, HALF_W * 2.0 + 1.6))
 			for sz in [-1.0, 1.0]:
 				var cz := float(sz) * (HALF_W + 0.95)
@@ -77,14 +79,16 @@ static func _deck_and_arches(lm: LandmarkMesh, deck_y: float) -> void:
 
 static func _abutments_and_statues(lm: LandmarkMesh, deck_y: float) -> void:
 	var abut_h := maxf(deck_y + 0.3, 2.0)
+	var abut_l := HALF_L - HALF_ARCH + 2.5
 	for sx in [-1.0, 1.0]:
-		var ax := float(sx) * (HALF_L - 2.2)
-		lm.box("Ashlar", Vector3(ax, -1.2 + abut_h * 0.5, 0.0), Vector3(5.0, abut_h, HALF_W * 2.0 + 3.2))
+		var ax := float(sx) * (HALF_ARCH + abut_l * 0.5 - 2.5)
+		lm.box("Ashlar", Vector3(ax, -1.2 + abut_h * 0.5, 0.0), Vector3(abut_l, abut_h, HALF_W * 2.0 + 2.4))
+		var st_x := float(sx) * (HALF_ARCH - 1.5)
 		for sz in [-1.0, 1.0]:
 			var pz := float(sz) * (HALF_W + 0.45)
 			# Monumental stone pedestal & equestrian warrior statue at each of the four corners (top 13.5 m)
-			lm.box("Stone", Vector3(ax, deck_y + 1.25, pz), Vector3(4.2, 2.5, 2.6))
-			LandmarkPaKit.equestrian(lm, "Stone", Vector3(ax, deck_y + 2.5, pz), 0.78,
+			lm.box("Stone", Vector3(st_x, deck_y + 1.25, pz), Vector3(4.2, 2.5, 2.6))
+			LandmarkPaKit.equestrian(lm, "Stone", Vector3(st_x, deck_y + 2.5, pz), 0.78,
 				PI * 0.5 if sx < 0 else -PI * 0.5, false)
 			LandmarkPaKit.paris_lamp(lm, "Iron", "Lamp",
-				Vector3(ax - float(sx) * 3.8, deck_y + 1.25, float(sz) * (HALF_W + 0.05)), 4.1)
+				Vector3(st_x - float(sx) * 3.8, deck_y + 1.25, float(sz) * (HALF_W + 0.05)), 4.1)

@@ -23,6 +23,8 @@ static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"palais_de_chaillot":
 			LandmarkPaChaillot.build(model)
+		"fontaine_de_varsovie":
+			LandmarkPaChaillot.fontaine_de_varsovie(model)
 		"ecole_militaire":
 			LandmarkPaChampDeMars.ecole_militaire(model)
 		"musee_quai_branly":

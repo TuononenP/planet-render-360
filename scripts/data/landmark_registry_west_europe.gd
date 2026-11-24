@@ -14,7 +14,7 @@ static func entries() -> Array:
 			"radius_m": 5000.0, "wiki_title": "Arc de Triomphe", "height_m": 50.0, "clear_m": 55.0, "yaw_deg": 115.5,
 			"kind": "Monument", "aliases": ["arc de triomphe", "triumphal arch, paris"]},
 		{"type": "louvre_pyramid", "skyline_priority": 9, "name": "Louvre Pyramid", "lat": 48.8610, "lon": 2.3358,
-			"radius_m": 5500.0, "wiki_title": "Louvre Pyramid", "height_m": 21.6, "clear_m": 45.0, "yaw_deg": 19.0,
+			"radius_m": 5500.0, "wiki_title": "Louvre Pyramid", "height_m": 21.6, "clear_m": 45.0, "yaw_deg": 15.5,
 			"kind": "Monument",
 			"aliases": ["louvre pyramid", "pyramide du louvre", "louvre museum", "musée du louvre"]},
 		{"type": "sacre_coeur", "skyline_priority": 9, "name": "Sacré-Cœur", "lat": 48.8867, "lon": 2.3431,

@@ -83,3 +83,90 @@ static func build(model: Node3D) -> void:
 		[Vector3(-104.0, 2.0, 56.0), Vector3(-104.0, 16.0, 38.0), 64.0, 0.9, 68.0],
 		[Vector3(104.0, 2.0, 56.0), Vector3(104.0, 16.0, 38.0), 64.0, 0.9, 68.0],
 	])
+
+## Fontaine de Varsovie (Warsaw Fountains, 1937; Roger-Henri Expert):
+## Monumental dressed-limestone terraced esplanade bridging the Jardins du Trocadéro slope:
+## flanking limestone stepped retaining walls & promenades, clipped boxwood parterre hedges,
+## 112 m turquoise reflecting pool, upper Art Deco cascade steps, gilded-bronze terrace statues,
+## and soft translucent white water-spray plumes (no opaque dark-shaded pipes).
+static func fontaine_de_varsovie(model: Node3D) -> void:
+	var lm := LandmarkMesh.new()
+	lm.use("Stone", LandmarkPaKit.lutetian("#E2D8C2", 3.4))
+	lm.use("Ashlar", LandmarkPaKit.ashlar("#C8BDA6", 3.2))
+	lm.use("Pave", LandmarkMaterials.pbr("pavement", "#CFC8BC", 4.0))
+	lm.use("Water", LandmarkMaterials.pool_water("#3B7485", 0.06))
+	lm.use("Hedge", LandmarkMaterials.paint("#3B5733", 0.88, 0.0))
+	lm.use("Gilt", LandmarkMaterials.gold())
+	lm.use("Bronze", LandmarkPaKit.bronze("#464D42"))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE4AA", 1.35))
+	var spray := StandardMaterial3D.new()
+	spray.albedo_color = Color(0.95, 0.98, 1.0, 0.42)
+	spray.roughness = 0.25
+	spray.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	spray.cull_mode = BaseMaterial3D.CULL_DISABLED
+	spray.emission_enabled = true
+	spray.emission = Color(0.86, 0.93, 0.98)
+	spray.emission_energy_multiplier = 0.28
+	lm.use("Spray", spray)
+	# Broad stepped stone basin foundation & lower promenade deck (y = 0..2.2 m)
+	lm.box("Ashlar", Vector3(0.0, 1.0, 2.0), Vector3(68.0, 2.0, 134.0))
+	lm.box("Pave", Vector3(0.0, 2.1, 2.0), Vector3(66.0, 0.25, 132.0))
+	# Flanking monumental stepped limestone terrace walls & upper garden walks (x = +/-30..+/-44 m)
+	# covering the steep carved V-banks cleanly and meeting the Jardins du Trocadéro avenues!
+	for sx in [-1.0, 1.0]:
+		var s := float(sx)
+		# Lower terrace retaining wall + mid stepped terrace + upper balustrade walk
+		lm.box("Stone", Vector3(s * 30.0, 2.6, 0.0), Vector3(8.0, 5.2, 132.0))
+		lm.box("Pave", Vector3(s * 30.0, 5.25, 0.0), Vector3(7.6, 0.18, 131.0))
+		lm.box("Stone", Vector3(s * 38.0, 3.3, -2.0), Vector3(11.0, 6.6, 128.0))
+		lm.box("Pave", Vector3(s * 38.0, 6.65, -2.0), Vector3(10.6, 0.18, 127.0))
+		# Crisp dressed-limestone parapet balustrades & clipped French boxwood hedges along the upper walk
+		lm.box("Stone", Vector3(s * 26.3, 5.85, 0.0), Vector3(0.75, 1.05, 130.0))
+		lm.box("Hedge", Vector3(s * 34.0, 7.15, -2.0), Vector3(2.2, 1.05, 122.0))
+		lm.box("Stone", Vector3(s * 43.0, 7.2, -2.0), Vector3(0.75, 1.0, 126.0))
+		# Stone piers & warm Parisian lamps lining the lower pool promenade
+		for k in 6:
+			var lz := lerpf(-46.0, 54.0, float(k) / 5.0)
+			lm.box("Ashlar", Vector3(s * 26.3, 6.0, lz), Vector3(1.3, 1.35, 1.3))
+			LandmarkPaKit.paris_lamp(lm, "Bronze", "Lamp", Vector3(s * 24.0, 2.2, lz), 3.9)
+		# Pool coping rim
+		lm.box("Stone", Vector3(s * 16.6, 2.55, 6.0), Vector3(1.4, 0.8, 112.4))
+	# Long rectangular turquoise reflecting pool (32 x 110 m)
+	lm.box("Water", Vector3(0.0, 2.34, 6.0), Vector3(32.0, 0.28, 110.0))
+	lm.box("Stone", Vector3(0.0, 2.55, 61.6), Vector3(34.6, 0.8, 1.4))
+	# Upper stepped Art Deco cascade terraces at the Palais de Chaillot (-Z) head of the pool
+	for step_i in 4:
+		var sy := 2.6 + float(step_i) * 1.35
+		var sz := -47.0 - float(step_i) * 4.4
+		var sw := 34.0 + float(step_i) * 3.8
+		lm.box("Stone", Vector3(0.0, sy * 0.5 + 1.0, sz), Vector3(sw, sy, 4.6))
+		lm.box("Water", Vector3(0.0, sy + 1.04, sz + 0.35), Vector3(sw - 2.8, 0.16, 3.6))
+		lm.box("Spray", Vector3(0.0, sy + 0.32, sz + 2.38), Vector3(sw - 3.6, 1.25, 0.16))
+	# Iconic gilded-bronze allegorical statues flanking the upper cascade (real Warsaw Fountains sculptures)
+	for sx in [-1.0, 1.0]:
+		var s := float(sx)
+		lm.box("Stone", Vector3(s * 20.5, 4.6, -50.0), Vector3(4.8, 5.2, 5.4))
+		lm.box("Ashlar", Vector3(s * 20.5, 7.35, -50.0), Vector3(5.2, 0.35, 5.8))
+		lm.frustum("Gilt", Vector3(s * 20.5, 7.5, -50.0), 0.72, 0.42, 2.8, 10)
+	# Soft translucent white mist plumes & gentle fountain jets along the reflecting pool (crest 10.5 m)
+	for j in 7:
+		var jz := lerpf(-34.0, 44.0, float(j) / 6.0)
+		for sx in [-1.0, 1.0]:
+			var s := float(sx)
+			# Translucent foam splash ring + gentle arched spray veil
+			lm.frustum("Spray", Vector3(s * 12.2, 2.48, jz), 0.75, 0.18, 3.6, 8)
+			var prev := Vector3(s * 12.2, 2.6, jz)
+			for seg in range(1, 7):
+				var t := float(seg) / 6.0
+				var p := Vector3(lerpf(s * 12.2, s * 2.4, t), 2.6 + sin(t * PI) * 3.8, jz + t * 2.4)
+				lm.beam("Spray", prev, p, 0.12, 0.12)
+				prev = p
+	# Three delicate central vertical mist plumes reaching 10.5 m
+	for cz in [-24.0, 4.0, 32.0]:
+		lm.frustum("Spray", Vector3(0.0, 2.45, float(cz)), 1.35, 0.25, 8.05, 10)
+		lm.frustum("Spray", Vector3(0.0, 2.45, float(cz)), 2.4, 2.1, 0.18, 12)
+	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-22.0, 3.0, -40.0), Vector3(0.0, 7.5, -52.0), 64.0, 0.95, 52.0],
+		[Vector3(22.0, 3.0, -40.0), Vector3(0.0, 7.5, -52.0), 64.0, 0.95, 52.0],
+	])
