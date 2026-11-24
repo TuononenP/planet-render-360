@@ -141,6 +141,11 @@ static func osm_bridge_path(lat: float, lon: float) -> String:
 	return "%s/osm_v%d_%d_%d_bridges_q%d.json" % [base_dir(), DATA_VERSION, quant(lat), quant(lon),
 		OsmQuery.BRIDGE_AREA_VERSION]
 
+## The aeroway layer (OsmQuery.build_aeroway_query).
+static func osm_aeroway_path(lat: float, lon: float) -> String:
+	return "%s/osm_v%d_%d_%d_aeroways_q%d.json" % [base_dir(), DATA_VERSION, quant(lat), quant(lon),
+		OsmQuery.AEROWAY_VERSION]
+
 static func landcover_path(kind: String, lat: float, lon: float) -> String:
 	return "%s/%s_v%d_%d_%d.png" % [base_dir(), kind, LANDCOVER_VERSION,
 		roundi(lat * 1000000.0), roundi(lon * 1000000.0)]

@@ -37,8 +37,11 @@ static func mats(lm: LandmarkMesh) -> void:
 ## nose along `heading` (radians in the airfield frame: 0 along +X, positive
 ## toward +Z).
 static func place(lm: LandmarkMesh, kind: String, tail_hex: String, at: Vector2, heading: float) -> void:
+	var xf := Transform3D(Basis(Vector3.UP, -heading), Vector3(at.x, LandmarkAirfieldKit.APRON_TOP, at.y))
+	if AircraftModel.merge_into_landmark(lm, kind, tail_hex, xf):
+		return
 	var master := _master(kind, tail_hex)
-	lm.merge(master, Transform3D(Basis(Vector3.UP, -heading), Vector3(at.x, LandmarkAirfieldKit.APRON_TOP, at.y)))
+	lm.merge(master, xf)
 
 ## Length of a kind's fuselage, for stand placement.
 static func length_m(kind: String) -> float:

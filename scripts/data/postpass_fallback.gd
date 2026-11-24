@@ -131,6 +131,12 @@ static func build_bridge_body(lat: float, lon: float, radius_m: int) -> String:
 	return "data=" + _part(_near(lat, lon, radius_m) + " AND osm_type <> 'N' AND tags->>'man_made' = 'bridge'",
 		lat, lon, OsmQuery.CAP_BRIDGE_AREAS).uri_encode()
 
+## The POST body for the aeroway layer (OsmQuery.build_aeroway_query).
+static func build_aeroway_body(lat: float, lon: float, radius_m: int) -> String:
+	return "data=" + _part(_near(lat, lon, radius_m)
+		+ " AND tags->>'aeroway' IN ('runway','taxiway','taxilane','apron','parking_position','gate','helipad','aerodrome')",
+		lat, lon, OsmQuery.CAP_AEROWAYS).uri_encode()
+
 ## The POST body for the POI layer (OsmQuery.build_poi_query): shop,
 ## amenity, office, tourism, craft and advertising nodes, nearest first.
 static func build_poi_body(lat: float, lon: float) -> String:

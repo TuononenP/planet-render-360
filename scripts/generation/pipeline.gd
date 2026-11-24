@@ -881,6 +881,7 @@ func _await_osm(data: LocationData) -> void:
 		data.piers = _osm.piers
 		data.shore_structures = _osm.shore_structures
 		data.bridge_areas = _osm.bridge_areas
+		data.aeroways = _osm.aeroways
 		if not warm_only:
 			HeritageZones.apply(data)
 			data.landmark_candidates = LandmarkSites.select(data, rank_landmarks(HeritageZones.filter_candidates(data, _osm_landmarks)))

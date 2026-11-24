@@ -81,6 +81,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "furniture", t)
 	var plazas := PlazaLife.build(root, data, ground, mask, ctx)
 	plazas += BangkokStreetLife.build(root, data, ground, mask, float(ctx["m2u"]))
+	plazas += AmsterdamStreetLife.build(root, data, ground, mask, float(ctx["m2u"]))
 	t = _lap(timings, "plazas", t)
 	if abort != null and abort.requested:
 		return {}
@@ -99,6 +100,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	t = _lap(timings, "trams", t)
 	var trains := StationTrains.build(root, data, ground)
 	t = _lap(timings, "trains", t)
+	var aircraft := AirportPlanes.build(root, data, ground)
+	t = _lap(timings, "aircraft", t)
 	if abort != null and abort.requested:
 		return {}
 	var wires := OverheadWires.build(root, data, ground, mask, marking_plan)
@@ -110,7 +113,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var beach := BeachDressing.build(root, data, ground, mask)
 	t = _lap(timings, "beach", t)
 	print("PROPS timings ms ", timings)
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "plazas": plazas, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks, "beach": beach}
+	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "plazas": plazas, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "aircraft": aircraft, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks, "beach": beach}
 
 ## Records the ms since `t` under `key`; returns the time now.
 static func _lap(timings: Dictionary, key: String, t: int) -> int:

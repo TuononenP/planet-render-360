@@ -120,14 +120,20 @@ static func glyph(lm: LandmarkMesh, ch: String, base: Vector2, up: Vector2, righ
 		strip(lm, "MarkW", centre, up, right, sv, su, y)
 
 ## A flat painted rectangle: `along_len` long (along `d`) and `wid` wide
-## (along `rt`), centred on `c`, at height `y`.
+## (along `rt`), centred on `c`, at height `y`. Subdivided every 40 m so
+## long edge lines drape cleanly onto conforming runways.
 static func strip(lm: LandmarkMesh, key: String, c: Vector2, d: Vector2, rt: Vector2, along_len: float,
 		wid: float, y: float) -> void:
 	if along_len <= 0.0:
 		return
-	var hl := d * along_len * 0.5
+	var segs := maxi(1, int(ceil(along_len / 40.0)))
+	var a := c - d * along_len * 0.5
+	var b := c + d * along_len * 0.5
 	var hw := rt * wid * 0.5
-	lm.quad(key, _v3(c - hl - hw, y), _v3(c + hl - hw, y), _v3(c + hl + hw, y), _v3(c - hl + hw, y), Vector3.UP)
+	for k in segs:
+		var p0 := a.lerp(b, float(k) / float(segs))
+		var p1 := a.lerp(b, float(k + 1) / float(segs))
+		lm.quad(key, _v3(p0 - hw, y), _v3(p1 - hw, y), _v3(p1 + hw, y), _v3(p0 + hw, y), Vector3.UP)
 
 static func _v2(p) -> Vector2:
 	return Vector2(float(p[0]), float(p[1]))

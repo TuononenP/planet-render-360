@@ -76,6 +76,11 @@ const BRIDGE_AREA_VERSION := 1
 ## man_made=bridge outlines over the detailed radius (a motorway
 ## interchange maps a few dozen).
 const CAP_BRIDGE_AREAS := 600
+## The aeroway layer (build_aeroway_query): runways, taxiways, aprons,
+## parking positions, gates and helipads, in its own request and cache file.
+const AEROWAY_VERSION := 1
+const CAP_AEROWAYS := 1500
+const AEROWAY_KINDS := "runway|taxiway|taxilane|apron|parking_position|gate|helipad|aerodrome"
 const QUERY_MARK := "pr360_q12"
 ## Multipolygon relations per land/water key (T2.4): areas are rarely
 ## relations (measured: 8 MPs in a Big Sur coastal response), so one
@@ -224,6 +229,17 @@ static func build_bridge_area_query(lat: float, lon: float, radius_m: int = 1200
 		+ ('(way["man_made"="bridge"](around:%d,%.6f,%.6f);'
 			+ 'relation["man_made"="bridge"](around:%d,%.6f,%.6f););out geom %d;') \
 			% [radius_m, lat, lon, radius_m, lat, lon, CAP_BRIDGE_AREAS]
+
+## Aeroway features (runways, taxiways, aprons, parking positions, gates,
+## helipads, aerodromes) over the detailed radius: AirportPlanes and
+## AirTrafficPlan dress airports and helipads worldwide from them.
+static func build_aeroway_query(lat: float, lon: float, radius_m: int = 1200) -> String:
+	return "[out:json][timeout:%d];" % OVERPASS_TIMEOUT_S \
+		+ ('(node["aeroway"~"^(%s)$"](around:%d,%.6f,%.6f);'
+			+ 'way["aeroway"~"^(%s)$"](around:%d,%.6f,%.6f);'
+			+ 'relation["aeroway"~"^(%s)$"]["type"="multipolygon"](around:%d,%.6f,%.6f););out geom %d;') \
+			% [AEROWAY_KINDS, radius_m, lat, lon, AEROWAY_KINDS, radius_m, lat, lon,
+				AEROWAY_KINDS, radius_m, lat, lon, CAP_AEROWAYS]
 
 ## Second, low-detail ring query (plan §3.1 Ultra budget): major roads
 ## + waterways + coastline out to ring_m. Best-effort — merged over the

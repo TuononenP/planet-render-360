@@ -221,6 +221,9 @@ var shore_structures: Array = []
 ## bridge_material, name, osm_id} (OsmParser._bridge_area): BridgeStructures
 ## builds one deck per outline. Empty where the bridge layer is not cached.
 var bridge_areas: Array = []
+## OSM aeroway features (OsmAeroway): {runways, taxiways, aprons, stands,
+## gates, helipads, aerodrome}. Empty where no airfield or helipad is mapped.
+var aeroways: Dictionary = {}
 ## Railway lines (rail, tram, light rail, metro above ground) —
 ## {points, class, gauge_m, embedded, bridge, tunnel, layer, width_m} in
 ## current internal units (OsmTags._rail_entry). Laid by RailBuilder.

@@ -40,6 +40,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	var piers: Array = []
 	var shore_structures: Array = []
 	var bridge_areas: Array = []
+	var aeroways := OsmAeroway.empty()
 	var country := ""
 	var parsed: Variant = JSON.parse_string(text)
 	if not (parsed is Dictionary):
@@ -48,7 +49,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			"barriers": barriers, "country": country, "railways": railways,
 			"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
 			"tram_stops": tram_stops, "bus_stops": bus_stops,
-			"rail_platforms": rail_platforms, "rail_stations": rail_stations, "bridge_areas": bridge_areas}
+			"rail_platforms": rail_platforms, "rail_stations": rail_stations,
+			"bridge_areas": bridge_areas, "aeroways": aeroways}
 	# Tiered statements print some elements twice (measured: 23 dupes in
 	# a Paris 800 m response); first occurrence wins.
 	var seen := {}
@@ -148,11 +150,16 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			if OsmTags.rail_station(el_tags):
 				var rp := WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon)
 				rail_stations.append({"x": rp.x, "z": rp.y, "name": str(el_tags.get("name", ""))})
+			if el_tags.has("aeroway"):
+				OsmAeroway.parse_node(aeroways, el_tags,
+					WorldScale.xz_from_latlon(float(el["lat"]), float(el["lon"]), c_lat, c_lon))
 			continue
 		# Multipolygon relations (fetched via the nwr land/water
 		# statements): stitched outer rings with inner-ring holes.
 		# Boundary/route relations are not areas and are skipped.
 		if str(el.get("type", "")) == "relation":
+			if el_tags.has("aeroway") and el.has("members"):
+				OsmAeroway.parse_relation(aeroways, el_tags, el.get("members", []), c_lat, c_lon)
 			if str(el_tags.get("man_made", "")) == "bridge" and el.has("members"):
 				for r in OsmGeometry._relation_rings(el.get("members", []), c_lat, c_lon):
 					_bridge_area(bridge_areas, el_tags, r["outer"], source_id)
@@ -241,6 +248,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		# A platform is noted for StationTrains whatever else it is drawn as.
 		if OsmTags.rail_platform(el_tags):
 			rail_platforms.append({"points": poly})
+		if el_tags.has("aeroway"):
+			OsmAeroway.parse_way(aeroways, el_tags, poly, aabb)
 		if str(el_tags.get("emergency", "")) == "lifeguard" \
 				or str(el_tags.get("building", "")) == "lifeguard_tower" \
 				or str(el_tags.get("lifeguard", "")) == "tower":
@@ -374,7 +383,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 		"barriers": barriers, "country": country, "railways": railways,
 		"furniture": furniture, "pois": pois, "piers": piers, "shore_structures": shore_structures,
 		"tram_stops": tram_stops, "bus_stops": bus_stops,
-		"rail_platforms": rail_platforms, "rail_stations": rail_stations, "bridge_areas": bridge_areas}
+		"rail_platforms": rail_platforms, "rail_stations": rail_stations,
+		"bridge_areas": bridge_areas, "aeroways": aeroways}
 
 ## A man_made=bridge outline (BridgeStructures builds one deck per
 ## outline): {points (closed ring), layer, bridge_structure,

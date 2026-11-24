@@ -47,33 +47,15 @@ static func active_endpoints() -> Array[String]:
 	return MapSources.overpass_endpoints()
 
 ## The ring runs alongside the detailed query. It used to start on a
-## mirror to keep the main instance's per-IP slots for the detailed
-## query, but no mirror answers (2026-11-11), so it starts on the main
-## instance too (a 429 there: OverpassRequest.RATE_LIMIT_CODES).
+## Ring endpoints (starts on main instance; 429 handled by OverpassRequest).
 static func ring_endpoints() -> Array[String]:
 	return endpoint_order(["//overpass-api.de"])
 
-## Seconds the best-effort ring may still run once the detailed data is
-## ready; past this the fetch finishes with the detailed data alone.
 const RING_GRACE_S := 10.0
-
-## Per-attempt HTTP timeout. The query's own [timeout:30] fires
-## first on a healthy connection; this only bounds a hung one.
-## Single source for the retry budget below and for _http.timeout,
-## so the two can never drift apart. Raised 35→60 s in T2.3: a full
-## Paris 800 m response is ≈8 MB and measured 25–47 s end to end.
+## Per-attempt HTTP timeout (query [timeout:30] fires first on healthy links).
 const ATTEMPT_TIMEOUT := 60.0
 
-## Worst-case seconds for both fetch phases (detailed and the
-## best-effort ring, now concurrent, so this is a generous bound): one
-## attempt timeout per phase (each query uses one instance), plus slack
-## each. Callers waiting on succeeded/failed must wait at least this long
-## or a late rescue is dropped. Typical is far lower (a failure falls back
-## at once, a silent instance after OverpassRequest.FIRST_BYTE_TIMEOUT).
-## Plus one Postpass attempt and its longest wait for Postpass's one slot
-## (PostpassGate.MAX_WAIT_S), one OSM API attempt, and a second's worth of
-## each step down to a smaller box (OsmApiFallback.STEP_DOWN_CODES) so a
-## late result lands.
+## Worst-case seconds for detailed + ring + Postpass + OSM API fallback.
 static func retry_budget_seconds() -> float:
 	return 2.0 * (ATTEMPT_TIMEOUT + 5.0) + PostpassGate.MAX_WAIT_S + PostpassFallback.TIMEOUT_S + 5.0 \
 		+ ATTEMPT_TIMEOUT + 5.0 + OsmApiFallback.extra_budget_seconds()
@@ -186,6 +168,9 @@ func _ready() -> void:
 		if _poi_pending:
 			_on_poi_answered(text))
 	_poi_postpass.failed.connect(_on_poi_postpass_failed)
+	_aeroway = OsmAerowayLayer.new()
+	add_child(_aeroway)
+	_aeroway.settled.connect(_try_finish)
 	_ring_grace = Timer.new()
 	_ring_grace.one_shot = true
 	_ring_grace.wait_time = RING_GRACE_S
@@ -260,8 +245,8 @@ var pois: Array = []
 ## Pier / pontoon ways of the last success (width_m NaN when untagged).
 var piers: Array = []
 var shore_structures: Array = []
-## man_made=bridge outlines of the last parse (OsmParser._bridge_area).
 var bridge_areas: Array = []
+var aeroways: Dictionary = {}
 
 ## Abandon any request still in flight. HTTPRequest serves one request at
 ## a time and answers ERR_BUSY (44) to a second one; a cancelled or
@@ -291,6 +276,8 @@ func cancel(keep_omt: bool = false) -> void:
 	if _bridge_postpass != null:
 		_bridge_postpass.cancel()
 		_poi_postpass.cancel()
+	if _aeroway != null:
+		_aeroway.cancel()
 	if _ring_grace != null:
 		_ring_grace.stop()
 
@@ -330,6 +317,7 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	rail_stations = []
 	shore_structures = []
 	bridge_areas = []
+	aeroways = {}
 	pois = []
 	# Cache key v2 (contract §5): radius suffix keeps preset queries
 	# from colliding; the ring keeps its own _ring marker (a different
@@ -349,6 +337,8 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	_bridge_started = false
 	_bridge_pending = false
 	_bridge_cache = CacheStore.osm_bridge_path(lat, lon)
+	if _aeroway != null:
+		_aeroway.reset(lat, lon, DETAILED_RADIUS_M)
 	_detailed_ready = false
 	_settled = false
 	_ring_pending = false
@@ -469,13 +459,11 @@ var _poi_cache := ""
 var _poi_started := false
 var _poi_pending := false
 var _poi_enabled := true
-## The bridge outline layer (OsmQuery.build_bridge_area_query): its own
-## request and cache file, asked for alongside the POIs. Without it
-## BridgeStructures falls back to grouping the bridge ways.
 var _bridge_text := ""
 var _bridge_cache := ""
 var _bridge_started := false
 var _bridge_pending := false
+var _aeroway: OsmAerowayLayer
 var _ring_pending := false
 var _parse_task := -1
 var _parse_gen := 0
@@ -643,7 +631,9 @@ func _try_finish() -> void:
 			_poi_pending = true
 			_poi_postpass.run(PostpassFallback.build_poi_body(_pending_lat, _pending_lon))
 			return
-	if not _poi_pending and not _bridge_pending:
+	if _aeroway != null:
+		_aeroway.start_if_needed(offline_mode, _settled)
+	if not _poi_pending and not _bridge_pending and (_aeroway == null or not _aeroway.pending):
 		_finish()
 
 func _run_poi_overpass() -> void:
@@ -935,12 +925,14 @@ func _finish() -> void:
 	var gen := _parse_gen
 	var lat := _pending_lat
 	var lon := _pending_lon
+	var aero_text := _aeroway.text if _aeroway != null else ""
 	var ckey := OsmParseCache.make_key(lat, lon, PackedStringArray([
 		"%d:%d" % [_detailed_text.hash(), _detailed_text.length()],
 		"%d:%d" % [_ring_text.hash(), _ring_text.length()],
 		"%d:%d" % [_poi_text.hash(), _poi_text.length()],
 		"%d:%d" % [_transit_text.hash(), _transit_text.length()],
-		"%d:%d" % [_bridge_text.hash(), _bridge_text.length()]]))
+		"%d:%d" % [_bridge_text.hash(), _bridge_text.length()],
+		"%d:%d" % [aero_text.hash(), aero_text.length()]]))
 	var hit := OsmParseCache.take(ckey)
 	if not hit.is_empty():
 		_on_parsed.call_deferred(gen, hit)
@@ -952,6 +944,8 @@ func _finish() -> void:
 		poi = merge_payloads(poi, _transit_text)
 	if _bridge_text != "":
 		poi = merge_payloads(poi, _bridge_text)
+	if aero_text != "":
+		poi = merge_payloads(poi, aero_text)
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
 		var parsed := parse_features(merge_payloads(merge_payloads(detailed, ring), poi), lat, lon)
 		OsmParseCache.store(ckey, parsed)
@@ -990,6 +984,7 @@ func _on_parsed(gen: int, parsed: Dictionary) -> void:
 	piers = parsed.get("piers", [])
 	shore_structures = parsed.get("shore_structures", [])
 	bridge_areas = parsed.get("bridge_areas", [])
+	aeroways = parsed.get("aeroways", {})
 	succeeded_v2.emit(parsed["roads"], parsed["waterways"],
 		parsed["trees"], parsed["barriers"])
 	succeeded.emit(parsed["buildings"], roads_to_v1(parsed["roads"]),

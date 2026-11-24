@@ -11,14 +11,15 @@ extends RefCounted
 ## aircraft are authored per airport from what the real airport looks like.
 
 const GROUND := 0.3
-## The paved layers stand LIFT proud of the seat so the ground's small swells
-## do not break through them; their skirts reach SKIRT_Y below it.
-const LIFT := 0.4
+## The paved layers sit flush over the conformed terrain surface (no thick
+## raised viaduct slabs); `conform()` drapes their vertices to GroundTruth.
+const LIFT := 0.06
 const SKIRT_Y := -1.5
 const APRON_TOP := GROUND + LIFT + 0.02
 const TAXI_TOP := GROUND + LIFT + 0.05
 const RUNWAY_TOP := GROUND + LIFT + 0.08
 const LINE_LIFT := 0.03
+const DRAPE_STEP_M := 40.0
 const MIN_RING_M := 1.0
 const GATE_GAP_M := 9.0
 
@@ -41,24 +42,35 @@ static func mats(lm: LandmarkMesh, wall_set: String, wall: String, roof_set: Str
 	LandmarkAircraft.mats(lm)
 
 ## The paved ground: aprons, taxiways (with their yellow centre lines),
-## runways and their paint.
+## runways and their paint — flat caps subdivided along their length so
+## `conform()` drapes them flush onto the terrain without raised slab skirts.
 static func surfaces(lm: LandmarkMesh, data: Dictionary) -> void:
 	for ring in data["aprons"]:
-		slab(lm, "Apron", _poly(ring), APRON_TOP)
+		cap(lm, "Apron", _poly(ring), APRON_TOP)
 	for t in data["taxiways"]:
-		var line := _poly(t["pts"])
+		var line := _subdivide(_poly(t["pts"]), DRAPE_STEP_M)
 		for p in Geometry2D.offset_polyline(line, float(t["w"]) * 0.5, Geometry2D.JOIN_ROUND, Geometry2D.END_ROUND):
-			slab(lm, "Runway", p, TAXI_TOP)
+			cap(lm, "Runway", p, TAXI_TOP)
 	for t in data["taxiways"]:
-		var line := _poly(t["pts"])
+		var line := _subdivide(_poly(t["pts"]), DRAPE_STEP_M)
 		for p in Geometry2D.offset_polyline(line, 0.15, Geometry2D.JOIN_ROUND, Geometry2D.END_BUTT):
 			cap(lm, "MarkY", p, TAXI_TOP + LINE_LIFT)
 	for r in data["runways"]:
 		var a := Vector2(float(r["a"][0]), float(r["a"][1]))
 		var b := Vector2(float(r["b"][0]), float(r["b"][1]))
-		var d := (b - a).normalized()
+		var length := a.distance_to(b)
+		if length < 1.0:
+			continue
+		var d := (b - a) / length
 		var hw := Vector2(-d.y, d.x) * float(r["w"]) * 0.5
-		slab(lm, "Runway", PackedVector2Array([a - hw, b - hw, b + hw, a + hw]), RUNWAY_TOP)
+		var segs := maxi(1, int(ceil(length / DRAPE_STEP_M)))
+		for k in segs:
+			var p0 := a.lerp(b, float(k) / float(segs))
+			var p1 := a.lerp(b, float(k + 1) / float(segs))
+			lm.quad("Runway", Vector3(p0.x - hw.x, RUNWAY_TOP, p0.y - hw.y),
+				Vector3(p1.x - hw.x, RUNWAY_TOP, p1.y - hw.y),
+				Vector3(p1.x + hw.x, RUNWAY_TOP, p1.y + hw.y),
+				Vector3(p0.x + hw.x, RUNWAY_TOP, p0.y + hw.y), Vector3.UP)
 		LandmarkRunwayMarks.paint(lm, r, RUNWAY_TOP)
 
 ## The measured hangars and sheds, extruded to their tagged or typical
@@ -368,6 +380,52 @@ static func _poly(pts: Array) -> PackedVector2Array:
 			out.append(v)
 	if out.size() > 1 and out[0].distance_to(out[out.size() - 1]) < 0.05:
 		out.remove_at(out.size() - 1)
+	return out
+
+## Drapes the flat paved ground surfaces (Runway, Apron, MarkW, MarkY) of a
+## capital airport landmark onto `ground` per vertex so long runways never
+## hover above sloping coastal terrain or expose raised slab walls.
+static func conform(root: Node3D, ground: GroundTruth) -> void:
+	var model := root.get_node_or_null("Model") as Node3D
+	if model == null or ground == null:
+		return
+	var to_world := root.transform * model.transform
+	var m2u := WorldScale.metres_to_units()
+	var base_y := root.position.y
+	for part in LandmarkBuilder.parts(root):
+		if str(part.name) not in ["Runway", "Apron", "MarkW", "MarkY"]:
+			continue
+		if part.mesh == null or part.mesh.get_surface_count() < 1:
+			continue
+		var arrays := MeshArrays.surface(part.mesh, 0).duplicate(true)
+		var verts: PackedVector3Array = (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate()
+		for i in verts.size():
+			var v := verts[i]
+			var w := to_world * Vector3(v.x, 0.0, v.z)
+			if ground.is_inside(w.x, w.z):
+				var gy := ground.height_at_world(w.x, w.z)
+				v.y = (gy - base_y) / m2u + (v.y - GROUND)
+				verts[i] = v
+		arrays[Mesh.ARRAY_VERTEX] = verts
+		var nm := ArrayMesh.new()
+		nm.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		nm.surface_set_material(0, part.mesh.surface_get_material(0))
+		MeshArrays.keep_surface(nm, arrays)
+		part.mesh = nm
+
+## Subdivides polyline segments longer than `step` metres so curved/long
+## taxiways drape cleanly over terrain undulations.
+static func _subdivide(pts: PackedVector2Array, step: float) -> PackedVector2Array:
+	if pts.size() < 2:
+		return pts
+	var out := PackedVector2Array([pts[0]])
+	for i in range(1, pts.size()):
+		var a := pts[i - 1]
+		var b := pts[i]
+		var seg := a.distance_to(b)
+		var n := maxi(1, int(ceil(seg / step)))
+		for k in range(1, n + 1):
+			out.append(a.lerp(b, float(k) / float(n)))
 	return out
 
 static func _area(ring: PackedVector2Array) -> float:

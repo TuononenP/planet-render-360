@@ -70,6 +70,9 @@ static func stitch(root: Node3D, ground: GroundTruth, type: String) -> void:
 	if type == "fori_ferry":
 		FtFori.conform(root, ground)
 		return
+	if str(LocationData.entry_for_type(type).get("kind", "")) == "Airport":
+		LandmarkAirfieldKit.conform(root, ground)
+		return
 	if not outline(type).is_empty():
 		_plinth(root, ground, type)
 		return

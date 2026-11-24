@@ -40,6 +40,7 @@ const LAYERS := {
 	"transportation": ["class", "subclass", "brunnel", "ramp", "layer", "surface"],
 	"landcover": ["class", "subclass"],
 	"landuse": ["class"],
+	"aeroway": ["class", "ref"],
 }
 
 ## OpenMapTiles water class -> OSM water=*. Pools are not carved ground.
@@ -207,12 +208,21 @@ static func _area_tags(layer: String, cls: String, tags: Dictionary) -> Dictiona
 				return {"landuse": cls}
 			if cls == "pitch":
 				return {"leisure": "pitch"}
+		"aeroway":
+			if cls in ["apron", "helipad", "runway", "taxiway"]:
+				return {"aeroway": cls}
 	return {}
 
 ## OSM tags for a line feature, {} to skip it.
 static func _line_tags(layer: String, cls: String, tags: Dictionary) -> Dictionary:
 	var out := {}
 	var sub := str(tags.get("subclass", ""))
+	if layer == "aeroway":
+		if cls in ["runway", "taxiway", "taxilane"]:
+			out["aeroway"] = cls
+			if str(tags.get("ref", "")) != "":
+				out["ref"] = str(tags["ref"])
+		return out
 	if layer == "waterway":
 		if cls in ["river", "canal", "stream", "drain", "ditch"]:
 			out["waterway"] = cls
