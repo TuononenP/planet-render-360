@@ -339,6 +339,10 @@ static func mix(biome: String, setting: String) -> Array:
 			# maples, lindens and honey locusts, a few pines.
 			return [["zelkova", 0.24], ["oak", 0.24], ["plane", 0.16], ["maple", 0.14], ["lime", 0.1],
 				["honey_locust", 0.06], ["scots_pine", 0.04], ["birch", 0.02]]
+		"amsterdam":
+			# Amsterdam Grachtengordel & Vondelpark: iconic Dutch elms (vase-
+			# shaped zelkova family), common limes along canal quays, and planes.
+			return [["zelkova", 0.52], ["lime", 0.30], ["plane", 0.14], ["oak", 0.04]]
 		"stockholm_park":
 			# Royal Djurgården: the old oaks of the hunting park, lime,
 			# birch, maple, and spruce and pine on the rocky ground.

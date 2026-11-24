@@ -240,6 +240,10 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		# Stockholm's quays, squares and walks are grey granite.
 		_sett_hex = ShoreApron.STOCKHOLM_SETT.to_html(false)
 		_paving_hex = ShoreApron.STOCKHOLM_PAVING.to_html(false)
+	elif AmsterdamCanalBridges.applies(data):
+		# Amsterdam's historic squares & canal quays: weathered grey-brown Dutch porphyry setts.
+		_sett_hex = "#847D75"
+		_paving_hex = "#8B847B"
 	elif ArchitectureParis.applies(data):
 		_sett_hex = ArchitectureParis.SETT_HEX
 		_paving_hex = ArchitectureParis.PAVING_HEX
@@ -330,6 +334,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		root.add_child(mi)
 	StairBuilder.lay(root, data, ground, surf, m2u)
 	BangkokCanalBridges.build(root, data, ground, surf, m2u)
+	AmsterdamCanalBridges.build(root, data, ground, surf, m2u)
 
 ## Paths a pedestrian square paves over (not steps, crossings, bridges,
 ## tunnels or a piece already clipped).

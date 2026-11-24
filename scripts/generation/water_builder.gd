@@ -91,6 +91,7 @@ static func build_water(data: LocationData, ground: GroundTruth = null, abort: B
 		StockholmLocks.build(root, ground.shoreline, data)
 		BangkokWaterfront.build(root, data, ground, abort)
 		VeniceWaterfront.build(root, data, ground, abort)
+		AmsterdamWaterfront.build(root, data, ground, abort)
 		_shore_aprons(root, data, ground, channels, abort)
 		return root
 	# Clip each water polygon once and reuse: _poly_levels and

@@ -13,7 +13,7 @@ const IN := {
 	"stockholm": [59.3293, 18.0686, "stockholm"], "monteliusvagen": [59.3207, 18.0604, "stockholm"],
 	"bangkok": [13.75398, 100.50144, "bangkok"], "bangkok_river": [13.7455, 100.4905, "bangkok"],
 	"london": [51.5018, -0.1196, "london"], "paris": [48.8622, 2.2887, "paris"],
-	"venice": [45.4318, 12.3290, "venice"],
+	"venice": [45.4318, 12.3290, "venice"], "amsterdam": [52.37403, 4.88969, "amsterdam"],
 }
 const OUT := {"tampere": [61.4978, 23.7610], "tallinn": [59.4370, 24.7536], "lyon": [45.7640, 4.8357]}
 

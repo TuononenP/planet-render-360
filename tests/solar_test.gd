@@ -92,6 +92,13 @@ func _rig_checks(failures: Array[String]) -> void:
 	if is_nan(g) or g < 12.0 or g > 24.0:
 		failures.append("polar golden hour out of range: %f" % g)
 	_moon_checks(rig, failures)
+	# Pre-weather UTC offset guess: Amsterdam (4.89° E) is CET UTC+1, London UTC+0.
+	rig.set_place(52.37403, 4.88969)
+	if absf(rig.utc_offset_h - 1.0) > 0.01:
+		failures.append("Amsterdam pre-weather UTC offset should be +1.0, got %.1f" % rig.utc_offset_h)
+	rig.set_place(51.5018, -0.1196)
+	if absf(rig.utc_offset_h - 0.0) > 0.01:
+		failures.append("London pre-weather UTC offset should be 0.0, got %.1f" % rig.utc_offset_h)
 	rig.free()
 
 ## The real moon: phase from the date, light from where it stands.

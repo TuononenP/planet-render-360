@@ -51,16 +51,10 @@ static func _platform_and_fence(lm: LandmarkMesh) -> void:
 			lm.frustum("Iron", bp + Vector3(0, 0.22, 0), 0.025, 0.02, 0.72, 6)
 
 static func _pedestal_and_statues(lm: LandmarkMesh) -> void:
-	# Stepped red granite pedestal + front ledge for Suomi-neito.
-	U.blk(lm, "Granite", 0.0, 0.42, 0.3, 3.2, 0.45, 3.6)
-	U.blk(lm, "Granite", 0.0, 0.87, 1.35, 1.6, 0.65, 1.2)
-	U.blk(lm, "Granite", 0.0, 0.87, 0.0, 2.4, 0.55, 2.4)
-	lm.frustum("Granite", Vector3(0, 1.42, 0), 1.15, 0.96, 3.0, 4, PI * 0.25)
-	U.blk(lm, "Granite", 0.0, 4.42, 0.0, 2.25, 0.38, 2.25)
-	# Gilded inscription plaque and bronze laurel wreath on the pedestal front.
-	lm.box("Gold", Vector3(0.0, 3.1, 0.88), Vector3(0.95, 0.55, 0.06), Basis(), 0.0)
-	lm.lathe("Bronze", Vector3(0.0, 2.35, 0.90), U.ball(0.24), 10, 1.0, 0.3)
-	# Maiden of Finland (Suomi-neito) holding a laurel wreath on the lower ledge.
-	LandmarkKits.statue_figure(lm, "Bronze", Vector3(0.0, 1.52, 1.35), 2.35, true)
-	# Johan Ludvig Runeberg standing atop the pedestal to exact 8.0 m.
-	LandmarkKits.statue_figure(lm, "Bronze", Vector3(0.0, 4.80, 0.0), 3.20, false)
+	# Stepped red granite base + extracted City of Helsinki 3D+ Reality Mesh (2024, CC BY 4.0)
+	# Runeberg & Suomi-neito monument rising to exact 8.0 m.
+	U.blk(lm, "Granite", 0.0, 0.42, 0.0, 3.2, 0.42, 3.2)
+	if not SculptureKit.stamp_path(lm, "Bronze", "res://assets/landmarks/helsinki_3d/runeberg_statue.glb",
+			Vector3(0.0, 0.84, 0.0), Vector3(1.0, 1.0, 1.0), 0.0):
+		U.blk(lm, "Granite", 0.0, 0.84, 0.0, 2.4, 3.5, 2.4)
+		LandmarkKits.statue_figure(lm, "Bronze", Vector3(0.0, 4.80, 0.0), 3.20, false)

@@ -59,6 +59,8 @@ const ZONES := [
 		"rules": {"tree_mix": "nyc_park"}},
 	{"id": "djurgarden", "lat": [59.318, 59.345], "lon": [18.090, 18.160],
 		"rules": {"tree_mix": "stockholm_park", "trees_only": true}},
+	{"id": "amsterdam_canals", "lat": [52.345, 52.392], "lon": [4.855, 4.935],
+		"rules": {"tree_mix": "amsterdam", "trees_only": true}},
 	{"id": "kungstradgarden", "lat": [59.3298, 59.3340], "lon": [18.0685, 18.0745],
 		"rules": {"tree_mix": "lime_avenue", "trees_only": true}},
 	{"id": "humlegarden", "lat": [59.3355, 59.3395], "lon": [18.0700, 18.0780],

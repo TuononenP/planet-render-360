@@ -13,16 +13,17 @@ const STATUE_DIR := "res://assets/statues/"
 static var _mesh_cache: Dictionary = {} # name -> Dictionary { "v", "n", "uv", "idx" }
 static var _mutex := Mutex.new()
 
-## Loads and caches the triangle arrays for `res://assets/statues/<asset_name>.glb`.
-static func _load_glb(asset_name: String) -> Dictionary:
+## Loads and caches the triangle arrays for `res://assets/statues/<asset_name>.glb`
+## or any full `res://...` `.glb` path.
+static func _load_glb(asset_or_path: String) -> Dictionary:
+	var path := asset_or_path if asset_or_path.begins_with("res://") else (STATUE_DIR + asset_or_path + ".glb")
 	_mutex.lock()
-	if _mesh_cache.has(asset_name):
-		var cached: Dictionary = _mesh_cache[asset_name]
+	if _mesh_cache.has(path):
+		var cached: Dictionary = _mesh_cache[path]
 		_mutex.unlock()
 		return cached
 	_mutex.unlock()
 
-	var path := STATUE_DIR + asset_name + ".glb"
 	var out := {}
 	if FileAccess.file_exists(path):
 		var bytes := FileAccess.get_file_as_bytes(path)
@@ -42,7 +43,7 @@ static func _load_glb(asset_name: String) -> Dictionary:
 						out = {"v": verts, "n": norms, "uv": uvs, "idx": indices}
 
 	_mutex.lock()
-	_mesh_cache[asset_name] = out
+	_mesh_cache[path] = out
 	_mutex.unlock()
 	return out
 
@@ -116,10 +117,15 @@ static func _stamp_glb(lm: LandmarkMesh, key: String, asset_name: String, base: 
 			s.uv.append_array([su[i0] * uv_scale, su[i1] * uv_scale, su[i2] * uv_scale])
 	return true
 
-## Public helper to stamp any cached `.glb` from `assets/statues/` into LandmarkMesh.
+## Public helper to stamp any cached `.glb` from `assets/statues/` or a full `res://` path into LandmarkMesh.
 static func stamp_asset(lm: LandmarkMesh, key: String, asset_name: String, base: Vector3,
 		scale_v: Vector3, yaw: float = 0.0, pitch: float = 0.0) -> bool:
 	return _stamp_glb(lm, key, asset_name, base, scale_v, yaw, pitch)
+
+## Stamps a `.glb` from an explicit `res://` path (e.g. `res://assets/landmarks/trafalgar/landseer_lion.glb`).
+static func stamp_path(lm: LandmarkMesh, key: String, res_path: String, base: Vector3,
+		scale_v: Vector3 = Vector3.ONE, yaw: float = 0.0, pitch: float = 0.0) -> bool:
+	return _stamp_glb(lm, key, res_path, base, scale_v, yaw, pitch)
 
 ## Classical / Baroque standing statue (draped Zenobia or heroic trident-bearing Neptune).
 static func classical_figure(lm: LandmarkMesh, key: String, base: Vector3, h: float,

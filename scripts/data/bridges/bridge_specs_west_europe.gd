@@ -299,16 +299,27 @@ static func rows() -> Array:
 				"height estimated | verified: en Wikipedia: cast-iron, ~30 m, just under 9 m wide, infobox " +
 				"one span; Buildings of Ireland (NIAH): single segmental cast-iron arch; Grace's Guide 98.5 " +
 				"ft x 30 ft; OSM bearing 174.7, centre matches"},
-		{"id": "br_amsterdam_python_bridge", "cc": "NL", "name": "Python Bridge", "wiki": "Python Bridge",
-			"aliases": ["pythonbrug", "hoge brug amsterdam"], "lat": 52.37305, "lon": 4.94888, "bearing": 169.6,
-			"st": "girder", "spans": [90.0], "width": 4.0, "clear": 6.0, "material": "steel", "base": "water",
-			"tier": 3, "conf": 1,
-			"src": "en Wikipedia (steel, main span 90 m), OSM way bearing/centre (81 m chain incl. ramps); width " +
-				"and height ESTIMATED, form is a box with a looping ramp | verified: en Wikipedia main span " +
-				"90 m; nl Wikipedia 93 m across the Spoorwegbassin, longer path because of the looping form, " +
-				"max headroom 9.5 m; OSM name search found nothing ('Hoge brug' tagged differently) | round " +
-				"2: verify2: searched and not found - nl Wikipedia re-read: 93 m over the Spoorwegbassin, max " +
-				"headroom 9.5 m, looping ramp; width unsourced"},
+		# br_amsterdam_python_bridge & br_amsterdam_magere_brug moved to bespoke AmsBridges (`AMS-4.1`).
+		{"id": "br_amsterdam_berlagebrug", "cc": "NL", "name": "Berlagebrug", "wiki": "Berlagebrug",
+			"aliases": ["berlagebrug", "berlage bridge amsterdam"], "lat": 52.34692, "lon": 4.91306, "bearing": 70.0,
+			"st": "bascule", "spans": [22.0, 22.0, 14.0, 22.0], "width": 24.0, "clear": 3.2,
+			"material": "stone", "base": "water", "tier": 2, "conf": 2,
+			"src": "nl Wikipedia (H.P. Berlage 1932 Amsterdam School brick/granite bascule bridge over the Amstel, 80 m long, 24 m wide)"},
+		{"id": "br_amsterdam_jan_schaeferbrug", "cc": "NL", "name": "Jan Schaeferbrug", "wiki": "Jan Schaeferbrug",
+			"aliases": ["jan schaeferbrug", "jan schaefer bridge"], "lat": 52.37728, "lon": 4.92556, "bearing": 168.0,
+			"st": "arch_deck", "spans": [30.0, 62.0, 30.0], "width": 16.0, "clear": 8.0, "rise": 6.5,
+			"material": "steel", "base": "water", "tier": 2, "conf": 2,
+			"src": "nl Wikipedia (2001 steel arch bridge linking Java-eiland across the IJhaven, ~122 m water span, 16 m wide)"},
+		{"id": "br_amsterdam_hogesluis", "cc": "NL", "name": "Hogesluis", "wiki": "Hogesluis",
+			"aliases": ["hogesluis", "hogesluis amsterdam"], "lat": 52.36120, "lon": 4.90415, "bearing": 65.0,
+			"st": "masonry", "spans": [14.0, 14.0, 16.0, 14.0, 14.0], "width": 22.0, "clear": 3.5, "rise": 2.4,
+			"material": "stone", "base": "water", "tier": 2, "conf": 2,
+			"src": "nl Wikipedia (historic five-arch brick & granite bridge over the Amstel at Sarphatistraat, ~72 m span)"},
+		{"id": "br_amsterdam_torontobrug", "cc": "NL", "name": "Torontobrug", "wiki": "Torontobrug",
+			"aliases": ["torontobrug", "toronto bridge amsterdam"], "lat": 52.35742, "lon": 4.90568, "bearing": 70.0,
+			"st": "girder", "spans": [28.0, 42.0, 28.0], "width": 18.0, "clear": 4.0,
+			"material": "concrete", "base": "water", "tier": 3, "conf": 2,
+			"src": "nl Wikipedia (1969 concrete girder bridge carrying Stadhouderskade over the Amstel, ~98 m span)"},
 		{"id": "br_luxembourg_adolphe_bridge", "cc": "LU", "name": "Adolphe Bridge", "wiki": "Adolphe Bridge",
 			"aliases": ["pont adolphe", "adolphe brucke", "adolphe bridge luxembourg"], "lat": 49.60844, "lon": 6.12688,
 			"bearing": 151.5, "st": "arch_deck", "spans": [27.0, 84.65, 27.0], "width": 18.0, "clear": 42.0,
@@ -383,15 +394,4 @@ static func rows() -> Array:
 				"OSM bearing 271.3, centre matches; length 153 m (OSM) vs 172/278 m conflicting | round 2: " +
 				"verify2: searched and not found - es Wikipedia re-read: nine semicircular arches, central " +
 				"the widest and decreasing outward, no figures"},
-		{"id": "br_amsterdam_magere_brug", "cc": "NL", "name": "Magere Brug", "wiki": "Magere Brug",
-			"aliases": ["skinny bridge amsterdam", "magere brug amstel"], "lat": 52.36358, "lon": 4.90236,
-			"bearing": 73.0, "st": "bascule", "spans": [28.0, 11.0, 28.0], "width": 4.0, "clear": 2.5,
-			"material": "steel", "base": "water", "tier": 2, "conf": 1,
-			"src": "en/nl Wikipedia articles found but infoboxes carry no dimensions; coordinate " +
-				"52.36361,4.90250 agrees with OSM within 12 m, OSM bearing; double-leaf wooden drawbridge " +
-				"with several openings: span split and width ESTIMATED (about 65-70 m overall), timber " +
-				"modelled as steel | verified: nl/en Wikipedia: 1934 reconstruction, wooden double bascule " +
-				"with several openings (9 openings in the 1871 version), no dimensions in articles; OSM name " +
-				"search found no bridge ways | round 2: verify2: searched and not found - nl Wikipedia re- " +
-				"read: no dimensions or opening layout"},
 	]

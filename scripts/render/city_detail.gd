@@ -13,9 +13,9 @@ extends RefCounted
 ## the layout stays the same across presets (AC-12).
 
 ## Bumped whenever a knob's value changes (WorldCache.key).
-const VERSION := 6
+const VERSION := 7
 
-const CITIES := ["helsinki", "espoo", "turku", "stockholm", "bangkok", "london", "paris", "venice"]
+const CITIES := ["helsinki", "espoo", "turku", "stockholm", "bangkok", "london", "paris", "venice", "amsterdam"]
 
 ## The detail city at (lat, lon): "helsinki", "espoo", "turku", "stockholm" or "".
 static func city_at(lat: float, lon: float) -> String:

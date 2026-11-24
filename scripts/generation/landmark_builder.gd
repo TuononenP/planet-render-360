@@ -112,6 +112,9 @@ static func build_bridge(type: String, deck_m: float, tilt_m: float = 0.0, rise_
 	if type == "passerelle_debilly":
 		LandmarkPaBridgeDebilly.build_fitted(model, deck_m, tilt_m, rise_m)
 		return root
+	if type in ["magere_brug", "blauwbrug", "torensluis", "python_bridge"]:
+		LandmarkSetAmsterdam.build(model, type)
+		return root
 	var row := BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m)
 	match type:
 		"br_turku_auransilta": FtBridgeAuransilta.build(model, row)

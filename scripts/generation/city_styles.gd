@@ -208,11 +208,22 @@ const DISTRICTS := [
 	["london", "london_modern", 51.5054, -0.0235, 1.0, 20.0],    # Canary Wharf
 	["london", "london_modern", 51.5140, -0.0830, 0.8, 8.0],     # the City
 	["london", "london_modern", 51.5062, -0.1110, 0.55, 9.0],    # South Bank & Blackfriars
-	["amsterdam", "amsterdam", 52.3700, 4.8880, 1.4, 4.0],       # Grachtengordel
+	["amsterdam", "amsterdam", 52.3735, 4.8965, 0.55, 4.0],      # Oude Centrum / De Wallen
+	["amsterdam", "amsterdam", 52.3740, 4.8880, 0.85, 4.0],      # Grachtengordel-West
+	["amsterdam", "amsterdam", 52.3655, 4.8920, 0.85, 4.0],      # Grachtengordel-Zuid
+	["amsterdam", "amsterdam", 52.3755, 4.8805, 0.70, 4.0],      # Jordaan
+	["amsterdam", "amsterdam", 52.3720, 4.9015, 0.45, 4.0],      # Nieuwmarkt / Lastage
+	["amsterdam", "amsterdam", 52.3665, 4.9110, 0.65, 5.0],      # Plantage
+	["amsterdam", "amsterdam", 52.3570, 4.8800, 0.90, 5.0],      # Museumkwartier / Oud-Zuid
 	["amsterdam", "amsterdam_school", 52.3530, 4.8960, 1.0, 6.0],  # De Pijp
+	["amsterdam", "amsterdam_school", 52.3640, 4.8680, 0.9, 5.0],  # Oud-West
 	["amsterdam", "amsterdam_school", 52.3480, 4.9010, 0.9, 6.0],  # Rivierenbuurt
 	["amsterdam", "amsterdam_school", 52.3890, 4.8800, 0.6, 6.0],  # Spaarndammerbuurt
-	["amsterdam", "amsterdam_modern", 52.3380, 4.8730, 0.9, 20.0],  # Zuidas
+	["amsterdam", "amsterdam_modern", 52.3760, 4.9380, 1.1, 7.0],  # Eastern Docklands (Java/KNSM/Borneo)
+	["amsterdam", "amsterdam_modern", 52.3790, 4.9090, 0.55, 8.0], # Oosterdok / IJdock
+	["amsterdam", "amsterdam_modern", 52.3870, 4.9020, 0.85, 10.0],# Overhoeks / Amsterdam-Noord
+	["amsterdam", "amsterdam_modern", 52.3450, 4.9175, 0.55, 18.0],# Amstelkwartier / Omval
+	["amsterdam", "amsterdam_modern", 52.3380, 4.8730, 0.9, 20.0], # Zuidas
 	["berlin", "berlin_plattenbau", 52.5250, 13.4700, 2.2, 8.0],  # Lichtenberg
 	["berlin", "berlin_plattenbau", 52.5200, 13.4150, 0.8, 5.0],  # Alexanderplatz
 	["berlin", "berlin_plattenbau", 52.5450, 13.5650, 2.5, 20.0],  # Marzahn

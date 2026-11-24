@@ -8,7 +8,7 @@ extends RefCounted
 
 static func entries() -> Array:
 	var all: Array = []
-	for batch in [LandmarkRegistryWestEurope.entries(), LandmarkRegistryLondon.entries(), LandmarkRegistryParis.entries(), LandmarkRegistrySouthEurope.entries(),
+	for batch in [LandmarkRegistryWestEurope.entries(), LandmarkRegistryLondon.entries(), LandmarkRegistryParis.entries(), LandmarkRegistryAmsterdam.entries(), LandmarkRegistrySouthEurope.entries(),
 			LandmarkRegistryVenice.entries(),
 			LandmarkRegistryCentralEurope.entries(), LandmarkRegistryMideastAfrica.entries(),
 			LandmarkRegistryAsiaSouth.entries(), LandmarkRegistryAsiaEast.entries(),
@@ -36,7 +36,7 @@ static func entries() -> Array:
 	return all
 
 static func sets() -> Array[Callable]:
-	return [LandmarkSetWestEurope.build, LandmarkSetLondon.build, LandmarkSetParis.build, LandmarkSetSouthEurope.build,
+	return [LandmarkSetWestEurope.build, LandmarkSetLondon.build, LandmarkSetParis.build, LandmarkSetAmsterdam.build, LandmarkSetSouthEurope.build,
 		LandmarkSetVenice.build,
 		LandmarkSetCentralEurope.build, LandmarkSetMideastAfrica.build,
 		LandmarkSetAsiaSouth.build, LandmarkSetAsiaEast.build,

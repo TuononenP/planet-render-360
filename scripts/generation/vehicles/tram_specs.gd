@@ -40,6 +40,8 @@ const WOOD := Color(0.42, 0.27, 0.15)
 const LIVERIES := {
 	"helsinki": {"lower": Color(0.0, 0.45, 0.27), "band": Color(0.0, 0.45, 0.27), "upper": Color(0.93, 0.9, 0.78),
 		"pillar": DARK, "roof": ROOF_GREY, "inner": WOOD, "gauge": 1.0, "boards": true},
+	"amsterdam": {"lower": Color(0.0, 0.34, 0.66), "band": WHITE, "upper": WHITE,
+		"pillar": DARK, "roof": Color(0.0, 0.34, 0.66), "inner": WOOD, "gauge": 1.435},
 	"lisbon_modern": {"lower": Color(0.96, 0.75, 0.05), "band": WHITE, "upper": Color(0.96, 0.75, 0.05),
 		"pillar": DARK, "roof": ROOF_GREY, "inner": WOOD, "gauge": 1.435},
 	"lisbon": {"lower": Color(0.95, 0.74, 0.06), "band": Color(0.95, 0.74, 0.06), "upper": Color(0.94, 0.93, 0.88),
@@ -226,6 +228,8 @@ static func pick(region: String, country: String, rail: Dictionary, h: float, ll
 			if gauge <= 0.95:
 				return {"kind": "heritage", "livery": "lisbon"}
 			return {"kind": "modern3", "livery": "lisbon_modern"}
+		"amsterdam":
+			return {"kind": "modern5", "livery": "amsterdam"}
 	if country.to_upper() == "PT":
 		return {"kind": "heritage", "livery": "porto"}
 	# One band colour per city, not per tram.

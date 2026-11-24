@@ -165,6 +165,12 @@ const ROWS := [
 	{"id": "bangkok", "label": "Bangkok", "name": "Bangkok, Thailand",
 		"lat": 13.75398, "lon": 100.50144, "eye_lat": 13.75270, "eye_lon": 100.49260,
 		"eye_m": 8.0, "bearing": 192.0, "pitch": 3.0, "zoom": 1.15},
+	# Dam Square east looking west-northwest past the Nationaal Monument onto
+	# Koninklijk Paleis, De Nieuwe Kerk, and the Grachtengordel toward Westertoren;
+	# origin matches the bundled Amsterdam capital snapshot (52.37403, 4.88969).
+	{"id": "amsterdam", "label": "Amsterdam", "name": "Amsterdam, The Netherlands",
+		"lat": 52.37403, "lon": 4.88969, "eye_lat": 52.37295, "eye_lon": 4.89330,
+		"eye_m": 6.0, "bearing": 276.0, "pitch": 5.0, "clear": false},
 ]
 
 ## Index of the starting place in ROWS (and in LocationData.quick_picks()).

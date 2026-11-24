@@ -18,11 +18,7 @@ static func entries() -> Array:
 			"secondary": true, "capital": "FR", "yaw_deg": 17.1, "clear_m": 16.0,
 			"clear_rect_m": [0.0, -89.0, 93.4, 112.3],
 			"aliases": ["gare du nord", "paris nord", "paris gare du nord"]},
-		{"type": "amsterdam_centraal", "name": "Amsterdam Centraal", "lat": 52.379001, "lon": 4.900698,
-			"radius_m": 6000.0, "wiki_title": "Amsterdam Centraal station", "height_m": 45.0, "kind": "Station",
-			"secondary": true, "capital": "NL", "yaw_deg": 30.1, "clear_m": 16.0,
-			"clear_rect_m": [0.0, -37.8, 138.4, 56.5],
-			"aliases": ["amsterdam centraal", "amsterdam central station", "amsterdam centraal station"]},
+		# amsterdam_centraal migrated to LandmarkRegistryAmsterdam (AmsRegCentre).
 		{"type": "brussels_central_station", "name": "Brussels-Central", "lat": 50.845511, "lon": 4.357066,
 			"radius_m": 6000.0, "wiki_title": "Brussels-Central railway station", "height_m": 26.0, "kind": "Station",
 			"secondary": true, "capital": "BE", "yaw_deg": 133.0, "clear_m": 16.0,

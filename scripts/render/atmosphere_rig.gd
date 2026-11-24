@@ -247,8 +247,22 @@ func set_place(lat: float, lon: float) -> void:
 	latitude = lat
 	longitude = lon
 	if not utc_offset_known:
-		utc_offset_h = roundf(lon / 15.0)
+		utc_offset_h = _guess_utc_offset(lat, lon)
 	_apply()
+
+## Pre-weather UTC offset guess: legal time zones that diverge from
+## `roundf(lon / 15.0)` (e.g. Benelux/France/Spain on CET UTC+1 despite
+## lying near 0°–7° E, Singapore on UTC+8), overridden once weather loads.
+static func _guess_utc_offset(lat: float, lon: float) -> float:
+	# Western Europe CET (NL, BE, LU, FR, ES): UTC+1 west of 7.5° E.
+	if lat >= 36.0 and lat <= 54.0 and lon >= -9.5 and lon < 7.5:
+		# Exclude UK & Ireland (UTC+0) and Portugal (UTC+0).
+		if not (lat >= 49.8 and lon < 1.8) and not (lat <= 42.2 and lon < -6.2):
+			return 1.0
+	# Singapore & Peninsular Malaysia (UTC+8).
+	if lat >= 1.0 and lat <= 6.8 and lon >= 99.5 and lon <= 104.6:
+		return 8.0
+	return roundf(lon / 15.0)
 
 func set_utc_offset(hours: float) -> void:
 	utc_offset_h = hours

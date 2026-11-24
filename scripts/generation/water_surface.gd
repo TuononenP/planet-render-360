@@ -96,7 +96,19 @@ static func inland_palette(data: LocationData) -> Dictionary:
 			"spec": 0.26,
 			"wave_amp": 0.48,
 		}
+	if data != null and amsterdam_canals(data.latitude, data.longitude):
+		# Deep reflective dark olive/bottle-green Dutch canals & brackish IJ.
+		return {
+			"deep": Color(0.036, 0.062, 0.044, 1.0),
+			"shallow": Color(0.058, 0.088, 0.056, 1.0),
+			"near_rough": 0.08,
+			"spec": 0.30,
+			"wave_amp": 0.32,
+		}
 	return {}
+
+static func amsterdam_canals(lat: float, lon: float) -> bool:
+	return lat >= 52.30 and lat <= 52.43 and lon >= 4.78 and lon <= 5.02
 
 ## Sea absorption in linear RGB. Small geographic boxes select sheltered
 ## estuaries; climate supplies the existing temperate/tropical fallback.

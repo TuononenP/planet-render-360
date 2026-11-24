@@ -7,6 +7,7 @@ extends RefCounted
 ## 1376320190), yaw 0 (+X east, +Z south toward the harbour).
 
 const FhU = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_util.gd")
+const RealityMesh = preload("res://scripts/generation/reality_mesh_kit.gd")
 
 const ENTRY := {"type": "market_square_helsinki", "name": "Market Square, Helsinki", "lat": 60.1676605, "lon": 24.9544392,
 	"radius_m": 1500.0, "wiki_title": "Market Square, Helsinki", "height_m": 9.0, "clear_m": 20.0,
@@ -27,7 +28,6 @@ static func build(model: Node3D) -> void:
 	lm.use("Green", LandmarkMaterials.paint("#6F9A45", 0.8, 0.0))
 	lm.use("Red", LandmarkMaterials.paint("#C5432F", 0.8, 0.0))
 	_sett_apron(lm)
-	_obelisk(lm)
 	_quay_edge(lm)
 	var n := 0
 	for row in 3:
@@ -39,6 +39,15 @@ static func build(model: Node3D) -> void:
 			_stall(lm, x, z, "Orange" if (i * 3 + row) % 4 != 3 else "White", n)
 			n += 1
 	lm.commit(model)
+	# Textured City of Helsinki 3D+ Reality Mesh (2024, CC BY 4.0) Keisarinnankivi obelisk & gilt eagle
+	if RealityMesh.add_textured_glb(model, "Keisarinnankivi",
+			"res://assets/landmarks/helsinki_3d/keisarinnankivi.glb",
+			Vector3(0.0, 0.08, 0.0), Vector3(0.96, 0.96, 0.96), 0.0, 0.65, 0.15) == null:
+		var fb := LandmarkMesh.new()
+		fb.use("Granite", LandmarkMaterials.pbr("stone", "#9A8D88", 2.5))
+		fb.use("Gold", LandmarkMaterials.gold())
+		_obelisk(fb)
+		fb.commit(model)
 	var warm := Color(1.0, 0.88, 0.64)
 	model.set_meta(LandmarkLights.FLOOD_META, [
 		[Vector3(-6.2, 0.4, -6.2), Vector3(0.0, 6.6, 0.0), 34.0, 1.0, 22.0, warm],

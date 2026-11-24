@@ -5,13 +5,15 @@ extends RefCounted
 ## registry type of LandmarkRegistrySouthEurope. Returns false for a type it does
 ## not own so LandmarkBuilder tries the next set.
 
+const SEuRomeTrevi = preload("res://scripts/generation/landmarks/south_europe/landmark_rome_trevi.gd")
+
 static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"leaning_tower_pisa": SEuPisa.build(model)
 		"st_peters_basilica": SEuRomeSacred.peters(model)
 		"pantheon_rome": SEuRomeSacred.pantheon(model)
 		"castel_sant_angelo": SEuRomeCivic.castel(model)
-		"trevi_fountain": SEuRomeCivic.trevi(model)
+		"trevi_fountain": SEuRomeTrevi.build(model)
 		"altare_della_patria": SEuRomeCivic.vittoriano(model)
 		"milan_cathedral": SEuDuomos.milan(model)
 		"florence_duomo": SEuDuomos.florence(model)

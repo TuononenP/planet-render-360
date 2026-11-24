@@ -263,6 +263,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	timings["roof_setup"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	var lod2_done := Lod2MeshBuilder.build_corridor(root, data, ground, sorted, standing, ctx)
+	AmsterdamHouseboats.build_all(root, data, ground, sorted, standing, lod2_done)
 	timings["lod2_meshes"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	for k in sorted.size():

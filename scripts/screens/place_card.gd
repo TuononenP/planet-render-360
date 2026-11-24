@@ -26,7 +26,8 @@ const NEAR := [[0, 200], [80, 168], [140, 186], [210, 160], [280, 190], [340, 17
 const SKY_FOR := {"Paris": 3, "Alps": 4, "Banff": 1, "Big Sur": 2, "Tokyo": 0,
 	"New York": 3, "Midtown": 2, "Stockholm": 1, "Monaco": 2, "Dubai": 2, "London": 0,
 	"Rome": 3, "Venice": 1, "Seoul": 0, "San Francisco": 3, "Helsinki": 3, "Espoo": 2,
-	"Turku": 3, "Central Park": 2, "Miami": 3, "Miami Beach": 2, "Bangkok": 3}
+	"Turku": 3, "Central Park": 2, "Miami": 3, "Miami Beach": 2, "Bangkok": 3,
+	"Amsterdam": 3}
 
 ## Height of the optional country line under the name.
 const SUBTITLE_H := 22

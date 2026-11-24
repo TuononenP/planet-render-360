@@ -27,6 +27,8 @@ const BUNDLES := {
 		"3D building meshes: © City of Espoo & HSY (CC BY 4.0); facade samples: Mapillary contributors (CC BY-SA 4.0)", false],
 	"turku:": ["res://assets/city_models/turku_lod2_meshes/",
 		"3D building meshes: © City of Turku (CC BY 4.0); facade samples: Mapillary & Panoramax contributors (CC BY-SA 4.0)", true],
+	"amsterdam:": ["res://assets/city_models/amsterdam_lod2_meshes/",
+		"3D building meshes: © 3DBAG by TU Delft & 3DGI (CC BY 4.0); roof samples: PDOK Luchtfoto (CC BY 4.0)", false],
 }
 
 const ROOF_MATS: Array[String] = ["", "metal", "terracotta", "copper", "bitumen"]
@@ -60,6 +62,9 @@ static func covers(lat: float, lon: float) -> bool:
 static func is_gk23(lat: float, lon: float) -> bool:
 	return lat >= 60.34 and lat <= 60.62 and lon >= 22.05 and lon <= 22.52
 
+static func is_rd_new(lat: float, lon: float) -> bool:
+	return lat >= 52.28 and lat <= 52.45 and lon >= 4.74 and lon <= 5.04
+
 static func cell_keys(lat: float, lon: float) -> Array:
 	var cells := _cells()
 	if cells.is_empty():
@@ -78,6 +83,13 @@ static func cell_keys(lat: float, lon: float) -> Array:
 		for ek in range(floori((c[0] - HALF_M) / 1000.0), floori((c[0] + HALF_M) / 1000.0) + 1):
 			for nk in range(floori((c[1] - HALF_M) / 1000.0), floori((c[1] + HALF_M) / 1000.0) + 1):
 				var key := "turku:%d_%d" % [ek, nk]
+				if cells.has(key):
+					keys.append(key)
+	elif is_rd_new(lat, lon):
+		var c := RdNew.forward(lat, lon)
+		for ek in range(floori((c[0] - HALF_M) / 1000.0), floori((c[0] + HALF_M) / 1000.0) + 1):
+			for nk in range(floori((c[1] - HALF_M) / 1000.0), floori((c[1] + HALF_M) / 1000.0) + 1):
+				var key := "amsterdam:%d_%d" % [ek, nk]
 				if cells.has(key):
 					keys.append(key)
 	return keys

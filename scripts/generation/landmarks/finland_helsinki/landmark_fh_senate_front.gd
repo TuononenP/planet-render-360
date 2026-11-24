@@ -185,18 +185,15 @@ static func _monument(lm: LandmarkMesh) -> void:
 	for sx in [-1.0, 1.0]:
 		_candelabrum(lm, c + Vector3(sx * (hw - 1.4), top, hd - 1.4), 8.0, 5)
 		_candelabrum(lm, c + Vector3(sx * (hw - 1.4), top, -hd + 1.4), 5.5, 3)
-	# Pedestal: three red-granite tiers, the die and its cornice.
-	var y := top
-	for t in [[6.0, 0.5, 6.0], [4.6, 0.5, 4.6], [3.4, 0.9, 2.8], [2.6, 3.6, 2.0], [3.0, 0.4, 2.4], [2.2, 0.4, 1.6]]:
-		lm.box("RedGranite", c + Vector3(0, y + float(t[1]) * 0.5, 0), Vector3(float(t[0]), float(t[1]), float(t[2])))
-		y += float(t[1])
-	LandmarkKits.statue_figure(lm, "Bronze", c + Vector3(0, y, 0), 3.5)
-	var foot := top + 1.0
-	for g in [Vector3(0, 0, 1.95), Vector3(0, 0, -1.95), Vector3(2.0, 0, 0), Vector3(-2.0, 0, 0)]:
-		var gp: Vector3 = c + g + Vector3(0, foot, 0)
-		LandmarkKits.statue_figure(lm, "Bronze", gp, 2.4)
-		var aside := Vector3(g.z, 0, -g.x).normalized() * 0.75
-		lm.box("Bronze", gp + aside + Vector3(0, 0.4, 0), Vector3(0.8, 0.8, 0.8))
+	# Extracted City of Helsinki 3D+ Reality Mesh (2024, CC BY 4.0) Alexander II ensemble
+	# mounted directly onto the crisp granite platform (y = 0.9 m -> 10.7 m exact).
+	if not SculptureKit.stamp_path(lm, "Bronze", "res://assets/landmarks/helsinki_3d/alexander_ii.glb",
+			c + Vector3(0.0, top, 0.0), Vector3(1.14, 1.16, 1.14), 0.0):
+		var y := top
+		for t in [[6.0, 0.5, 6.0], [4.6, 0.5, 4.6], [3.4, 0.9, 2.8], [2.6, 3.6, 2.0], [3.0, 0.4, 2.4], [2.2, 0.4, 1.6]]:
+			lm.box("RedGranite", c + Vector3(0, y + float(t[1]) * 0.5, 0), Vector3(float(t[0]), float(t[1]), float(t[2])))
+			y += float(t[1])
+		LandmarkKits.statue_figure(lm, "Bronze", c + Vector3(0, y, 0), 3.5)
 
 ## Granite posts every ~2.5 m with iron panels between them on `a`..`b`.
 static func _fence(lm: LandmarkMesh, a: Vector3, b: Vector3) -> void:

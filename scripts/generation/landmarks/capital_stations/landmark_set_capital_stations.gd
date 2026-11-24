@@ -10,7 +10,6 @@ extends RefCounted
 static func build(model: Node3D, type: String) -> bool:
 	match type:
 		"gare_du_nord": LandmarkCsWest.gare_du_nord(model)
-		"amsterdam_centraal": LandmarkCsWest.amsterdam_centraal(model)
 		"brussels_central_station": LandmarkCsWest.brussels_central(model)
 		"heuston_station": LandmarkCsWest.heuston(model)
 		"bern_station": LandmarkCsWest.bern(model)

@@ -28,7 +28,7 @@ static func extra_budget_seconds() -> float:
 ## resolved nodes (a relation with no such member) is no footprint;
 ## neither counts as a building.
 static func names_building(tags: Dictionary) -> bool:
-	return tags.has("building") and str(tags["building"]) != "no"
+	return (tags.has("building") and str(tags["building"]) != "no") or OsmTags.is_stupa(tags)
 
 static func url_for(lat: float, lon: float, radius_m: int) -> String:
 	var dlat := radius_m / M_PER_DEG
