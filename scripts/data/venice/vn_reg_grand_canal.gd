@@ -15,7 +15,7 @@ static func entries() -> Array:
 			"aliases": ["san giorgio maggiore", "basilica di san giorgio maggiore", "san giorgio venice"]},
 		{"type": "punta_della_dogana", "name": "Punta della Dogana",
 			"lat": 45.43072, "lon": 12.33627, "radius_m": 4000.0,
-			"wiki_title": "Punta della Dogana", "height_m": 28.0, "yaw_deg": 10.0,
+			"wiki_title": "Punta della Dogana", "height_m": 28.0, "yaw_deg": -11.0,
 			"skyline_priority": 9, "clear_m": 42.0, "clear_rect_m": [0.0, 0.0, 88.0, 48.0],
 			"kind": "Museum",
 			"aliases": ["punta della dogana", "dogana da mar", "venice customs house"]},

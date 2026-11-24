@@ -216,7 +216,20 @@ static func lotte(model: Node3D) -> void:
 	for s in [-1.0, 1.0]:
 		lm.box("Beacon", Vector3(s * hw, 536.0, 0), Vector3(1.4, 38.0, 6.0))
 		lm.box("Beacon", Vector3(0, 536.0, s * hw), Vector3(6.0, 38.0, 1.4))
-	lm.box("Podium", Vector3(0, 7.0, 0), Vector3(96.0, 14.0, 96.0))
+	# Tower podium + attached Lotte World Mall (aligned with Jamsil grid, yaw_deg = -23).
+	lm.box("Podium", Vector3(0, 9.0, 0), Vector3(84.0, 18.0, 84.0))
+	# West wing: Avenuel luxury department store (~85 m x 145 m x 44 m).
+	lm.box("Podium", Vector3(-62.0, 22.0, -8.0), Vector3(82.0, 44.0, 140.0))
+	lm.box("Glass", Vector3(-62.0, 24.0, -8.0), Vector3(83.2, 34.0, 134.0))
+	# Connecting glass atrium between tower and east shopping mall.
+	lm.box("Glass", Vector3(58.0, 16.0, -24.0), Vector3(46.0, 32.0, 74.0))
+	lm.box("Frame", Vector3(58.0, 32.5, -24.0), Vector3(48.0, 1.2, 76.0))
+	# East wing: Lotte World Mall shopping mall & concert hall / cinema (~205 m x 96 m).
+	lm.box("Podium", Vector3(165.0, 22.0, -52.0), Vector3(196.0, 44.0, 92.0))
+	lm.box("Glass", Vector3(165.0, 24.0, -52.0), Vector3(197.2, 32.0, 86.0))
+	# Upper concert hall & cinema volume rising above the east mall roof.
+	lm.box("Podium", Vector3(158.0, 54.0, -48.0), Vector3(102.0, 22.0, 72.0))
+	lm.box("Frame", Vector3(158.0, 65.5, -48.0), Vector3(104.0, 1.5, 74.0))
 	lm.commit(model)
 
 ## Rounded-square (superellipse) section at height fraction f.

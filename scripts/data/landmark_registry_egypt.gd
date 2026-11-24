@@ -54,7 +54,7 @@ static func entries() -> Array:
 			"yaw_deg": 31.0, "kind": "Temple", "aliases": ["philae temple", "temple of isis at philae",
 				"philae", "agilkia island", "معبد فيلة"]},
 		{"type": "edfu_temple", "name": "Temple of Horus at Edfu", "lat": 24.9780, "lon": 32.8734,
-			"radius_m": 4000.0, "wiki_title": "Temple of Edfu", "height_m": 36.0, "clear_m": 125.0,
+			"radius_m": 4000.0, "wiki_title": "Temple of Edfu", "height_m": 36.0, "clear_m": 125.0, "yaw_deg": 16.0,
 			"kind": "Temple", "aliases": ["temple of horus at edfu", "temple of horus", "temple of edfu",
 				"edfu temple", "معبد إدفو"]},
 		{"type": "kom_ombo_temple", "name": "Temple of Kom Ombo", "lat": 24.4520, "lon": 32.9281,

@@ -35,7 +35,7 @@ static func entries() -> Array:
 			"aliases": ["obelisco de buenos aires", "buenos aires obelisk", "obelisco porteño"]},
 		{"type": "gran_torre_santiago", "name": "Gran Torre Santiago", "lat": -33.4177, "lon": -70.6067,
 			"radius_m": 8000.0, "wiki_title": "Gran Torre Santiago", "height_m": 300.0,
-			"clear_m": 100.0, "kind": "Skyscraper",
+			"clear_m": 100.0, "yaw_deg": 31.9, "kind": "Skyscraper",
 			"aliases": ["gran torre santiago", "costanera center", "gran torre costanera"]},
 		{"type": "teatro_amazonas", "name": "Teatro Amazonas", "lat": -3.1303, "lon": -60.0233,
 			"radius_m": 3500.0, "wiki_title": "Amazon Theatre", "height_m": 36.0,

@@ -27,10 +27,10 @@ static func entries() -> Array:
 			"radius_m": 4000.0, "wiki_title": "Shibuya Stream", "height_m": 180.0, "clear_m": 25.0,
 			"yaw_deg": 44.0, "kind": "Skyscraper", "aliases": ["shibuya stream", "渋谷ストリーム"]},
 		{"type": "shibuya_109", "name": "Shibuya 109", "lat": 35.659589, "lon": 139.698717,
-			"radius_m": 1500.0, "wiki_title": "109 (department store)", "height_m": 33.6, "clear_m": 15.0,
+			"radius_m": 1500.0, "wiki_title": "109 (department store)", "height_m": 33.6, "clear_m": 15.0, "yaw_deg": 25.0,
 			"kind": "Department store", "aliases": ["shibuya 109", "shibuya109", "ichi-maru-kyu", "渋谷109"]},
 		{"type": "qfront", "name": "QFRONT", "lat": 35.659880, "lon": 139.700363,
-			"radius_m": 1500.0, "wiki_title": "Q-Front", "height_m": 45.9, "clear_m": 12.0,
+			"radius_m": 1500.0, "wiki_title": "Q-Front", "height_m": 45.9, "clear_m": 12.0, "yaw_deg": 15.9,
 			"kind": "Video screen", "aliases": ["qfront", "q-front", "q front shibuya"]},
 		# Gwanghwamun Square and Gyeongbokgung, north of it.
 		{"type": "king_sejong_statue", "name": "Statue of King Sejong", "lat": 37.5729184, "lon": 126.9769125,

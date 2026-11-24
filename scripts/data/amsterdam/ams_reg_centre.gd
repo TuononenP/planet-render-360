@@ -19,7 +19,7 @@ static func entries() -> Array:
 
 		{"type": "westerkerk", "name": "Westerkerk & Westertoren",
 			"lat": 52.37448, "lon": 4.88402, "radius_m": 6000.0,
-			"wiki_title": "Westerkerk", "height_m": 86.0, "yaw_deg": 18.0,
+			"wiki_title": "Westerkerk", "height_m": 86.0, "yaw_deg": 2.9,
 			"skyline_priority": 9, "clear_m": 30.0, "clear_rect_m": [0.0, 0.0, 60.0, 34.0],
 			"model_rects_m": [[0.0, 0.0, 60.0, 34.0]], "kind": "Church",
 			"aliases": ["westerkerk", "westertoren", "westerkerk amsterdam"]},

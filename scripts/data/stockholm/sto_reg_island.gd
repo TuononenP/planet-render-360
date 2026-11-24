@@ -23,7 +23,7 @@ static func entries() -> Array:
 			"kind": "Tower", "clear_m": 10.0,
 			"aliases": ["birger jarls torn", "birger jarl tower", "birger jarls tower"]},
 		{"type": "norstedts_building", "name": "Norstedtshuset", "lat": 59.326017, "lon": 18.063129,
-			"radius_m": 3000.0, "wiki_title": "Norstedtshuset", "height_m": 39.0,
+			"radius_m": 3000.0, "wiki_title": "Norstedtshuset", "height_m": 39.0, "yaw_deg": 25.3,
 			"kind": "Office building", "clear_m": 38.0,
 			"aliases": ["norstedtshuset", "norstedts building", "norstedts"]},
 		{"type": "evert_taubes_terrass", "name": "Evert Taubes terrass", "lat": 59.32493, "lon": 18.061899,

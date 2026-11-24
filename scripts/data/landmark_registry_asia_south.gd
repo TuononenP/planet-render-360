@@ -42,7 +42,7 @@ static func entries() -> Array:
 			"clear_rect_m": [-210.0, 0.0, 340.0, 105.0], "tree_clear_m": 25.0,
 			"kind": "Temple", "aliases": ["angkor wat", "angkor vat", "អង្គរវត្ត"]},
 		{"type": "petronas_towers", "name": "Petronas Towers", "lat": 3.15785, "lon": 101.71165, "radius_m": 4000.0,
-			"wiki_title": "Petronas Towers", "height_m": 451.9, "clear_m": 110.0,
+			"wiki_title": "Petronas Towers", "height_m": 451.9, "clear_m": 110.0, "yaw_deg": -40.3,
 			"kind": "Skyscraper", "aliases": ["petronas twin towers", "petronas towers", "menara berkembar petronas", "menara petronas"]},
 		{"type": "marina_bay_sands", "name": "Marina Bay Sands", "lat": 1.2834, "lon": 103.8607, "radius_m": 4000.0,
 			"wiki_title": "Marina Bay Sands", "height_m": 207.0, "clear_m": 190.0, "yaw_deg": -75.0,
