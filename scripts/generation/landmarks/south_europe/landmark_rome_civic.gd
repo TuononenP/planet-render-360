@@ -237,111 +237,124 @@ static func _bridge(lm: LandmarkMesh) -> void:
 ## whole front into the great basin.
 static func trevi(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Travertine", LandmarkMaterials.pbr("limestone", "#CDBB98", 3.0))
-	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#E0D2B0", 2.0))
-	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#51493C", 3.0))
-	lm.use("Rock", LandmarkMaterials.pbr("rock", "#B7AA8E", 4.0))
+	lm.use("Travertine", LandmarkMaterials.pbr("limestone", "#D6C6A6", 3.0))
+	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#E5D8BC", 2.0))
+	lm.use("Exedra", LandmarkMaterials.pbr("limestone", "#C4B392", 2.4))
+	lm.use("Glass", LandmarkMaterials.glass("#262F36"))
+	lm.use("Rock", LandmarkMaterials.pbr("rock", "#BDB094", 3.2))
 	lm.use("Water", LandmarkMaterials.pool_water("#2C8A96", 0.06))
-	lm.use("Marble", LandmarkMaterials.marble("#E2DDD2", 0.38))
+	lm.use("Marble", LandmarkMaterials.marble("#E4DFD4", 0.36))
 	var f := -10.0
 	var nz := Vector3(0, 0, 1)
-	# Palazzo Poli: body, rusticated ground storey, giant pilasters,
-	# windows, main cornice, attic with its windows and balustrade.
+	# Palazzo Poli: warm Roman travertine palace wings with rusticated basement,
+	# giant Corinthian pilasters, alternating triangular/arched pediments, mezzanine & balustrade.
 	lm.box("Travertine", Vector3(0, 10.0, f - 6.0), Vector3(49.15, 20.0, 12.0))
-	lm.box("Trim", Vector3(0, 3.6, f + 0.1), Vector3(49.15, 0.5, 0.4))
+	lm.box("Trim", Vector3(0, 3.6, f + 0.18), Vector3(49.15, 0.55, 0.55))
 	for s in [-1.0, 1.0]:
+		var sf := float(s)
 		for i in 4:
-			var x: float = s * (13.0 + 3.6 * float(i))
-			lm.box("Trim", Vector3(x, 10.4, f + 0.25), Vector3(1.2, 13.0, 0.5))
-			lm.box("Trim", Vector3(x, 17.2, f + 0.35), Vector3(1.6, 0.9, 0.7))
+			var x: float = sf * (13.0 + 3.6 * float(i))
+			lm.box("Trim", Vector3(x, 10.6, f + 0.28), Vector3(1.15, 13.4, 0.55))
+			lm.box("Trim", Vector3(x, 17.5, f + 0.40), Vector3(1.55, 0.85, 0.72))
+			lm.box("Trim", Vector3(x, 3.95, f + 0.34), Vector3(1.40, 0.55, 0.65))
 		for i in 3:
-			var x: float = s * (14.8 + 3.6 * float(i))
-			LandmarkDetail.window(lm, "Trim", "Shadow", Vector3(x, 1.8, f + 0.02), nz, 1.2, 2.0, false, 0.2)
-			LandmarkDetail.window(lm, "Trim", "Shadow", Vector3(x, 7.4, f + 0.02), nz, 1.4, 3.0, false, 0.25)
-			lm.gable("Trim", Vector3(x, 9.6, f + 0.25), 2.2, 0.5, 0.6, Basis(), 0.0, "Trim")
-			LandmarkDetail.window(lm, "Trim", "Shadow", Vector3(x, 13.4, f + 0.02), nz, 1.3, 2.4, false, 0.2)
-			SEuParts.niche(lm, "Trim", "Shadow", Vector3(x, 19.3, f), nz, 1.0, 1.4, SEuParts.RECT, 0.15)
-	LandmarkDetail.cornice(lm, "Trim", Vector3(-24.6, 18.0, f), Vector3(24.6, 18.0, f), nz, 1.2, true)
+			var x: float = sf * (14.8 + 3.6 * float(i))
+			# Lower rusticated palace windows (dark glass in moulded travertine frames)
+			LandmarkDetail.window(lm, "Trim", "Glass", Vector3(x, 1.9, f + 0.04), nz, 1.25, 2.0, false, 0.22)
+			# Piano-nobile Baroque windows with carved sills & alternating triangular / segmental arched pediments
+			LandmarkDetail.window(lm, "Trim", "Glass", Vector3(x, 7.6, f + 0.04), nz, 1.45, 3.2, false, 0.28)
+			lm.box("Trim", Vector3(x, 5.85, f + 0.28), Vector3(1.85, 0.32, 0.42))
+			if i == 1:
+				SEuParts.arch_ring(lm, "Trim", Vector3(x, 9.45, f + 0.34), Vector3.RIGHT, nz, 1.95, 0.35, 0.45, false, 10)
+			else:
+				lm.gable("Trim", Vector3(x, 9.55, f + 0.30), 2.2, 0.55, 0.65, Basis(), 0.0, "Trim")
+			# Upper mezzanine & small attic windows
+			LandmarkDetail.window(lm, "Trim", "Glass", Vector3(x, 13.4, f + 0.04), nz, 1.35, 2.3, false, 0.24)
+			lm.box("Trim", Vector3(x, 14.75, f + 0.26), Vector3(1.75, 0.28, 0.38))
+			LandmarkDetail.window(lm, "Trim", "Glass", Vector3(x, 19.3, f + 0.04), nz, 1.10, 1.35, false, 0.18)
+	LandmarkDetail.cornice(lm, "Trim", Vector3(-24.7, 18.0, f + 0.1), Vector3(24.7, 18.0, f + 0.1), nz, 1.35, true)
 	lm.box("Travertine", Vector3(0, 20.3, f - 6.0), Vector3(49.15, 1.0, 12.0))
-	SEuParts.rail(lm, "Trim", Vector3(-24.4, 20.8, f - 0.4), Vector3(-13.5, 20.8, f - 0.4), 1.1, 3.6)
-	SEuParts.rail(lm, "Trim", Vector3(13.5, 20.8, f - 0.4), Vector3(24.4, 20.8, f - 0.4), 1.1, 3.6)
-	# Triumphal arch: protruding central bay, attic, columns.
-	lm.box("Travertine", Vector3(0, 10.4, f + 1.5), Vector3(24.0, 20.8, 3.0))
+	SEuParts.rail(lm, "Trim", Vector3(-24.4, 20.9, f - 0.2), Vector3(-12.6, 20.9, f - 0.2), 1.25, 3.0)
+	SEuParts.rail(lm, "Trim", Vector3(12.6, 20.9, f - 0.2), Vector3(24.4, 20.9, f - 0.2), 1.25, 3.0)
+	# Central Baroque Triumphal Arch: projecting travertine bay, 4 giant Corinthian columns & entablature.
+	lm.box("Travertine", Vector3(0, 10.4, f + 1.5), Vector3(24.2, 20.8, 3.0))
 	for x in [-11.0, -6.6, 6.6, 11.0]:
-		LandmarkDetail.column(lm, "Trim", Vector3(float(x), 1.6, f + 4.0), 0.85, 15.2, "corinthian", 24)
-		lm.box("Trim", Vector3(float(x), 0.8, f + 4.0), Vector3(2.4, 1.6, 2.4))
-	lm.box("Trim", Vector3(0, 17.6, f + 3.4), Vector3(25.0, 1.6, 2.4))
-	LandmarkDetail.cornice(lm, "Trim", Vector3(-12.5, 18.4, f + 4.6), Vector3(12.5, 18.4, f + 4.6), nz, 1.0, true)
-	# Attic with the dedication panel and four statues of the seasons.
-	lm.box("Travertine", Vector3(0, 21.6, f + 1.5), Vector3(24.0, 4.4, 3.4))
-	lm.box("Marble", Vector3(0, 21.4, f + 3.25), Vector3(12.0, 2.4, 0.1))
-	for i in 10:
-		lm.box("Shadow", Vector3(-5.0 + float(i) * 1.1, 21.6, f + 3.32), Vector3(0.6, 0.5, 0.04))
-	LandmarkDetail.cornice(lm, "Trim", Vector3(-12.2, 23.8, f + 3.2), Vector3(12.2, 23.8, f + 3.2), nz, 0.5, false)
+		LandmarkDetail.column(lm, "Trim", Vector3(float(x), 1.8, f + 4.1), 0.85, 15.0, "corinthian", 24)
+		lm.box("Trim", Vector3(float(x), 0.9, f + 4.1), Vector3(2.45, 1.8, 2.45))
+	lm.box("Trim", Vector3(0, 17.6, f + 3.45), Vector3(25.2, 1.65, 2.55))
+	LandmarkDetail.cornice(lm, "Trim", Vector3(-12.6, 18.45, f + 4.7), Vector3(12.6, 18.45, f + 4.7), nz, 1.1, true)
+	# High Attic with moulded Latin dedication panel (CLEMENS XII PONT MAX) & 4 marble Season statues.
+	lm.box("Travertine", Vector3(0, 21.6, f + 1.55), Vector3(24.2, 4.4, 3.5))
+	lm.box("Trim", Vector3(0, 21.45, f + 3.35), Vector3(12.4, 2.6, 0.24))
+	lm.box("Exedra", Vector3(0, 21.45, f + 3.49), Vector3(11.6, 2.0, 0.08))
+	LandmarkDetail.cornice(lm, "Trim", Vector3(-12.4, 23.85, f + 3.35), Vector3(12.4, 23.85, f + 3.35), nz, 0.6, false)
 	for x in [-11.0, -6.6, 6.6, 11.0]:
-		SEuParts.figure(lm, "Marble", Vector3(float(x), 19.4, f + 4.0), 2.8, int(x) % 2 == 0)
-	# Clement XII's arms held by two Fames, to 26.3 m.
-	lm.box("Trim", Vector3(0, 24.6, f + 1.6), Vector3(5.0, 1.0, 2.6))
-	lm.lathe("Marble", Vector3(0, 25.1, f + 2.0), PackedVector2Array([Vector2(1.2, 0), Vector2(1.0, 0.8),
-		Vector2(0.4, 1.2), Vector2(0.0, 1.2)]), 10, 1.0, 0.4)
+		lm.box("Trim", Vector3(float(x), 19.05, f + 4.1), Vector3(1.6, 0.9, 1.6))
+		SculptureKit.classical_figure(lm, "Marble", Vector3(float(x), 19.5, f + 4.1), 3.0, false, 0.0)
+	# Clement XII's ornate papal coat of arms flanked by two sculpted winged Fames, to 26.3 m.
+	lm.box("Trim", Vector3(0, 24.45, f + 1.8), Vector3(5.6, 0.9, 2.6))
+	lm.lathe("Marble", Vector3(0, 24.85, f + 2.2), PackedVector2Array([
+		Vector2(0.85, 0.0), Vector2(1.25, 0.55), Vector2(1.10, 1.15),
+		Vector2(0.55, 1.55), Vector2(0.20, 1.75), Vector2(0.0, 1.75),
+	]), 20, 1.0, 0.45)
 	for s in [-1.0, 1.0]:
-		SEuParts.figure(lm, "Marble", Vector3(s * 2.0, 25.1, f + 2.0), 1.2, true)
-	# Exedra of Oceanus and the flanking niches with their reliefs.
-	SEuParts.niche(lm, "Trim", "Shadow", Vector3(0, 3.0, f + 3.05), nz, 7.6, 13.4, SEuParts.ROUND, 0.6, 0.6, false)
-	SEuParts.arch_ring(lm, "Trim", Vector3(0, 12.6, f + 3.4), Vector3.RIGHT, nz, 7.6, 0.6, 0.6, false, 10)
+		var sf := float(s)
+		SculptureKit.winged_angel(lm, "Marble", Vector3(sf * 2.05, 24.75, f + 2.2), 1.95, -sf * 0.35)
+	# Coffered Roman Travertine Central Exedra Arch (warm sunlit stone, NEVER dark brick!)
+	SEuParts.niche(lm, "Trim", "Exedra", Vector3(0, 3.0, f + 3.05), nz, 7.6, 13.4, SEuParts.ROUND, 0.75, 0.65, false)
+	SEuParts.arch_ring(lm, "Trim", Vector3(0, 12.6, f + 3.55), Vector3.RIGHT, nz, 7.6, 0.75, 0.85, false, 18)
+	# Coffered arch ribs inside the exedra barrel vault
+	for k in 7:
+		var a := PI * (float(k) + 0.5) / 7.0
+		var cp := Vector3(cos(a) * 3.45, 12.6 + sin(a) * 3.45, f + 3.15)
+		lm.box("Trim", cp, Vector3(0.55, 0.35, 1.05), Basis(Vector3.BACK, a - PI * 0.5), 0.0)
 	for s in [-1.0, 1.0]:
-		SEuParts.col(lm, "Trim", Vector3(s * 3.2, 3.0, f + 3.6), 0.4, 9.6, "corinthian", 10)
-		SEuParts.niche(lm, "Trim", "Shadow", Vector3(s * 8.8, 4.2, f + 3.05), nz, 2.6, 5.4, SEuParts.ROUND, 0.35)
-		SculptureKit.classical_figure(lm, "Marble", Vector3(float(s) * 8.8, 4.4, f + 3.3), 3.4, float(s) > 0.0, -float(s) * 0.18)
-		lm.box("Marble", Vector3(s * 8.8, 12.2, f + 3.1), Vector3(3.6, 2.4, 0.3))
-		SEuParts.figure(lm, "Marble", Vector3(s * 9.4, 11.2, f + 3.3), 1.6)
-		SEuParts.figure(lm, "Marble", Vector3(s * 8.2, 11.2, f + 3.3), 1.6)
-	# Stratified craggy Baroque travertine reef shelves across the front, Oceanus's shell chariot, sea-horses & Tritons.
-	SEuUtil.blob(lm, "Rock", Vector3(0, 0, f + 5.0), 23.0, 4.0, 6.2, Vector3.ZERO, true, 10, 32)
-	var crags := [
-		[-18.5, 0.0, 5.8, 5.2, 2.4, 3.2], [18.5, 0.0, 5.8, 5.2, 2.4, 3.2],
-		[-12.5, 0.0, 7.2, 4.8, 2.9, 3.6], [12.5, 0.0, 7.2, 4.8, 2.9, 3.6],
-		[-6.8, 0.0, 8.6, 4.4, 3.1, 3.8], [6.8, 0.0, 8.6, 4.4, 3.1, 3.8],
-		[0.0, 1.4, 6.8, 5.0, 2.4, 3.2], [0.0, 0.2, 9.2, 5.6, 2.0, 3.0],
-		[-9.6, 0.3, 9.4, 3.4, 1.8, 2.6], [9.6, 0.3, 9.4, 3.4, 1.8, 2.6],
-		[-15.8, 0.2, 8.2, 3.2, 1.6, 2.4], [15.8, 0.2, 8.2, 3.2, 1.6, 2.4],
-	]
-	for cr in crags:
-		SEuUtil.blob(lm, "Rock", Vector3(float(cr[0]), float(cr[1]), f + float(cr[2])),
-			float(cr[3]), float(cr[4]), float(cr[5]), Vector3.ZERO, true, 6, 14)
-	# Solid travertine rock pedestal & sculpted Baroque scalloped shell chariot cradling Oceanus
-	SEuUtil.blob(lm, "Rock", Vector3(0.0, 2.7, f + 4.8), 3.5, 2.7, 2.8, Vector3.ZERO, true, 6, 16)
+		var sf := float(s)
+		SEuParts.col(lm, "Trim", Vector3(sf * 3.25, 3.0, f + 3.65), 0.42, 9.6, "corinthian", 16)
+		# Flanking warm travertine niches with moulded pedestals for Abundance (left) & Salubrity (right)
+		SEuParts.niche(lm, "Trim", "Exedra", Vector3(sf * 8.8, 4.0, f + 3.05), nz, 2.7, 5.6, SEuParts.ROUND, 0.45)
+		lm.box("Trim", Vector3(sf * 8.8, 4.15, f + 3.35), Vector3(1.65, 0.55, 1.15))
+		SculptureKit.classical_figure(lm, "Marble", Vector3(sf * 8.8, 4.42, f + 3.45), 3.45, false, -sf * 0.16)
+		# Framed travertine bas-relief panels above the niches (Agrippa & the Roman maiden)
+		lm.box("Trim", Vector3(sf * 8.8, 12.2, f + 3.15), Vector3(3.8, 2.5, 0.32))
+		lm.box("Exedra", Vector3(sf * 8.8, 12.2, f + 3.33), Vector3(3.3, 2.0, 0.08))
+		SculptureKit.classical_figure(lm, "Trim", Vector3(sf * 9.35, 11.25, f + 3.38), 1.65, false, 0.0)
+		SculptureKit.classical_figure(lm, "Trim", Vector3(sf * 8.25, 11.25, f + 3.38), 1.65, false, 0.0)
+	# Blender-sculpted craggy stepped Baroque Roman travertine reef (flat rock ledges at y = 2.15 m
+	# so EVERY sea-horse & Triton stands 100% unburied above the rock!).
+	SculptureKit.stamp_asset(lm, "Rock", "trevi_reef", Vector3(0.0, 0.0, f + 6.4), Vector3.ONE, 0.0)
+	# Sculpted Baroque scalloped shell chariot resting solidly on the 3.85 m central cliff plinth
 	var sh_centers := PackedVector3Array()
 	var sh_rows: Array = []
 	for j in 6:
 		var t := float(j) / 5.0
-		var y_sh := 4.15 + t * 1.30
-		var r_x := 0.01 if (j == 0 or j == 5) else lerpf(1.25, 2.55, sin(t * PI * 0.72))
-		var r_z := 0.01 if (j == 0 or j == 5) else lerpf(0.95, 1.65, sin(t * PI * 0.72))
-		sh_centers.append(Vector3(0.0, y_sh, f + 4.65))
+		var y_sh := 3.70 + t * 1.15
+		var r_x := 0.01 if (j == 0 or j == 5) else lerpf(1.35, 2.65, sin(t * PI * 0.72))
+		var r_z := 0.01 if (j == 0 or j == 5) else lerpf(1.05, 1.75, sin(t * PI * 0.72))
+		sh_centers.append(Vector3(0.0, y_sh, f + 4.75))
 		var row := PackedVector3Array()
 		for i in 29:
 			var a := TAU * float(i) / 28.0 if i < 28 else 0.0
 			var flute := (1.0 + 0.08 * sin(a * 12.0) * sin(t * PI)) if (j > 0 and j < 5) else 1.0
-			row.append(Vector3(cos(a) * r_x * flute, y_sh, f + 4.65 + sin(a) * r_z * flute))
+			row.append(Vector3(cos(a) * r_x * flute, y_sh, f + 4.75 + sin(a) * r_z * flute))
 		sh_rows.append(row)
 	SculptureKit.emit_rings(lm, "Marble", sh_centers, sh_rows)
-	# Upright scalloped shell backrest rising behind Oceanus's calves
 	for k in 7:
 		var u := (float(k) / 6.0) * 2.0 - 1.0
 		var ang := u * 1.05
-		var top_y := 6.85 + 0.45 * cos(u * PI * 0.5)
+		var top_y := 6.45 + 0.45 * cos(u * PI * 0.5)
 		SculptureKit.loft_tube(lm, "Marble", PackedVector3Array([
-			Vector3(sin(ang) * 1.45, 5.15, f + 4.45 - cos(ang) * 0.65),
-			Vector3(sin(ang) * 2.35, top_y, f + 4.30 - cos(ang) * 1.05),
+			Vector3(sin(ang) * 1.45, 4.75, f + 4.55 - cos(ang) * 0.65),
+			Vector3(sin(ang) * 2.35, top_y, f + 4.40 - cos(ang) * 1.05),
 		]), PackedVector2Array([Vector2(0.24, 0.16), Vector2(0.32, 0.14)]), 10)
-	SculptureKit.classical_figure(lm, "Marble", Vector3(0, 5.42, f + 4.65), 5.8, true, 0.0)
+	SculptureKit.classical_figure(lm, "Marble", Vector3(0, 4.82, f + 4.80), 5.8, true, 0.0)
+	# Two rearing marble sea-horses & two Baroque Tritons standing 100% UNBURIED on the 2.15 m rock ledges!
 	for s in [-1.0, 1.0]:
 		var sf := float(s)
-		var yaw_out := sf * 0.38
-		var rear := 0.38 if sf < 0.0 else 0.18
-		SculptureKit.rearing_horse(lm, "Marble", Vector3(sf * 4.2, 1.55, f + 8.6), 1.32, yaw_out, rear)
-		SculptureKit.triton_figure(lm, "Marble", Vector3(sf * 6.8, 2.05, f + 8.4), 3.0, sf * 0.52, sf > 0.0)
+		var yaw_out := sf * 0.48
+		var rear := 0.30 if sf < 0.0 else 0.12
+		SculptureKit.rearing_horse(lm, "Marble", Vector3(sf * 4.8, 2.22, f + 9.0), 1.38, yaw_out, rear)
+		SculptureKit.triton_figure(lm, "Marble", Vector3(sf * 8.2, 2.25, f + 8.8), 2.95, sf * 0.45, sf > 0.0)
 	# Basin: rim, water, the steps down from the piazza.
 	lm.box("Water", Vector3(0, 0.55, f + 15.0), Vector3(48.0, 0.1, 22.0))
 	lm.box("Travertine", Vector3(0, 0.6, f + 26.2), Vector3(50.0, 1.2, 0.8))
