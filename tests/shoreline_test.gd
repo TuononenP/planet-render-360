@@ -392,6 +392,21 @@ func _low_quay_fixture() -> void:
 	var river_ground := GroundTruth.new(split_river)
 	_check(river_ground.water_level_at(40, 0) < 3.0,
 		"a small high tributary polygon must not lift a river above its dry banks (%.2f)" % river_ground.water_level_at(40, 0))
+	# A river connected to a tidal sea/coast (like Aurajoki in Turku) must never
+	# be lowered below sea level by lower_for_quays, even with setback retaining walls.
+	var sea_river := _data()
+	sea_river.land_polygons = [
+		{"class": "water", "tidal": false, "points": PackedVector2Array([
+			Vector2(0, -300), Vector2(100, -300), Vector2(100, 300), Vector2(0, 300)]), "holes": []},
+		{"class": "water", "tidal": true, "points": PackedVector2Array([
+			Vector2(0, 290), Vector2(200, 290), Vector2(200, 500), Vector2(0, 500)]), "holes": []}]
+	sea_river.shore_structures = [{"points": PackedVector2Array([Vector2(-10, -250), Vector2(-10, 250)]),
+		"kind": "retaining_wall", "id": "way:coastal_wall"}]
+	var sea_river_ground := GroundTruth.new(sea_river)
+	_check(not sea_river_ground.shoreline.domains.is_quayed(0),
+		"a river joined to a tidal sea must not be lowered as a two-level quayed river")
+	_check(absf(sea_river_ground.water_level_at(50, 0) - sea_river_ground.water_level_at(50, 400)) < 0.05,
+		"a river joined to a tidal sea must stay at sea level")
 
 ## A short break in the mapped wall is bridged (one quay, its walk whole).
 ## Across a long one the street stands out to the water between two

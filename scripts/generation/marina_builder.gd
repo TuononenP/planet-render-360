@@ -103,9 +103,15 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 		if _length(pts) < MIN_PIER_M * m2u:
 			continue
 		if bool((p as Dictionary).get("floating", false)):
-			decks.append(_deck(pts, ground, m2u, taken))
+			if _is_closed_pier(pts, m2u):
+				decks.append(_poly_deck(pts, ground, m2u, taken))
+			else:
+				decks.append(_deck(pts, ground, m2u, taken))
 		else:
-			_reserve_pier(pts, m2u, taken)
+			if _is_closed_pier(pts, m2u):
+				_reserve_poly(pts, m2u, taken)
+			else:
+				_reserve_pier(pts, m2u, taken)
 	# Reserve mapped vessels, water landmarks and large berths before filling with small craft.
 	for b in data.buildings:
 		if b is Dictionary and ShipBuilder.accepts(b):
@@ -135,6 +141,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 			continue  # a quay or mole on dry ground: no berths
 		var require_water: bool = carved or has_shore
 		var y_ref := _pier_height(pts, ground)
+		var closed_pier := _is_closed_pier(pts, m2u)
+		var ring := _pier_ring(pts) if closed_pier else PackedVector2Array()
 		k += 1
 		var t := 1.5 * m2u
 		var slot := 0
@@ -145,6 +153,9 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 			var nrm := Vector2(-dir.y, dir.x)
 			var widest := 0.0
 			for side: float in [-1.0, 1.0]:
+				var out := nrm * side
+				if closed_pier and Geometry2D.is_point_in_polygon(pos + out * 0.25 * m2u, ring):
+					continue
 				var h := _hash(pos.x, pos.y, float(k * 7 + slot) + (0.5 if side > 0.0 else 0.0))
 				var len_m := 5.0 + 24.0 * h * h
 				var sail := _hash(pos.y, pos.x, float(k * 13 + slot)) < float(fleet["sail_share"])
@@ -158,8 +169,8 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float,
 					kind = "catamaran"
 				var beam_m := (CatamaranModel.BERTH_BEAM_SHARE if kind == "catamaran" else 0.3) * len_m
 				widest = maxf(widest, beam_m)
-				var stern: Vector2 = pos + nrm * side * (DECK_W_M * 0.5 + 0.5) * m2u
-				var out := nrm * side
+				var edge_off := 0.5 if closed_pier else (DECK_W_M * 0.5 + 0.5)
+				var stern: Vector2 = pos + out * edge_off * m2u
 				var bow := stern + out * len_m * m2u
 				if QuayMoorings.near_bridge(bridge_list, stern, bow, (beam_m * 0.5 + 2.5) * m2u):
 					continue
@@ -402,6 +413,42 @@ static func _claim(taken: Dictionary, stern: Vector2, out: Vector2, len_m: float
 		taken[c] = true
 	return true
 
+static func _is_closed_pier(pts: PackedVector2Array, m2u: float) -> bool:
+	return pts.size() >= 4 and pts[0].distance_to(pts[pts.size() - 1]) <= 0.5 * m2u
+
+static func _pier_ring(pts: PackedVector2Array) -> PackedVector2Array:
+	var n := pts.size()
+	if n >= 2 and pts[0].distance_squared_to(pts[n - 1]) < 0.0001:
+		n -= 1
+	return pts.slice(0, n)
+
+static func _reserve_poly(pts: PackedVector2Array, m2u: float, taken: Dictionary) -> void:
+	var ring := _pier_ring(pts)
+	if ring.size() < 3:
+		return
+	var box := RingGeometry.aabb(ring)
+	var step := CELL_M * m2u
+	var x := box.position.x
+	while x <= box.end.x + 0.01:
+		var z := box.position.y
+		while z <= box.end.y + 0.01:
+			var p := Vector2(x, z)
+			if Geometry2D.is_point_in_polygon(p, ring):
+				taken[_cell(p, m2u)] = true
+			z += step
+		x += step
+
+## A closed-polygon floating pier's deck: {poly: PackedVector2Array, y: float},
+## reserving its interior cells in `taken`.
+static func _poly_deck(pts: PackedVector2Array, ground: GroundTruth, m2u: float, taken: Dictionary) -> Dictionary:
+	var ring := _pier_ring(pts)
+	_reserve_poly(pts, m2u, taken)
+	var ys: Array[float] = []
+	for q in ring:
+		ys.append(maxf(ground.water_level_at(q.x, q.y), ground.height_at_world(q.x, q.y)))
+	ys.sort()
+	return {"poly": ring, "y": ys[ys.size() / 2] if not ys.is_empty() else 0.0}
+
 ## A floating pier's deck as [x, z, water y] posts (every ~3 m), marking
 ## its cells taken.
 static func _deck(pts: PackedVector2Array, ground: GroundTruth, m2u: float, taken: Dictionary) -> Array:
@@ -467,11 +514,40 @@ const PONTOON_DEPTH_M := 0.5
 static func _deck_mesh(decks: Array, m2u: float) -> ArrayMesh:
 	var b := TreeMeshLibrary.Buf.new()
 	var half := DECK_W_M * 0.5 * m2u
-	for posts in decks:
-		for i in (posts as Array).size() - 1:
+	var up := DECK_UP_M * m2u
+	var drop := Vector3(0.0, -PONTOON_DEPTH_M * m2u, 0.0)
+	for entry in decks:
+		if entry is Dictionary:
+			var ring: PackedVector2Array = entry["poly"]
+			if ring.size() < 3:
+				continue
+			var y := float(entry["y"]) + up
+			var tris := Geometry2D.triangulate_polygon(ring)
+			for i in range(0, tris.size(), 3):
+				var p0 := Vector3(ring[tris[i]].x, y, ring[tris[i]].y)
+				var p1 := Vector3(ring[tris[i + 1]].x, y, ring[tris[i + 1]].y)
+				var p2 := Vector3(ring[tris[i + 2]].x, y, ring[tris[i + 2]].y)
+				var base_i := b.verts.size()
+				b.verts.append_array(PackedVector3Array([p0, p2, p1] if (p1 - p0).cross(p2 - p0).dot(Vector3.UP) > 0.0 else [p0, p1, p2]))
+				b.normals.append_array(PackedVector3Array([Vector3.UP, Vector3.UP, Vector3.UP]))
+				b.uvs.append_array(PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE]))
+				b.colors.append_array(PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE]))
+				b.idx.append_array(PackedInt32Array([base_i, base_i + 1, base_i + 2]))
+			var ccw := Geometry2D.is_polygon_clockwise(ring)
+			for i in ring.size():
+				var a := ring[i]
+				var c_pt := ring[(i + 1) % ring.size()]
+				var d := (c_pt - a).normalized()
+				var n2 := Vector2(d.y, -d.x) if ccw else Vector2(-d.y, d.x)
+				var out := Vector3(n2.x, 0.0, n2.y)
+				var va := Vector3(a.x, y, a.y)
+				var vb := Vector3(c_pt.x, y, c_pt.y)
+				_quad(b, [va, vb, vb + drop, va + drop], out)
+			continue
+		var posts: Array = entry
+		for i in posts.size() - 1:
 			var p0: Array = posts[i]
 			var p1: Array = posts[i + 1]
-			var up := DECK_UP_M * m2u
 			var c := [Vector3(float(p0[0]) - float(p0[3]) * half, float(p0[2]) + up, float(p0[1]) - float(p0[4]) * half),
 				Vector3(float(p0[0]) + float(p0[3]) * half, float(p0[2]) + up, float(p0[1]) + float(p0[4]) * half),
 				Vector3(float(p1[0]) + float(p1[3]) * half, float(p1[2]) + up, float(p1[1]) + float(p1[4]) * half),
@@ -479,7 +555,6 @@ static func _deck_mesh(decks: Array, m2u: float) -> ArrayMesh:
 			_quad(b, c, Vector3.UP)
 			# Side faces down below the waterline: a flat strip had no
 			# thickness and floated on the water with no contact line.
-			var drop := Vector3(0.0, -PONTOON_DEPTH_M * m2u, 0.0)
 			var out0 := Vector3(-float(p0[3]), 0.0, -float(p0[4]))
 			_quad(b, [c[0], c[3], (c[3] as Vector3) + drop, (c[0] as Vector3) + drop], out0)
 			_quad(b, [c[1], c[2], (c[2] as Vector3) + drop, (c[1] as Vector3) + drop], -out0)

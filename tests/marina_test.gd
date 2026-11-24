@@ -196,6 +196,34 @@ func _init() -> void:
 			failures.append("%s mesh: %d surfaces, %.1f m long" % [kind, mesh.get_surface_count(), box.size.x])
 	root.free()
 	high.free()
+	# Closed-polygon floating pier (area=yes, like Turku's guest harbour pontoons):
+	# builds a solid triangulated deck and only berths boats outward.
+	var poly_d := LocationData.new()
+	RenderSettings.apply_preset(poly_d, RenderSettings.Preset.ULTRA)
+	poly_d.heights.resize(poly_d.grid_size * poly_d.grid_size)
+	poly_d.heights.fill(-6.0)
+	poly_d.water_level = 0.0
+	poly_d.seed_value = 7
+	poly_d.latitude = 60.44
+	poly_d.longitude = 22.25
+	poly_d.country = "FI"
+	poly_d.piers = [{"points": PackedVector2Array([
+		Vector2(-30.0 * m, -1.5 * m), Vector2(30.0 * m, -1.5 * m),
+		Vector2(30.0 * m, 1.5 * m), Vector2(-30.0 * m, 1.5 * m),
+		Vector2(-30.0 * m, -1.5 * m)]), "floating": true, "width_m": NAN}]
+	var poly_ground := GroundTruth.new(poly_d)
+	var poly_plan := MarinaBuilder.plan(poly_d, poly_ground, m)
+	var poly_decks: Array = poly_plan["decks"]
+	if poly_decks.size() != 1 or not (poly_decks[0] is Dictionary):
+		failures.append("a closed floating pier should produce a polygon deck entry")
+	var poly_mesh := MarinaBuilder._deck_mesh(poly_decks, m)
+	if poly_mesh.get_surface_count() != 1 or poly_mesh.get_aabb().size.z > 3.2 * m:
+		failures.append("a 3 m wide closed pier deck should match its mapped width, got %.2f m" % (poly_mesh.get_aabb().size.z / m))
+	for pb: Array in poly_plan["boats"]:
+		var po: Vector3 = pb[0]
+		if absf(po.z) < 1.5 * m:
+			failures.append("closed pier moored a boat inside its polygon: z=%.2f" % (po.z / m))
+			break
 	if failures.is_empty():
 		print("MARINA OK: piers parsed, %d boats stern-to on both sides, wet and clear of each other, deterministic, meshes" % boats.size())
 		quit(0)

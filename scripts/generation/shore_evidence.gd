@@ -435,14 +435,27 @@ func _at_quay(pts: PackedVector2Array) -> bool:
 						return true
 	return false
 
-## Keeps `run` in `runs` when it is long enough; a fresh run either way.
+## Keeps `run` in `runs` when it is long enough and does not duplicate an
+## already-recorded run from an overlapping water polygon; a fresh run either way.
 static func _close_quay_run(run: Dictionary, runs: Array) -> Dictionary:
 	var shore: PackedVector2Array = run["shore"]
 	var length := 0.0
 	for i in shore.size() - 1:
 		length += shore[i].distance_to(shore[i + 1])
-	if shore.size() >= 2 and length >= QUAY_MIN_RUN_M * WorldScale.metres_to_units():
-		runs.append(run)
+	var m2u := WorldScale.metres_to_units()
+	if shore.size() >= 2 and length >= QUAY_MIN_RUN_M * m2u:
+		var mid := shore[shore.size() / 2]
+		var dup := false
+		for existing: Dictionary in runs:
+			var es: PackedVector2Array = existing["shore"]
+			for i in es.size() - 1:
+				if Geometry2D.get_closest_point_to_segment(mid, es[i], es[i + 1]).distance_to(mid) <= 2.0 * m2u:
+					dup = true
+					break
+			if dup:
+				break
+		if not dup:
+			runs.append(run)
 	return _quay_run()
 
 ## Where a mapped wall (`walls`, feature indexes) parallel to `dir` crosses

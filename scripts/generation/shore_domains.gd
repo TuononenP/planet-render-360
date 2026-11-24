@@ -242,8 +242,17 @@ func lower_under_bridges(roads: Array, dry: Callable) -> void:
 ## 2–3 m under its streets instead of 6–7, with no room for a low quay.
 func lower_for_quays(quays: Array, dry: Callable) -> void:
 	var m2u := WorldScale.metres_to_units()
-	var streets := {}
-	var lengths := {}
+	var parent := _groups()
+	var group_streets := {}
+	var group_lengths := {}
+	var group_perim := {}
+	var tidal_groups := {}
+	for id in bodies.size():
+		var g := _root(parent, id)
+		if bool(bodies[id]["tidal"]):
+			tidal_groups[g] = true
+		if str(bodies[id]["kind"]) != "channel":
+			group_perim[g] = float(group_perim.get(g, 0.0)) + _clipped_perimeter(bodies[id])
 	for q: Dictionary in quays:
 		var shore: PackedVector2Array = q["shore"]
 		var wall: PackedVector2Array = q["wall"]
@@ -251,25 +260,28 @@ func lower_for_quays(quays: Array, dry: Callable) -> void:
 		var id := at(shore[shore.size() / 2] - land * 0.5 * m2u)
 		if id < 0 or bool(bodies[id]["tidal"]):
 			continue
-		if not streets.has(id):
-			streets[id] = []
+		var g := _root(parent, id)
+		if tidal_groups.has(g):
+			continue
+		if not group_streets.has(g):
+			group_streets[g] = []
 		for i in wall.size():
 			var p: Vector2 = wall[i] + land * 2.0 * m2u
 			if bounds.has_point(p):
-				(streets[id] as Array).append(float(dry.call(p.x, p.y)))
+				(group_streets[g] as Array).append(float(dry.call(p.x, p.y)))
 			if i > 0:
-				lengths[id] = float(lengths.get(id, 0.0)) + shore[i - 1].distance_to(shore[i])
-	var parent := _groups()
+				group_lengths[g] = float(group_lengths.get(g, 0.0)) + shore[i - 1].distance_to(shore[i])
 	var group_cap := {}
-	for id: int in streets:
-		var values: Array = streets[id]
-		var qlen := float(lengths.get(id, 0.0))
-		if qlen < QUAY_MIN_LENGTH_M * m2u or qlen < _clipped_perimeter(bodies[id]) * QUAY_MIN_SHARE \
+	for g: int in group_streets:
+		if tidal_groups.has(g):
+			continue
+		var values: Array = group_streets[g]
+		var qlen := float(group_lengths.get(g, 0.0))
+		if qlen < QUAY_MIN_LENGTH_M * m2u or qlen < float(group_perim.get(g, 0.0)) * QUAY_MIN_SHARE \
 				or values.size() < 3:
 			continue
 		values.sort()
-		var g := _root(parent, id)
-		group_cap[g] = minf(float(group_cap.get(g, INF)), float(values[values.size() / 2]) - QUAY_DROP_M * m2u)
+		group_cap[g] = float(values[values.size() / 2]) - QUAY_DROP_M * m2u
 	for id in bodies.size():
 		var g := _root(parent, id)
 		if not group_cap.has(g) or bool(bodies[id]["tidal"]):
