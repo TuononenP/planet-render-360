@@ -32,11 +32,14 @@ func _init(data: LocationData = null, box: Rect2 = Rect2(), abort: BuildAbort = 
 	if data == null:
 		return
 	bounds = box
+	var model_rects := LandmarkSites.model_rect_sites(data)
 	for i in data.land_polygons.size():
 		if abort != null and abort.requested:
 			return
 		var poly: Dictionary = data.land_polygons[i]
 		if str(poly.get("class", "")) == "water":
+			if is_model_pool(poly, model_rects):
+				continue
 			_add(poly.get("points", PackedVector2Array()), poly.get("holes", []),
 				{"source": i, "kind": "polygon", "tidal": bool(poly.get("tidal", false)),
 				"bay": bool(poly.get("bay", false)), "still_pool": bool(poly.get("still_pool", false))})
@@ -60,6 +63,21 @@ func _init(data: LocationData = null, box: Rect2 = Rect2(), abort: BuildAbort = 
 	for coast in ShoreCoast.domains(data.waterways, bounds, diagnostics):
 		_add(coast["points"], coast.get("holes", []), {"source": -1, "kind": "coast", "tidal": true})
 	_setup_native()
+
+## True when a non-tidal water basin (< 220 m across) lies inside a bespoke
+## landmark's `model_rects_m` (e.g. Fontaine de Varsovie), where the monument
+## builds its own architectural stone basin instead of a carved lake bank.
+static func is_model_pool(poly: Dictionary, model_rects: Array) -> bool:
+	if model_rects.is_empty() or bool(poly.get("tidal", false)):
+		return false
+	var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
+	if pts.size() < 3 or not LandmarkSites.in_model_rects(pts[0], model_rects):
+		return false
+	var box := RingGeometry.aabb(pts)
+	if box.size.length() > 220.0 * WorldScale.metres_to_units():
+		return false
+	return LandmarkSites.in_model_rects(pts[pts.size() / 2], model_rects) \
+		and LandmarkSites.in_model_rects(box.get_center(), model_rects)
 
 func _outside_polygon_runs(a: Vector2, b: Vector2) -> Array:
 	if native != null and native.has_method("outside_runs"):

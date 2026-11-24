@@ -126,6 +126,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 			near.append([(p - centre).length_squared(), it])
 	near.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
 	var placed := {}  # mesh key -> Array[Transform3D]
+	var models := LandmarkSites.model_rect_sites(data)
 	var count := 0
 	var all_spots: Array = []
 	for e in near:
@@ -137,7 +138,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 			break
 		var p := _clear_of_lanes(spot[0], spot[1], str(spot[2]).begins_with("signals"), mask, m2u, aprons, crossings)
 		if p.x == INF or mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.WATER, 0.0) \
-				or ground.water_at(p.x, p.y) > 0.0:
+				or ground.water_at(p.x, p.y) > 0.0 or LandmarkSites.in_model_rects(p, models):
 			continue
 		var basis := Basis(Vector3.UP, _yaw(spot[1])).scaled(Vector3.ONE * m2u)
 		if not placed.has(spot[2]):

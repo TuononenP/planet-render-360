@@ -80,6 +80,10 @@ static func terraces() -> Dictionary:
 		# at the ground of the model's origin ("flat": raised as well as cut).
 		"kulturhuset_sergels_torg": {"x0": -84.0, "x1": 84.0, "z0": -72.0, "z1": 14.0, "feather_m": 8.0,
 			"flat": true},
+		# Fontaine de Varsovie: holds the Colline de Chaillot slope cleanly under
+		# the horizontal reflecting pool, stepped parterre walls and cascade head
+		# without pulling down the Palais de Chaillot belvedere bluff above z = -56 m.
+		"fontaine_de_varsovie": {"x0": -33.5, "x1": 33.5, "z0": -54.0, "z1": 78.0, "feather_m": 10.0},
 	}
 
 static func _cut_terraces(surface: PackedFloat32Array, size: int, step: float, data: LocationData) -> void:
@@ -130,6 +134,16 @@ static func terrace_hold_m(type: String, l: Vector2) -> float:
 		if l.y < -53.5 and absf(l.x) <= 59.0:
 			return lerpf(0.0, 5.2, clampf((-53.5 - l.y) / 17.5, 0.0, 1.0))
 		return 0.0
+	if type == "fontaine_de_varsovie":
+		var ax := absf(l.x)
+		if l.y < -38.0:
+			var cas_y := lerpf(1.2, 7.6, clampf((-38.0 - l.y) / 16.0, 0.0, 1.0))
+			return cas_y + (lerpf(0.0, 2.2, clampf((ax - 24.5) / 9.0, 0.0, 1.0)) if ax > 24.5 else 0.0)
+		var base_y := lerpf(1.2, 0.0, clampf((l.y - 62.0) / 18.0, 0.0, 1.0))
+		if ax <= 24.8:
+			return base_y
+		var slope_top := lerpf(7.2, 2.2, clampf((l.y + 38.0) / 104.0, 0.0, 1.0))
+		return lerpf(base_y, slope_top, clampf((ax - 24.8) / 8.7, 0.0, 1.0))
 	return 0.0
 
 ## The cut's model-local rect (x, z), metres.

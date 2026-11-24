@@ -115,6 +115,7 @@ static func build(data: LocationData, photo: Texture2D, photo_rect: Rect2,
 	m.set_shader_parameter("class_map", ImageTexture.create_from_image(cmap))
 	var colours := (ShoreApron.palette_overrides(data) if ShoreApron.stockholm(data) else FinnishGranite.palette_overrides(data)).duplicate()
 	colours.merge(BeachDressing.palette_overrides(data), true)
+	colours.merge(ArchitectureParis.palette_overrides(data), true)
 	m.set_shader_parameter("palette", ImageTexture.create_from_image(palette(data.season,
 		ClimateModel.grass_tint(data, data.season), colours)))
 	m.set_shader_parameter("class_n", float(CLASS_TEXELS))
@@ -449,11 +450,14 @@ static func _paint_classes(data: LocationData, paint: Callable, road_inset_m: fl
 ## OSM land-cover polygons, back to front (the first in the list wins).
 static func _paint_land(data: LocationData, paint: Callable) -> void:
 	var polys: Array = data.land_polygons
+	var model_rects := LandmarkSites.model_rect_sites(data)
 	for k in range(polys.size() - 1, -1, -1):
 		var poly = polys[k]
 		if not (poly is Dictionary):
 			continue
 		var cls := str((poly as Dictionary).get("class", ""))
+		if cls == "water" and ShoreDomains.is_model_pool(poly, model_rects):
+			continue
 		if cls == "grass" and str((poly as Dictionary).get("sward", "")) == "wild":
 			cls = "meadow"
 		if not ID.has(cls):

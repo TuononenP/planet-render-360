@@ -67,6 +67,7 @@ static func build_vegetation(data: LocationData, ground: GroundTruth = null, abo
 		_fill_cover(plan, data, ground, mask, ctx, abort)
 		if abort != null and abort.requested:
 			return root
+		ArchitectureParis.plant_trocadero_bosquets(plan, data, ground, mask, ctx)
 		CanopyVegetation.add(plan, data, ground, mask, ctx, abort)
 		if abort != null and abort.requested:
 			return root

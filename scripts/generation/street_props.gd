@@ -138,6 +138,7 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 	var occupied := {}
 	var occ_cell := 10.0 * m2u
 	var sites := _lamp_sites(data, ground, m2u, ctx.get("marking_plan"))
+	var models := LandmarkSites.model_rect_sites(data)
 	var pole_grid: Dictionary = ctx.get("pole_grid", {})
 	for r in data.roads:
 		var pts: PackedVector2Array
@@ -189,7 +190,8 @@ static func _lampposts(root: Node3D, data: LocationData, ground: GroundTruth,
 				if park_path and mask.cover_at(p.x, p.y) < 0:
 					continue
 				if mask.blocked(p.x, p.y, VegetationMask.BUILDING | VegetationMask.ROAD
-						| VegetationMask.WATER, 0.0) or ground.water_at(p.x, p.y) > 0.0:
+						| VegetationMask.WATER, 0.0) or ground.water_at(p.x, p.y) > 0.0 \
+						or LandmarkSites.in_model_rects(p, models):
 					continue
 				if _on_apron(sites["aprons"], p, m2u) or on_crossing(sites["crossings"], p, m2u):
 					continue

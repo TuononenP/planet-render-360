@@ -166,6 +166,8 @@ static func _finish(cls: String, surface: String) -> String:
 static func _district_finish(road: Dictionary, districts: Array, m2u: float, parks: Array = []) -> String:
 	var cls := str(road.get("class", "unclassified"))
 	var finish := "crossing" if bool(road.get("crossing", false)) else _finish(cls, str(road.get("surface", "")).to_lower())
+	if ArchitectureParis.park_way(road, parks) and _gravel_hex == ArchitectureParis.PARK_GRAVEL_HEX:
+		return "gravel"
 	if str(road.get("surface", "")) != "" or bool(road.get("crossing", false)) or bool(road.get("bridge", false)):
 		return finish
 	if FinnishGranite.park_way(road, parks):
@@ -238,6 +240,11 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		# Stockholm's quays, squares and walks are grey granite.
 		_sett_hex = ShoreApron.STOCKHOLM_SETT.to_html(false)
 		_paving_hex = ShoreApron.STOCKHOLM_PAVING.to_html(false)
+	elif ArchitectureParis.applies(data):
+		_sett_hex = ArchitectureParis.SETT_HEX
+		_paving_hex = ArchitectureParis.PAVING_HEX
+		_gravel_hex = ArchitectureParis.PARK_GRAVEL_HEX
+		_gravel_set = "gravel"
 	_stone_deck = QuayBuilder.stone_material(data) if QuayBuilder.stone_quays(data) else null
 	BridgeArches.stone_arches = QuayBuilder.stone_quays(data)
 	var m2u := WorldScale.metres_to_units()
@@ -870,7 +877,7 @@ class _Surface extends RefCounted:
 
 		var region := CityStyles.region_at(data.latitude, data.longitude)
 		districts = CityStyles.local_frame(region, data.latitude, data.longitude).get("districts", [])
-		if FinnishGranite.applies(data):
+		if FinnishGranite.applies(data) or ArchitectureParis.applies(data):
 			parks = GroundMaterial._grass_polys(data)
 		size = data.grid_size
 		step = WorldScale.detailed_extent_units() / float(maxi(size - 1, 1))

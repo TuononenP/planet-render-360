@@ -16,6 +16,71 @@ const ZINC_METAL := ["#5a646e", "#66707a", "#525c66", "#6d7780"]
 const STONE := ["#d6c5a3", "#dccbaa", "#cfbf9e"]
 ## Café awnings: oxblood, bottle green, mustard, navy, brick red.
 const CAFE := ["#7a1f24", "#1f3b2c", "#c8a24a", "#2a2f4a", "#8a2a1a"]
+## Parisian garden allées sablées (stabilised crushed Lutetian limestone sand) & blond stone paving.
+const PARK_GRAVEL_HEX := "#C6B89A"
+const PAVING_HEX := "#A69E90"
+const SETT_HEX := "#938C80"
+
+static func applies(data: LocationData) -> bool:
+	return data != null and CityDetail.city_at(data.latitude, data.longitude) == "paris"
+
+static func palette_overrides(data: LocationData) -> Dictionary:
+	return {"path": Color.html(PARK_GRAVEL_HEX)} if applies(data) else {}
+
+## Footways, pedestrian alleys and cycle paths inside Parisian parks & formal
+## gardens (Jardins du Trocadéro, Champ de Mars, Tuileries, Luxembourg) are laid
+## in pale cream-ochre stabilised limestone sand rather than dark road tarmac.
+static func park_way(road: Dictionary, parks: Array) -> bool:
+	if parks.is_empty() or bool(road.get("crossing", false)) or bool(road.get("bridge", false)) \
+			or bool(road.get("area", false)) or bool(road.get("kerb_line", false)):
+		return false
+	if str(road.get("class", "")) not in ["footway", "path", "pedestrian", "cycleway"]:
+		return false
+	if str(road.get("surface", "")).to_lower() in ["sett", "paving_stones", "cobblestone", "unhewn_cobblestone"]:
+		return false
+	var pts: PackedVector2Array = road.get("points", PackedVector2Array())
+	return not pts.is_empty() and GroundMaterial._grass_at(pts[pts.size() / 2], parks)
+
+## Fills the un-surveyed sloped park bosquets of Jardins du Trocadéro flanking
+## the Fontaine de Varsovie (`|fx| = 36.5..63 m, fz = -92..+68 m`) with real
+## multi-card 3D Parisian park trees (Horse Chestnut, London Plane, Lime, Oak),
+## bridging the gap between the stone monument (`±34.5 m`) and the Paris OpenData
+## street/alley alignment register (`±65 m`). Strictly obeys `mask` & `_site_ok`.
+static func plant_trocadero_bosquets(plan: Dictionary, data: LocationData,
+		ground: GroundTruth, mask: VegetationMask, ctx: Dictionary) -> void:
+	if str(ctx.get("city", "")) != "paris":
+		return
+	var entry := LocationData.entry_for_type("fontaine_de_varsovie")
+	if entry.is_empty():
+		return
+	var m2u: float = ctx["m2u"]
+	var f_at := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]),
+		data.latitude, data.longitude)
+	if f_at.length() > 950.0 * m2u:
+		return
+	var ax := LandmarkSites.axis(entry)
+	var sd := Vector2(-ax.y, ax.x)
+	var species := ["horse_chestnut", "plane", "lime", "oak"]
+	var idx := 0
+	var fz := -90.0
+	while fz <= 66.0:
+		var fx := 37.5
+		while fx <= 61.5:
+			for sx in [-1.0, 1.0]:
+				idx += 1
+				var jx := (sin(float(idx) * 12.9898) * 0.5) * 3.2
+				var jz := (cos(float(idx) * 78.233) * 0.5) * 3.6
+				var p := f_at + (ax * (float(sx) * (fx + jx)) + sd * (fz + jz)) * m2u
+				if mask.cover_at(p.x, p.y) < 0:
+					continue
+				if not VegetationBuilder._site_ok(p.x, p.y, ground, mask,
+						VegetationBuilder.SYNTHETIC_BITS, 1.1, ctx):
+					continue
+				var sp: String = species[idx % species.size()]
+				var sc := 0.88 + fposmod(sin(float(idx) * 43.758) * 19.3, 0.28)
+				VegetationBuilder._add(plan, p.x, p.y, ground, sp, sc, 1.05, false)
+			fx += 7.8
+		fz += 8.5
 
 const BASE := {
 	"paris_post_haussmann": "haussmann", "paris_faubourg": "haussmann",
