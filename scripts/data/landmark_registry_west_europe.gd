@@ -15,7 +15,7 @@ static func entries() -> Array:
 			"kind": "Monument", "aliases": ["arc de triomphe", "triumphal arch, paris"]},
 		{"type": "louvre_pyramid", "skyline_priority": 9, "name": "Louvre Pyramid", "lat": 48.8610, "lon": 2.3358,
 			"radius_m": 5500.0, "wiki_title": "Louvre Pyramid", "height_m": 21.6, "clear_m": 54.0, "yaw_deg": 15.5,
-			"kind": "Monument",
+			"base_at_m": [0.0, 0.0], "base_drop_m": 0.90, "kind": "Monument",
 			"aliases": ["louvre pyramid", "pyramide du louvre", "louvre museum", "musée du louvre"]},
 		{"type": "sacre_coeur", "skyline_priority": 9, "name": "Sacré-Cœur", "lat": 48.8867, "lon": 2.3431,
 			"radius_m": 7000.0, "wiki_title": "Sacré-Cœur, Paris", "height_m": 83.0, "clear_m": 70.0,

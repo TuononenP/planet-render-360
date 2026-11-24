@@ -13,6 +13,7 @@ const U = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_
 
 const ENTRY := {"type": "havis_amanda", "name": "Havis Amanda", "lat": 60.1675863, "lon": 24.9513987,
 	"radius_m": 1500.0, "wiki_title": "Havis Amanda", "height_m": 5.0, "clear_m": 7.0,
+	"base_at_m": [0.0, 9.0], "base_drop_m": 0.35,
 	"kind": "Fountain", "aliases": ["havis amanda", "havis amanda fountain", "manta helsinki"]}
 
 const RIM := 0.88

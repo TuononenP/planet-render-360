@@ -130,7 +130,8 @@ static func louvre_pyramid(model: Node3D) -> void:
 	lm.use("Water", LandmarkMaterials.pool_water("#2A6878", 0.05))
 	lm.use("Granite", LandmarkMaterials.pbr("stone", "#4F5256", 2.0, 0.28))
 	lm.use("CoreLamp", LandmarkMaterials.night_lit("#FFCE80", 1.45, "#CFC4AC"))
-	LandmarkWestKit.blk(lm, "Paving", 0, 0.0, 0, 108.0, 0.06, 108.0)
+	# Level Cour Napoléon terrace apron with 1.2 m foundation skirt so sloped DEM never buries or undercuts it
+	LandmarkWestKit.blk(lm, "Paving", 0, -1.20, 0, 108.0, 1.28, 108.0)
 	# Perimeter dark-granite curb around the Grand Pyramid opening into the sunlit Hall Napoléon atrium
 	for s in [-1.0, 1.0]:
 		var sf := float(s)
