@@ -25,6 +25,7 @@ static func build(model: Node3D) -> void:
 	_fountains(lm)
 	_national_gallery(lm)
 	lm.commit(model)
+	_fountain_flow(model)
 	model.set_meta(LandmarkLights.FLOOD_META, [
 		[Vector3(0.0, 2.0, 14.0), Vector3(0.0, 38.0, 0.0), 42.0, 1.0, 65.0],
 		[Vector3(0.0, 2.0, -56.0), Vector3(0.0, 18.0, -76.0), 68.0, 0.9, 65.0],
@@ -65,6 +66,23 @@ static func _fountains(lm: LandmarkMesh) -> void:
 		lm.disc("Water", Vector3(fx, 0.95, fz), Vector3.UP, 10.6, 16)
 		lm.frustum("Bronze", Vector3(fx, 1.0, fz), 2.2, 1.4, 3.2, 12)
 		lm.frustum("Bronze", Vector3(fx, 4.2, fz), 3.6, 0.8, 1.4, 12)
+
+static func _fountain_flow(model: Node3D) -> void:
+	var fk := FountainKit.new()
+	for sx in [-1.0, 1.0]:
+		var c := Vector3(float(sx) * 26.0, 0.0, -36.0)
+		var wat_y := 0.96
+		fk.jet_plume(c + Vector3(0.0, 5.5, 0.0), 4.6, 0.20, 0.62)
+		fk.bowl_curtain(c, 3.55, 4.35, wat_y, 1.05, 24)
+		fk.splash_ring(c + Vector3(0.0, wat_y, 0.0), 5.6, 0.88)
+		for k in 4:
+			var a := PI * 0.25 + PI * 0.5 * float(k)
+			var d := Vector3(cos(a), 0.0, sin(a))
+			fk.arc_stream(c + d * 6.4 + Vector3(0.0, 1.25, 0.0), c + d * 2.8 + Vector3(0.0, wat_y, 0.0),
+				2.1, 0.12, 0.32)
+			fk.splash_ring(c + d * 2.8 + Vector3(0.0, wat_y, 0.0), 1.4, 0.80)
+		fk.mist_emitter(c + Vector3(0.0, wat_y + 0.5, 0.0), 2.5, 1.6, 4)
+	fk.commit(model)
 
 static func _national_gallery(lm: LandmarkMesh) -> void:
 	# North terrace overlooking Trafalgar Square (z = -84 m)

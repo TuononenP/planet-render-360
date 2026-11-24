@@ -26,7 +26,7 @@ static func steps(model: Node3D) -> void:
 	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#A65A3E", 2.0))
 	lm.use("Dome", LandmarkMaterials.pbr("concrete", "#8E9291", 3.0, 0.55, 0.3))
 	lm.use("Gold", LandmarkMaterials.gold())
-	lm.use("Water", LandmarkMaterials.glass("#2A6C78"))
+	lm.use("Water", LandmarkMaterials.pool_water("#2E7480", 0.07))
 	# Flights, landings and the planted islands between the arms.
 	LandmarkRmLUtil.flight(lm, "Steps", 0.0, 36.0, 34.0, 22.0, 0.0, 6.0, 24)
 	lm.box("Steps", Vector3(0, 3.0, 19.5), Vector3(36.0, 6.0, 5.0))
@@ -72,6 +72,23 @@ static func steps(model: Node3D) -> void:
 	_barcaccia(lm, Vector3(0, 0, 46.0))
 	_trinita(lm, 23.0)
 	lm.commit(model)
+	_barcaccia_flow(model, Vector3(0.0, 0.0, 46.0))
+
+static func _barcaccia_flow(model: Node3D, c: Vector3) -> void:
+	var fk := FountainKit.new()
+	var wat_y := 0.35
+	fk.jet_plume(c + Vector3(0.0, 2.12, 0.0), 1.45, 0.10, 0.28)
+	fk.bowl_curtain(c, 0.88, 2.05, 1.15, 0.32, 16)
+	# Overflowing sheets spilling over the half-sunk boat gunwales into the oval basin.
+	for s in [-1.0, 1.0]:
+		fk.cascade_sheet(c + Vector3(s * 2.25, 0.0, -2.4), c + Vector3(s * 2.25, 0.0, 2.4),
+			1.28, wat_y, Vector3(s, 0.0, 0.0), 0.38, 0.68)
+		fk.splash_strip(c + Vector3(s * 2.55, wat_y, -2.4), c + Vector3(s * 2.55, wat_y, 2.4),
+			Vector3(s, 0.0, 0.0), 1.1, 0.78)
+		# Bow and stern sun-shield spouts arcing into the ends of the basin.
+		fk.arc_stream(c + Vector3(0.0, 1.65, s * 5.2), c + Vector3(0.0, wat_y, s * 6.35), 0.35, 0.08, 0.18)
+		fk.splash_ring(c + Vector3(0.0, wat_y, s * 6.35), 0.85, 0.74)
+	fk.commit(model)
 
 ## Barcaccia: an oval basin with the half-sunk travertine boat, its
 ## raised bow and stern, the papal sun shields and a central spout.
@@ -158,7 +175,7 @@ static func popolo(model: Node3D) -> void:
 	lm.use("Granite", LandmarkMaterials.pbr("stone", "#A0593F", 3.0))
 	lm.use("Dome", LandmarkMaterials.pbr("concrete", "#8E9291", 3.0, 0.55, 0.3))
 	lm.use("Ochre", LandmarkMaterials.pbr("render", "#C9965F", 4.0))
-	lm.use("Water", LandmarkMaterials.glass("#2A6C78"))
+	lm.use("Water", LandmarkMaterials.pool_water("#2E7480", 0.07))
 	lm.use("Gold", LandmarkMaterials.gold())
 	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#EDE8DC", 2.0))
 	_church(lm, 21.0, 8.4, 8.4, 6.0, 9.0, 4.5, 22.0, 8)
@@ -186,6 +203,32 @@ static func popolo(model: Node3D) -> void:
 			Vector2(2.1, 0.4)]), 20, 1.0, 1.0, 0.0, true, false)
 		lm.disc("Water", bc + Vector3(0, 0.55, 0), Vector3.UP, 2.15, 20)
 	lm.commit(model)
+	_popolo_flow(model, o)
+
+static func _popolo_flow(model: Node3D, o: Vector3) -> void:
+	var fk := FountainKit.new()
+	# Four Egyptian lions spouting parabolic arcs into their round corner basins.
+	for k in 4:
+		var a := PI * 0.25 + PI * 0.5 * float(k)
+		var d := Vector3(cos(a), 0.0, sin(a))
+		var p := o + d * 7.6
+		var mouth := p + d * 1.1 + Vector3(0.0, 3.05, 0.0)
+		var land := p + d * 4.2 + Vector3(0.0, 0.55, 0.0)
+		fk.arc_stream(mouth, land, 0.35, 0.09, 0.22)
+		fk.splash_ring(land, 1.05, 0.80)
+	# East and west hemicycle fountains: cascading plumes and flanking arcs.
+	for s in [-1.0, 1.0]:
+		var toward := -float(s)
+		var f := Vector3(float(s) * 66.0 + toward * -8.0, 0.0, 43.0)
+		var fy := 0.65
+		fk.jet_plume(f + Vector3(0.0, 2.1, 0.0), 2.4, 0.12, 0.32)
+		fk.splash_ring(f + Vector3(0.0, fy, 0.0), 2.4, 0.78)
+		for sz in [-1.0, 1.0]:
+			var sp := f + Vector3(toward * 0.6, 1.8, float(sz) * 2.2)
+			var ld := f + Vector3(toward * 2.6, fy, float(sz) * 1.6)
+			fk.arc_stream(sp, ld, 0.42, 0.08, 0.20)
+			fk.splash_ring(ld, 0.9, 0.72)
+	fk.commit(model)
 
 ## A seated Egyptian-style lion facing d on its plinth top `p`.
 static func _lion(lm: LandmarkMesh, p: Vector3, d: Vector3) -> void:

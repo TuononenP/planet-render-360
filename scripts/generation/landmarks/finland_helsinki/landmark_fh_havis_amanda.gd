@@ -22,7 +22,7 @@ static func build(model: Node3D) -> void:
 	lm.use("Granite", LandmarkMaterials.pbr("stone", "#A06B63", 1.2))
 	lm.use("Step", LandmarkMaterials.pbr("stone", "#8E8A86", 2.0))
 	lm.use("Bronze", LandmarkMaterials.paint("#3E5B4C", 0.45, 0.65))
-	lm.use("Water", LandmarkMaterials.glass("#6E9992"))
+	lm.use("Water", LandmarkMaterials.pool_water("#4E8882", 0.07))
 	# Two low paving steps and the basin: a rounded rim, the water inside.
 	lm.lathe("Step", Vector3.ZERO, PackedVector2Array([Vector2(6.8, 0), Vector2(6.8, 0.14),
 		Vector2(6.3, 0.16), Vector2(6.3, 0.30), Vector2(5.9, 0.32)]), 64)
@@ -35,9 +35,11 @@ static func build(model: Node3D) -> void:
 		Vector2(1.7, 0.9), Vector2(1.2, 1.4), Vector2(1.0, 1.9), Vector2(0.8, 2.3), Vector2(0.55, 2.5)]), 32)
 	lm.lathe("Bronze", Vector3(0, 2.55, 0), PackedVector2Array([Vector2(0.5, 0), Vector2(1.5, 0.12),
 		Vector2(2.0, 0.34), Vector2(1.9, 0.4), Vector2(1.3, 0.3), Vector2(0.4, 0.22)]), 40)
-	_sea_lions_and_jets(lm)
+	var fk := FountainKit.new()
+	_sea_lions_and_jets(lm, fk)
 	_mermaid_figure(lm, Vector3(0.0, 2.86, 0.0))
 	lm.commit(model)
+	fk.commit(model)
 	var warm := Color(1.0, 0.88, 0.66)
 	model.set_meta(LandmarkLights.FLOOD_META, [
 		[Vector3(4.2, RIM + 0.1, 4.2), Vector3(0.0, 3.8, 0.0), 50.0, 0.9, 14.0, warm],
@@ -46,7 +48,8 @@ static func build(model: Node3D) -> void:
 		[Vector3(4.2, RIM + 0.1, -4.2), Vector3(0.0, 3.8, 0.0), 50.0, 0.9, 14.0, warm],
 	])
 
-static func _sea_lions_and_jets(lm: LandmarkMesh) -> void:
+static func _sea_lions_and_jets(lm: LandmarkMesh, fk: FountainKit) -> void:
+	var wat_y := RIM - 0.14
 	for i in 4:
 		var a := TAU * float(i) / 4.0 + PI * 0.25
 		var d := Vector3(cos(a), 0, sin(a))
@@ -66,20 +69,16 @@ static func _sea_lions_and_jets(lm: LandmarkMesh) -> void:
 				p - d * 0.4 + right * s * 0.56 + Vector3(0, 0.02, 0), 0.14, 0.06)
 		# Parabolic water jet arching from sea lion mouth into the basin.
 		var mouth := p - d * 0.94 + Vector3(0, 0.90, 0)
-		var land := d * 1.9 + Vector3(0, RIM - 0.14, 0)
-		_water_arc(lm, mouth, land, 0.55)
+		var land := d * 1.9 + Vector3(0, wat_y, 0)
+		fk.arc_stream(mouth, land, 0.62, 0.07, 0.18)
+		fk.splash_ring(land, 0.82, 0.80)
 		# Fish heads on the central pedestal also spouting into the basin.
 		var fish_m := d * 1.45 + Vector3(0, 1.45, 0)
+		var fish_land := d * 3.1 + Vector3(0, wat_y, 0)
 		lm.beam("Bronze", d * 0.85 + Vector3(0, 1.32, 0), fish_m, 0.26, 0.24)
-		_water_arc(lm, fish_m, d * 3.1 + Vector3(0, RIM - 0.14, 0), 0.35)
-
-static func _water_arc(lm: LandmarkMesh, a: Vector3, b: Vector3, arc_h: float) -> void:
-	var prev := a
-	for k in range(1, 9):
-		var t := float(k) / 8.0
-		var pt := a.lerp(b, t) + Vector3(0, sin(t * PI) * arc_h, 0)
-		lm.beam("Water", prev, pt, 0.045, 0.045)
-		prev = pt
+		fk.arc_stream(fish_m, fish_land, 0.38, 0.06, 0.16)
+		fk.splash_ring(fish_land, 0.70, 0.75)
+	fk.mist_emitter(Vector3(0.0, wat_y + 0.25, 0.0), 1.2, 0.85, 4)
 
 ## Vallgren's standing bronze mermaid figure with sculpted multi-ring anatomy.
 static func _mermaid_figure(lm: LandmarkMesh, base: Vector3) -> void:

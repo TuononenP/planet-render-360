@@ -26,7 +26,7 @@ static func navona(model: Node3D) -> void:
 	lm.use("Gold", LandmarkMaterials.gold())
 	lm.use("Rock", LandmarkMaterials.pbr("rock", "#B7AA8E", 4.0))
 	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#EDE8DC", 2.0))
-	lm.use("Water", LandmarkMaterials.glass("#2A6C78"))
+	lm.use("Water", LandmarkMaterials.pool_water("#2E7884", 0.07))
 	lm.use("Ochre", LandmarkMaterials.pbr("render", "#C9965F", 4.0))
 	lm.use("Rose", LandmarkMaterials.pbr("render", "#C58468", 4.0))
 	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#A65A3E", 2.0))
@@ -52,6 +52,40 @@ static func navona(model: Node3D) -> void:
 		LandmarkRmLUtil.block(lm, wall, Vector3(float(e[0]), 0, 34.0), float(e[1]), float(e[2]),
 			16.0, Vector3(0, 0, -1), 5, 6, 1.3, 2.3, "Tile")
 	lm.commit(model)
+	_navona_water_flow(model)
+
+static func _navona_water_flow(model: Node3D) -> void:
+	var fk := FountainKit.new()
+	# Fountain of the Four Rivers: grotto cascades + rock spills into the circular basin (y = 0.85 m).
+	var ry := 0.85
+	for k in 4:
+		var g := PI * 0.5 * float(k)
+		var d := Vector3(cos(g), 0.0, sin(g))
+		var side := Vector3(-d.z, 0.0, d.x)
+		var p0 := d * 9.5 - side * 1.4
+		var p1 := d * 9.5 + side * 1.4
+		fk.cascade_sheet(p0, p1, 3.2, ry, d, 1.15, 0.86)
+		fk.splash_strip(p0 + d * 0.9 + Vector3(0.0, ry, 0.0), p1 + d * 0.9 + Vector3(0.0, ry, 0.0), d, 2.2, 0.88)
+		fk.mist_emitter(d * 10.6 + Vector3(0.0, ry + 0.3, 0.0), 1.9, 1.2, 3)
+		var diag := PI * 0.25 + PI * 0.5 * float(k)
+		var dd := Vector3(cos(diag), 0.0, sin(diag))
+		fk.arc_stream(dd * 8.6 + Vector3(0.0, 2.7, 0.0), dd * 11.4 + Vector3(0.0, ry, 0.0), 0.55, 0.14, 0.36)
+		fk.splash_ring(dd * 11.4 + Vector3(0.0, ry, 0.0), 1.35, 0.84)
+	# Fontana del Moro (-70) & Fontana del Nettuno (+70): shell curtain + central jet + 4 triton arcs.
+	for x in [-70.0, 70.0]:
+		var c := Vector3(float(x), 0.0, 0.0)
+		var sy := 0.75
+		fk.jet_plume(c + Vector3(0.0, 2.6, 0.0), 3.4, 0.14, 0.42)
+		fk.bowl_curtain(c, 3.05, 2.65, sy, 0.65, 20)
+		fk.splash_ring(c + Vector3(0.0, sy, 0.0), 4.4, 0.78)
+		for k in 4:
+			var a := PI * 0.25 + PI * 0.5 * float(k)
+			var spout := c + Vector3(cos(a) * 8.4, 2.1, sin(a) * 5.2)
+			var land := c + Vector3(cos(a) * 4.8, sy, sin(a) * 3.1)
+			fk.arc_stream(spout, land, 0.85, 0.10, 0.26)
+			fk.splash_ring(land, 1.1, 0.75)
+		fk.mist_emitter(c + Vector3(0.0, sy + 0.4, 0.0), 1.6, 1.1, 4)
+	fk.commit(model)
 
 ## Round basin, pierced rock with four river gods, palm, lion and horse,
 ## the Pamphilj dove on the obelisk.

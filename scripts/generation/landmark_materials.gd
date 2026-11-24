@@ -146,6 +146,8 @@ static func pool_water(hex: String = "#386878", roughness: float = 0.08) -> Stan
 	m.normal_scale = 0.14
 	m.uv1_scale = Vector3(0.28, 0.28, 0.28)
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.set_meta(FountainWater.BASIN_META, {"hex": hex, "roughness": roughness})
+	m.set_meta("landmark_hex", hex)
 	_cache[key] = m
 	var ret: StandardMaterial3D = m
 	_mutex.unlock()

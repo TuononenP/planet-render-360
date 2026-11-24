@@ -80,6 +80,7 @@ func _run() -> void:
 		var hero := LandmarkBuilder.build(str(t))
 		var box := _extent(hero)
 		var aabb: AABB = box[0]
+		FountainWater.upgrade(hero, RenderSettings.Preset.HIGH if _plain else RenderSettings.Preset.ULTRA)
 		if not _plain:
 			LandmarkShader.upgrade(hero)
 		if _night:

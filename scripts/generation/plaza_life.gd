@@ -43,11 +43,11 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	lm.use("Foliage", LandmarkMaterials.pbr("lawn", "#486B3A", 1.5, 0.88))
 	lm.use("Produce", LandmarkMaterials.pbr("render", "#C88B2E", 1.2, 0.78))
 	lm.use("Water", LandmarkMaterials.pool_water("#2A606E", 0.08))
-	lm.use("Spray", LandmarkMaterials.lit("#E6F5FF", 0.35))
 
+	var fk := FountainKit.new()
 	var occupied := {}
 	var count := 0
-	var f_ctx := {"data": data, "ground": ground, "mask": mask, "ex": ex,
+	var f_ctx := {"data": data, "ground": ground, "mask": mask, "ex": ex, "fk": fk,
 		"centre": centre, "radius_u": radius_u, "m2u": m2u, "occ": occupied, "pal": pal}
 	count += _build_fountains(lm, f_ctx)
 	count += _build_planters(lm, f_ctx)
@@ -59,6 +59,9 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var node := Node3D.new()
 	node.name = "PlazaLife"
 	lm.commit(node)
+	if not fk.is_empty():
+		fk.commit(node, "", preset >= RenderSettings.Preset.HIGH)
+	FountainWater.upgrade(node, preset)
 	if node.get_child_count() == 0:
 		node.free()
 		return 0
@@ -178,6 +181,7 @@ static func _build_fountains(lm: LandmarkMesh, ctx: Dictionary) -> int:
 	var centre: Vector2 = ctx["centre"]
 	var radius_u: float = ctx["radius_u"]
 	var ex: Dictionary = ctx["ex"]
+	var fk: FountainKit = ctx["fk"]
 	var winter := data.season == LocationData.Season.WINTER
 	var count := 0
 	var poly_centres := PackedVector2Array()
@@ -201,7 +205,7 @@ static func _build_fountains(lm: LandmarkMesh, ctx: Dictionary) -> int:
 			continue
 		if _excluded(c, ex, true, pts):
 			continue
-		_emit_fountain_poly(lm, pts, pd.get("holes", []), c, area, ground, winter, m2u)
+		_emit_fountain_poly(lm, fk, pts, pd.get("holes", []), c, area, ground, winter, m2u)
 		poly_centres.append(c)
 		_mark_spot(ctx["occ"], c, 5.0 * m2u)
 		count += 1
@@ -227,13 +231,13 @@ static func _build_fountains(lm: LandmarkMesh, ctx: Dictionary) -> int:
 		if skip:
 			continue
 		var ring := _octagon(at, 1.5 * m2u)
-		_emit_fountain_poly(lm, ring, [], at, PI * 1.5 * 1.5 * m2u * m2u, ground, winter, m2u)
+		_emit_fountain_poly(lm, fk, ring, [], at, PI * 1.5 * 1.5 * m2u * m2u, ground, winter, m2u)
 		poly_centres.append(at)
 		_mark_spot(ctx["occ"], at, 4.0 * m2u)
 		count += 1
 	return count
 
-static func _emit_fountain_poly(lm: LandmarkMesh, pts: PackedVector2Array, holes: Array,
+static func _emit_fountain_poly(lm: LandmarkMesh, fk: FountainKit, pts: PackedVector2Array, holes: Array,
 		c: Vector2, area: float, ground: GroundTruth, winter: bool, m2u: float) -> void:
 	var cw := RingGeometry.signed_area(pts) > 0.0
 	var rim_ys: Array[float] = []
@@ -280,12 +284,22 @@ static func _emit_fountain_poly(lm: LandmarkMesh, pts: PackedVector2Array, holes
 			Vector2(0.88 * scale, stem_h + 0.12 * scale), Vector2(0.18 * scale, stem_h + 0.28 * scale)]), 10)
 		if not winter:
 			var jet_base := Vector3(c.x, wat_y + stem_h + 0.25 * scale, c.y)
-			var jet_h := clampf(1.25 * scale, 0.9 * m2u, 2.8 * m2u)
-			lm.frustum("Spray", jet_base, 0.12 * scale, 0.03 * scale, jet_h, 6)
+			var jet_h := clampf(1.45 * scale, 1.0 * m2u, 3.0 * m2u)
+			fk.jet_plume(jet_base, jet_h, 0.11 * scale, 0.30 * scale)
+			var bowl_r := 0.92 * scale
+			if area > 18.0 * m2u * m2u:
+				fk.bowl_curtain(Vector3(c.x, wat_y, c.y), bowl_r, stem_h + 0.10 * scale, 0.0, 0.35 * scale, 16)
+				fk.splash_ring(Vector3(c.x, wat_y, c.y), bowl_r + 0.85 * scale, 0.78, 0.028 * m2u)
+			else:
+				fk.splash_ring(Vector3(c.x, wat_y, c.y), 0.95 * scale, 0.74, 0.028 * m2u)
+			var arc_reach := clampf(sqrt(area / PI) * 0.42, 0.65 * scale, 2.2 * scale)
 			for k in 5:
 				var a := TAU * float(k) / 5.0
-				var p_top := jet_base + Vector3(cos(a) * 0.42 * scale, jet_h * 0.65, sin(a) * 0.42 * scale)
-				lm.beam("Spray", jet_base, p_top, 0.06 * scale, 0.06 * scale)
+				var land := Vector3(c.x + cos(a) * arc_reach, wat_y, c.y + sin(a) * arc_reach)
+				fk.arc_stream(jet_base, land, jet_h * 0.55, 0.06 * scale, 0.15 * scale, 0.90, 10)
+				fk.splash_ring(land, 0.55 * scale, 0.68, 0.028 * m2u)
+			if area > 22.0 * m2u * m2u:
+				fk.mist_emitter(Vector3(c.x, wat_y + 0.35 * m2u, c.y), 1.3 * m2u, 0.85 * m2u, 3)
 
 ## --- B. Raised Stone & Timber Planters ---------------------------------
 

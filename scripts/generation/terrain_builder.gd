@@ -221,6 +221,8 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
 			LandmarkTerrain.stitch(hero, ground, c_type)
 			var imp_mode := LandmarkImpostor.apply_if_far(hero, dist_m, c_type, cacheable)
+			if imp_mode != "stripped":
+				FountainWater.upgrade(hero, data.quality_preset)
 			if imp_mode != "stripped" and RenderQuality.ultra_desktop(data.quality_preset):
 				LandmarkLights.dress(hero, c_type)
 				LandmarkShader.upgrade(hero)
@@ -606,6 +608,8 @@ static func _landmark(data: LocationData, ground: GroundTruth = null) -> Node3D:
 	root.rotation.y = -deg_to_rad(float(entry.get("yaw_deg", 0.0)))
 	LandmarkTerrain.stitch(root, ground, data.landmark_type)
 	var imp_mode := LandmarkImpostor.apply_if_far(root, pos.length(), data.landmark_type)
+	if imp_mode != "stripped":
+		FountainWater.upgrade(root, data.quality_preset)
 	if imp_mode != "stripped" and RenderQuality.ultra_desktop(data.quality_preset):
 		LandmarkLights.dress(root, data.landmark_type)
 		LandmarkShader.upgrade(root)

@@ -33,7 +33,6 @@ static func place_de_la_concorde(model: Node3D) -> void:
 		lm.frustum("Gilt", fc + Vector3(0.0, 3.5, 0.0), 4.6, 3.8, 0.75, 16)
 		lm.frustum("Bronze", fc + Vector3(0.0, 4.2, 0.0), 1.4, 1.1, 2.4, 10)
 		lm.frustum("Gilt", fc + Vector3(0.0, 6.6, 0.0), 2.2, 1.6, 0.55, 12)
-		lm.frustum("Water", fc + Vector3(0.0, 7.1, 0.0), 0.35, 0.05, 2.1, 8)
 	# Ornate black-and-gold rostral lamp columns ringing the square
 	for k in 8:
 		var a := TAU * (float(k) + 0.5) / 8.0
@@ -46,12 +45,34 @@ static func place_de_la_concorde(model: Node3D) -> void:
 			lm.box("Stone", pp + Vector3(0.0, 3.0, 0.0), Vector3(7.0, 6.0, 7.0))
 			lm.frustum("Stone", pp + Vector3(0.0, 6.0, 0.0), 1.6, 1.2, 3.6, 8)
 	lm.commit(model)
+	_concorde_fountain_flow(model)
 	model.set_meta(LandmarkLights.FLOOD_META, [
 		[Vector3(12.0, 1.5, 12.0), Vector3(0.0, 16.0, 0.0), 48.0, 1.1, 45.0],
 		[Vector3(-12.0, 1.5, -12.0), Vector3(0.0, 16.0, 0.0), 48.0, 1.1, 45.0],
 		[Vector3(0.0, 1.5, 72.0), Vector3(0.0, 6.0, 58.0), 58.0, 0.9, 32.0],
 		[Vector3(0.0, 1.5, -72.0), Vector3(0.0, 6.0, -58.0), 58.0, 0.9, 32.0],
 	])
+
+static func _concorde_fountain_flow(model: Node3D) -> void:
+	var fk := FountainKit.new()
+	for sz in [-1.0, 1.0]:
+		var fc := Vector3(0.0, 0.0, float(sz) * 58.0)
+		var wat_y := 0.92
+		# Cresting central vertical plume above the top gilded bowl.
+		fk.jet_plume(fc + Vector3(0.0, 7.15, 0.0), 2.8, 0.16, 0.48)
+		# Overflowing water curtains cascading from upper gilded bowl -> main bowl -> grand basin.
+		fk.bowl_curtain(fc, 1.95, 7.10, 4.20, 0.65, 22)
+		fk.bowl_curtain(fc, 4.30, 4.15, wat_y, 1.15, 28)
+		fk.splash_ring(fc + Vector3(0.0, wat_y, 0.0), 6.4, 0.90)
+		# Six arched jets leaping outward from the bronze triton & nereid figures around the basin.
+		for k in 6:
+			var a := TAU * float(k) / 6.0 + PI / 6.0
+			var d := Vector3(cos(a), 0.0, sin(a))
+			fk.arc_stream(fc + d * 3.2 + Vector3(0.0, 2.8, 0.0), fc + d * 6.9 + Vector3(0.0, wat_y, 0.0),
+				1.05, 0.11, 0.28)
+			fk.splash_ring(fc + d * 6.9 + Vector3(0.0, wat_y, 0.0), 1.35, 0.82)
+		fk.mist_emitter(fc + Vector3(0.0, wat_y + 0.45, 0.0), 2.4, 1.5, 5)
+	fk.commit(model)
 
 ## Palais Bourbon / Assemblée Nationale (28 m; 96 x 78 m):
 ## Poyet's 1806 12-column Corinthian temple front overlooking Quai d'Orsay & Pont de la Concorde,

@@ -241,7 +241,7 @@ static func trevi(model: Node3D) -> void:
 	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#E0D2B0", 2.0))
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#51493C", 3.0))
 	lm.use("Rock", LandmarkMaterials.pbr("rock", "#B7AA8E", 4.0))
-	lm.use("Water", LandmarkMaterials.glass("#2A6C78"))
+	lm.use("Water", LandmarkMaterials.pool_water("#2C8A96", 0.06))
 	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#EFEADF", 2.0))
 	var f := -10.0
 	var nz := Vector3(0, 0, 1)
@@ -323,6 +323,42 @@ static func trevi(model: Node3D) -> void:
 		lm.box("Travertine", Vector3(s * 24.6, 1.25, f + 15.0), Vector3(1.1, 0.15, 23.4))
 	SEuUtil.steps_up(lm, "Travertine", Vector3(0, 0, f + 26.6), Vector3(0, 0, 1), 50.0, 1.0, 0.18, 3)
 	lm.commit(model)
+	_trevi_water_flow(model, f)
+	var warm := Color(1.0, 0.90, 0.72)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-12.0, 1.2, f + 18.0), Vector3(-6.0, 8.0, f + 3.0), 58.0, 1.0, 42.0, warm],
+		[Vector3(12.0, 1.2, f + 18.0), Vector3(6.0, 8.0, f + 3.0), 58.0, 1.0, 42.0, warm],
+		[Vector3(0.0, 1.2, f + 19.0), Vector3(0.0, 7.0, f + 5.5), 62.0, 1.05, 38.0, Color(0.82, 0.96, 1.0)],
+	])
+
+static func _trevi_water_flow(model: Node3D, f: float) -> void:
+	var fk := FountainKit.new()
+	var wat_y := 0.60
+	var fwd := Vector3(0.0, 0.0, 1.0)
+	# Travertine reef ellipsoid extends to z = f + 11.5 m at the waterline;
+	# drape cascades over the outer slope so every fall pours visibly into the basin.
+	fk.cascade_sheet(Vector3(-3.0, 0.0, f + 7.2), Vector3(3.0, 0.0, f + 7.2), 4.05, 2.35, fwd, 2.2, 0.76)
+	fk.cascade_sheet(Vector3(-4.4, 0.0, f + 9.4), Vector3(4.4, 0.0, f + 9.4), 2.55, wat_y, fwd, 2.5, 0.92)
+	# Flanking reef cascades spilling past the sea-horses, tritons and outer rock shelves.
+	for s in [-1.0, 1.0]:
+		fk.cascade_sheet(Vector3(s * 4.4, 0.0, f + 10.3), Vector3(s * 9.8, 0.0, f + 9.9), 2.6, wat_y, fwd, 2.1, 0.88)
+		fk.cascade_sheet(Vector3(s * 10.2, 0.0, f + 9.6), Vector3(s * 16.8, 0.0, f + 8.6), 2.3, wat_y, fwd, 2.0, 0.84)
+		fk.cascade_sheet(Vector3(s * 17.0, 0.0, f + 8.4), Vector3(s * 21.8, 0.0, f + 6.9), 1.85, wat_y, fwd, 1.8, 0.78)
+		# Arched spouts leaping cleanly clear of the reef into the turquoise basin.
+		fk.arc_stream(Vector3(s * 2.1, 4.15, f + 6.6), Vector3(s * 3.1, wat_y, f + 13.4), 0.95, 0.18, 0.48)
+		fk.arc_stream(Vector3(s * 7.0, 2.55, f + 10.2), Vector3(s * 8.2, wat_y, f + 14.2), 0.70, 0.16, 0.42)
+		fk.arc_stream(Vector3(s * 13.8, 2.35, f + 9.1), Vector3(s * 14.6, wat_y, f + 13.0), 0.58, 0.14, 0.36)
+		fk.splash_ring(Vector3(s * 3.1, wat_y, f + 13.4), 1.85, 0.94)
+		fk.splash_ring(Vector3(s * 8.2, wat_y, f + 14.2), 1.60, 0.88)
+		fk.splash_ring(Vector3(s * 14.6, wat_y, f + 13.0), 1.45, 0.82)
+		fk.mist_emitter(Vector3(s * 7.6, wat_y + 0.35, f + 12.2), 2.2, 1.5, 4)
+		fk.mist_emitter(Vector3(s * 14.4, wat_y + 0.30, f + 11.0), 1.8, 1.3, 3)
+	# Churning aerated plunge-pool boil curving along the entire reef waterline.
+	fk.splash_strip(Vector3(-11.0, wat_y, f + 11.4), Vector3(11.0, wat_y, f + 11.4), fwd, 3.8, 0.95)
+	fk.splash_strip(Vector3(-21.5, wat_y, f + 9.2), Vector3(-10.5, wat_y, f + 11.3), Vector3(-0.18, 0.0, 0.98), 3.4, 0.88)
+	fk.splash_strip(Vector3(10.5, wat_y, f + 11.3), Vector3(21.5, wat_y, f + 9.2), Vector3(0.18, 0.0, 0.98), 3.4, 0.88)
+	fk.mist_emitter(Vector3(0.0, wat_y + 0.4, f + 12.0), 2.8, 2.0, 6)
+	fk.commit(model)
 
 # --- Vittoriano ---------------------------------------------------------
 
@@ -345,7 +381,7 @@ static func vittoriano(model: Node3D) -> void:
 	lm.use("Steps", LandmarkMaterials.pbr("limestone", "#D2CCBE", 2.0))
 	lm.use("Bronze", LandmarkMaterials.paint("#58684F", 0.5, 0.5))
 	lm.use("Gold", LandmarkMaterials.gold())
-	lm.use("Water", LandmarkMaterials.glass("#3A6E7A"))
+	lm.use("Water", LandmarkMaterials.pool_water("#367A86", 0.07))
 	var nz := Vector3(0, 0, 1)
 	# Terraces.
 	lm.box("Marble", Vector3(0, 6.5, 27.0), Vector3(135.0, 13.0, 26.0))
@@ -426,6 +462,12 @@ static func vittoriano(model: Node3D) -> void:
 		_quadriga(lm, Vector3(px, 70.2, -19.0))
 		lm.box("Marble", Vector3(px, 0.0, -19.0) + Vector3(0, PORTICO_Y + 0.2, 0), Vector3(22.0, 0.4, 14.0))
 	lm.commit(model)
+	var fk := FountainKit.new()
+	for s in [-1.0, 1.0]:
+		var sx := float(s) * 50.0
+		fk.cascade_sheet(Vector3(sx - 5.5, 0.0, 42.4), Vector3(sx + 5.5, 0.0, 42.4), 2.4, 0.60, Vector3(0.0, 0.0, 1.0), 0.75, 0.78)
+		fk.splash_strip(Vector3(sx - 6.0, 0.60, 43.0), Vector3(sx + 6.0, 0.60, 43.0), Vector3(0.0, 0.0, 1.0), 2.2, 0.84)
+	fk.commit(model)
 
 ## Arc of the concave portico: a box-section band centred on the arc of
 ## radius r round `c` (the portico bows back toward -Z), between angles

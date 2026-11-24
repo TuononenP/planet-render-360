@@ -20,9 +20,10 @@ static func bethesda_fountain(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	_stone(lm, "Stone", SANDSTONE)
 	lm.use("Bronze", LandmarkMaterials.paint(BRONZE, 0.5, 0.6))
-	lm.use("Water", LandmarkMaterials.glass("#3d5866"))
+	lm.use("Water", LandmarkMaterials.pool_water("#366C7A", 0.07))
 	lm.lathe("Stone", Vector3.ZERO, PackedVector2Array([Vector2(13.7, -0.2), Vector2(13.7, 0.55),
 		Vector2(14.6, 0.55), Vector2(14.6, -0.2)]), 48, 1.0, 1.0, 0.0, true, false)
+	lm.disc("Water", Vector3(0, 0.42, 0), Vector3.UP, 13.72, 48)
 	# Lower pedestal, the lower bowl, the column, the upper bowl, the plinth.
 	lm.lathe("Stone", Vector3.ZERO, PackedVector2Array([Vector2(2.6, -0.2), Vector2(2.4, 1.1),
 		Vector2(0.8, 1.3), Vector2(0.9, 1.5), Vector2(3.3, 1.9), Vector2(3.4, 2.15), Vector2(0.75, 2.2),
@@ -38,6 +39,12 @@ static func bethesda_fountain(model: Node3D) -> void:
 		lm.quad("Bronze", Vector3(0, 6.5, side * 0.15), Vector3(-0.4, 6.4, side * 1.3),
 			Vector3(-0.7, 7.9, side * 1.1), Vector3(-0.1, 7.0, side * 0.2), Vector3(0, 0, side))
 	lm.commit(model)
+	var fk := FountainKit.new()
+	fk.bowl_curtain(Vector3.ZERO, 1.75, 3.96, 2.12, 0.52, 20)
+	fk.bowl_curtain(Vector3.ZERO, 3.35, 2.12, 0.42, 0.85, 26)
+	fk.splash_ring(Vector3(0.0, 0.42, 0.0), 5.2, 0.84)
+	fk.mist_emitter(Vector3(0.0, 0.72, 0.0), 1.8, 1.2, 4)
+	fk.commit(model)
 
 ## Bow Bridge (1862): a cream cast-iron arch across the Lake, 26.5 m
 ## between its schist abutments, a timber deck and the openwork railing

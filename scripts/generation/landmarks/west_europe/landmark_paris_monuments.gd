@@ -138,6 +138,7 @@ static func louvre_pyramid(model: Node3D) -> void:
 		LandmarkWestKit.blk(lm, "Granite", p.x, 0, p.z, 8.4, 0.25, 8.4)
 		_pyramid(lm, p, 3.9, 4.95, 5, false)
 	# Triangular basins in polished granite, two flanking each small pyramid.
+	var fk := FountainKit.new()
 	for side in 3:
 		var b := Basis(Vector3.UP, -PI * 0.5 * float(side))
 		for sgn in [-1.0, 1.0]:
@@ -155,13 +156,15 @@ static func louvre_pyramid(model: Node3D) -> void:
 			lm.poly_prism("Water", inner, 0.45, 0.5)
 			for k in 4:
 				var jp := cen + (poly[0] - cen) * (0.2 * float(k) - 0.2)
-				lm.frustum("Water", Vector3(jp.x, 0.5, jp.y), 0.08, 0.02, 2.2, 6)
+				fk.jet_plume(Vector3(jp.x, 0.5, jp.y), 2.35, 0.08, 0.24)
+				fk.splash_ring(Vector3(jp.x, 0.5, jp.y), 1.15, 0.78)
 	# Glazed entrance canopy on the west face.
 	lm.box("Frame", Vector3(-18.6, 1.6, 0), Vector3(1.6, 0.25, 5.0))
 	for sz in [-2.4, 2.4]:
 		lm.box("Frame", Vector3(-19.2, 0.85, sz), Vector3(0.18, 1.6, 0.18), Basis(), 0.0)
 	lm.box("Glass", Vector3(-17.9, 1.3, 0), Vector3(0.05, 2.5, 4.4), Basis(), 0.0)
 	lm.commit(model)
+	fk.commit(model)
 
 ## Glass pyramid on `c`: glass skin, the diagonal lattice of n courses a
 ## face (members parallel to the hip edges), hips and base frame; with

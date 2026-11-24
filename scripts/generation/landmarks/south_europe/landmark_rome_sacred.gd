@@ -30,7 +30,7 @@ static func peters(model: Node3D) -> void:
 	lm.use("Dome", LandmarkMaterials.pbr("concrete", "#9AA09E", 3.0, 0.55, 0.12))
 	lm.use("Steps", LandmarkMaterials.pbr("stone", "#BDB4A2", 2.0))
 	lm.use("Gold", LandmarkMaterials.gold())
-	lm.use("Water", LandmarkMaterials.glass("#3A6E7A"))
+	lm.use("Water", LandmarkMaterials.pool_water("#347A86", 0.07))
 	_body(lm)
 	_facade(lm)
 	_dome(lm)
@@ -41,6 +41,7 @@ static func peters(model: Node3D) -> void:
 		LandmarkKits.dome_on_drum(lm, "Stone", "Dome", mc + Vector3(0, 4.0, 0), 7.0, 7.0, 8.0, 5.0, 24, 8)
 	_piazza(lm)
 	lm.commit(model)
+	_piazza_fountain_flow(model)
 
 ## Michelangelo's Greek cross with its three apses and Maderno's nave:
 ## giant Corinthian pilasters, two tiers of windows, the attic with its
@@ -347,8 +348,22 @@ static func _piazza(lm: LandmarkMesh) -> void:
 		lm.frustum("Stone", fc + Vector3(0, 5.0, 0), 0.6, 0.5, 2.0, 10)
 		lm.lathe("Stone", fc + Vector3(0, 7.0, 0), PackedVector2Array([Vector2(0.5, 0), Vector2(2.0, 0.5),
 			Vector2(2.1, 0.8), Vector2(1.6, 0.8)]), 20)
-		lm.lathe("Water", fc + Vector3(0, 7.8, 0), PackedVector2Array([Vector2(1.6, 0), Vector2(1.0, 0.8),
-			Vector2(0.3, 1.6), Vector2(0.0, 1.8)]), 12)
+
+static func _piazza_fountain_flow(model: Node3D) -> void:
+	var fk := FountainKit.new()
+	var ex := 250.0
+	for s in [-1.0, 1.0]:
+		var fc := Vector3(ex, 0.0, float(s) * 60.0)
+		var wat_y := 0.55
+		# Tall central jet plume cresting above the upper inverted mushroom cap.
+		fk.jet_plume(fc + Vector3(0.0, 7.75, 0.0), 4.2, 0.22, 0.65)
+		# Upper cap overflow curtain spilling into the broad monolithic granite bowl.
+		fk.bowl_curtain(fc, 2.05, 7.75, 5.15, 0.72, 22)
+		# Full 360-degree shimmering water veil cascading from the main granite bowl into the basin.
+		fk.bowl_curtain(fc, 3.55, 5.15, wat_y, 1.35, 28)
+		fk.splash_ring(fc + Vector3(0.0, wat_y, 0.0), 6.2, 0.92)
+		fk.mist_emitter(fc + Vector3(0.0, wat_y + 0.5, 0.0), 2.8, 1.7, 5)
+	fk.commit(model)
 
 # --- Pantheon ---------------------------------------------------------
 
@@ -373,6 +388,7 @@ static func pantheon(model: Node3D) -> void:
 	lm.use("Tile", LandmarkMaterials.pbr("terracotta", "#8F5B47", 2.0))
 	lm.use("Bronze", LandmarkMaterials.pbr("concrete", "#6C5A3C", 2.0, 0.4, 0.7))
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#463F36", 3.0))
+	lm.use("Water", LandmarkMaterials.pool_water("#327882", 0.07))
 	lm.use("Pink", LandmarkMaterials.pbr("stone", "#A78C80", 2.0))
 	var r := ROT_R
 	# Drum in three bands, each topped by a cornice.
@@ -459,6 +475,7 @@ static func pantheon(model: Node3D) -> void:
 	lm.disc("Shadow", Vector3(0, ey + 6.2, zf - 0.85), Vector3(0, 0, -1), 0.9, 12)
 	_rotonda(lm)
 	lm.commit(model)
+	_rotonda_flow(model)
 
 ## Piazza della Rotonda's fountain 78 m north of the rotunda, 11 m west of
 ## its axis: Della Porta's 1575 marble basin on two steps, the stem with
@@ -470,11 +487,27 @@ static func _rotonda(lm: LandmarkMesh) -> void:
 	lm.frustum("Trim", c + Vector3(0, 0.3, 0), 5.4, 5.1, 0.3, 20)
 	lm.lathe("Pink", c + Vector3(0, 0.6, 0), PackedVector2Array([Vector2(4.6, 0), Vector2(4.6, 0.9),
 		Vector2(4.2, 0.9), Vector2(4.2, 0.1), Vector2(0.01, 0.1)]), 20, 1.0, 1.0, 0.0, true, false)
+	lm.disc("Water", c + Vector3(0, 1.32, 0), Vector3.UP, 4.22, 24)
 	lm.frustum("Trim", c + Vector3(0, 0.6, 0), 1.3, 0.9, 2.2, 12)
 	lm.lathe("Trim", c + Vector3(0, 2.8, 0), PackedVector2Array([Vector2(0.9, 0), Vector2(2.0, 0.3),
 		Vector2(2.1, 0.7), Vector2(1.7, 0.7), Vector2(0.01, 0.4)]), 14, 1.0, 1.0, 0.0, true, false)
+	lm.disc("Water", c + Vector3(0, 3.42, 0), Vector3.UP, 1.72, 16)
 	lm.box("Trim", c + Vector3(0, 4.5, 0), Vector3(2.4, 1.6, 2.4))
 	lm.box("Trim", c + Vector3(0, 5.5, 0), Vector3(1.6, 1.0, 1.6))
 	lm.box("Trim", c + Vector3(0, 6.1, 0), Vector3(2.0, 0.3, 2.0))
 	lm.spire("Pink", c + Vector3(0, 6.25, 0), 0.62, 7.3, 0.4)
 	lm.spire("Pink", c + Vector3(0, 13.55, 0), 0.4, 0.95, 0.0)
+
+static func _rotonda_flow(model: Node3D) -> void:
+	var fk := FountainKit.new()
+	var c := Vector3(-11.0, 0.0, -78.0)
+	var wat_y := 1.32
+	fk.bowl_curtain(c, 2.05, 3.46, wat_y, 0.55, 18)
+	fk.splash_ring(c + Vector3(0.0, wat_y, 0.0), 3.1, 0.80)
+	for k in 4:
+		var a := PI * 0.25 + PI * 0.5 * float(k)
+		var d := Vector3(cos(a), 0.0, sin(a))
+		fk.arc_stream(c + d * 1.15 + Vector3(0.0, 4.1, 0.0), c + d * 2.9 + Vector3(0.0, wat_y, 0.0), 0.42, 0.09, 0.22)
+		fk.splash_ring(c + d * 2.9 + Vector3(0.0, wat_y, 0.0), 0.85, 0.72)
+	fk.mist_emitter(c + Vector3(0.0, wat_y + 0.3, 0.0), 1.3, 0.9, 3)
+	fk.commit(model)

@@ -103,6 +103,10 @@ static func fondation_louis_vuitton(model: Node3D) -> void:
 	# Warm interior gallery lights glowing behind the sails
 	lm.box("SailLamp", Vector3(2.0, 26.0, 0.0), Vector3(68.0, 1.2, 16.0))
 	lm.commit(model)
+	var fk := FountainKit.new()
+	fk.cascade_sheet(Vector3(-42.0, 0.0, 5.2), Vector3(42.0, 0.0, 5.2), 2.05, 1.13, Vector3(0.0, 0.0, 1.0), 0.35, 0.65)
+	fk.splash_strip(Vector3(-42.0, 1.13, 5.5), Vector3(42.0, 1.13, 5.5), Vector3(0.0, 0.0, 1.0), 1.4, 0.72)
+	fk.commit(model)
 	model.set_meta(LandmarkLights.FLOOD_META, [
 		[Vector3(0.0, 2.0, 42.0), Vector3(0.0, 24.0, 0.0), 72.0, 1.05, 85.0],
 	])

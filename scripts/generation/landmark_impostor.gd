@@ -338,7 +338,8 @@ static func bake(root: Node3D, _yaw_deg: float = 0.0) -> Dictionary:
 static func _extract_surfaces(root: Node3D) -> Array:
 	var out: Array = []
 	for mi in LandmarkBuilder.parts(root):
-		if mi.mesh == null or bool(mi.get_meta("lod_impostor", false)):
+		if mi.mesh == null or bool(mi.get_meta("lod_impostor", false)) \
+				or bool(mi.get_meta(FountainWater.IMPOSTOR_SKIP_META, false)):
 			continue
 		var xf := _transform_in_root(mi, root)
 		var sc := MeshArrays.surface_count(mi.mesh)
@@ -387,6 +388,8 @@ static func _transform_in_root(node: Node3D, root: Node3D) -> Transform3D:
 	return xf
 
 static func _surface_color(mat: Material) -> Dictionary:
+	if mat != null and not (mat is StandardMaterial3D) and mat.has_meta("landmark_hex"):
+		return {"color": Color(str(mat.get_meta("landmark_hex"))), "use_vcol": false}
 	if mat is StandardMaterial3D:
 		var sm := mat as StandardMaterial3D
 		if sm.has_meta("landmark_hex"):
