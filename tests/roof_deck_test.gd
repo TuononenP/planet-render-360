@@ -28,6 +28,12 @@ func _init() -> void:
 	var tower_surf := RoadBuilder._Surface.new(tower, GroundTruth.new(tower))
 	if tower_surf.landmark_roof_y(Vector2.ZERO) > -1e8:
 		failures.append("a clock tower's height is no roof (Big Ben's Palace site lifted a footbridge 96 m)")
+	# A landmark with clear_rect_m must not extend its roof clear_m outside the rect.
+	var hall := _data([{"x": 0.0, "z": 0.0, "type": "county_hall", "height": 45.0,
+		"clear_m": 65.0, "clear_rect_m": [0.0, 0.0, 100.0, 40.0], "yaw_deg": 0.0}])
+	var hall_surf := RoadBuilder._Surface.new(hall, GroundTruth.new(hall))
+	if hall_surf.landmark_roof_y(Vector2(130.0, 0.0)) > -1e8:
+		failures.append("clear_rect_m roof must not reach outside its rect by clear_m")
 	if failures.is_empty():
 		print("ROOF DECK OK: layer-5 bridge lands on a 20 m landmark roof, ground beyond it")
 		quit(0)

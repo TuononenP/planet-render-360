@@ -42,6 +42,12 @@ static func roof_y(sites: Array, p: Vector2, height_at: Callable) -> float:
 	var best := -INF
 	for site in sites:
 		var at: Vector2 = site[0]
-		if LandmarkSites.span_dist(p, at, site[1]) < LandmarkSites.clear_m(site[1]):
+		var entry: Dictionary = site[1]
+		# A landmark with an explicit precinct rect only covers points inside
+		# that rect — adding clear_m outside it lifted nearby footbridges up
+		# to adjacent tall buildings (County Hall lifted St Thomas' walkways 45 m).
+		var hit := LandmarkSites.rect_dist(p, at, entry) <= 0.0 if entry.has("clear_rect_m") \
+			else LandmarkSites.span_dist(p, at, entry) < LandmarkSites.clear_m(entry)
+		if hit:
 			best = maxf(best, float(height_at.call(at.x, at.y)) + float(site[2]) * WorldScale.metres_to_units())
 	return best
