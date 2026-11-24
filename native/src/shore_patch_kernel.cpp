@@ -100,11 +100,16 @@ double ShorePatchKernel::vertex_height(Vector2 p, int owner, bool hard, Heights 
 	else {
 		h = grid_height(land, p);
 		const Vector4 near = sampler->nearest_bank(p, hard ? 1 : 2);
-		if (near.x >= 0 && near.w < step) {
-			const Bank &bank = banks[(int)near.x]; const Vector2 d = bank.b - bank.a;
-			const double t = std::clamp((double)(Vector2(near.y, near.z) - bank.a).dot(d) / std::max((double)d.length_squared(), 0.0001), 0.0, 1.0);
-			const double rim = bank.hard ? Math::lerp(bank.top_a, bank.top_b, t) : levels[bank.body].at(p);
-			h = Math::lerp(rim, h, std::clamp((double)near.w / step, 0.0, 1.0));
+		if (near.x >= 0) {
+			const Bank &bank = banks[(int)near.x];
+			const double reach = bank.hard ? (double)step : std::min((double)step, 3.0);
+			if (near.w < reach) {
+				const Vector2 d = bank.b - bank.a;
+				const double t = std::clamp((double)(Vector2(near.y, near.z) - bank.a).dot(d) / std::max((double)d.length_squared(), 0.0001), 0.0, 1.0);
+				const double rim = bank.hard ? Math::lerp(bank.top_a, bank.top_b, t) : levels[bank.body].at(p);
+				const double w = bank.hard ? std::clamp((double)near.w / reach, 0.0, 1.0) : Math::smoothstep(0.0, reach, (double)near.w);
+				h = Math::lerp(rim, h, w);
+			}
 		}
 	}
 	heights[key] = h;
@@ -213,6 +218,15 @@ Array ShorePatchKernel::cell(const Vector2i &key, const Dictionary &edge_cells, 
 			piece.push_back(a.lerp(b, (real_t)((double)(i + 1) / (double)count)));
 			cut_edges.push_back(piece);
 		}
+	}
+	for (int sub = 1; sub < 4; ++sub) {
+		const real_t f = (real_t)sub / (real_t)4;
+		const real_t sx = snap_cm(Vector2(Math::lerp(box.position.x, box.get_end().x, f), box.position.y)).x;
+		const real_t sz = snap_cm(Vector2(box.position.x, Math::lerp(box.position.y, box.get_end().y, f))).y;
+		Array vx; vx.push_back(Vector2(sx, box.position.y)); vx.push_back(Vector2(sx, box.get_end().y));
+		Array hz; hz.push_back(Vector2(box.position.x, sz)); hz.push_back(Vector2(box.get_end().x, sz));
+		cut_edges.push_back(vx);
+		cut_edges.push_back(hz);
 	}
 	const double expected = box.get_area();
 	const double tolerance = std::max(0.02, expected * 0.001);

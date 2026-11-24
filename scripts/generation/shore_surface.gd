@@ -45,6 +45,12 @@ static func build(model: ShorelineModel, abort: BuildAbort = null) -> void:
 			var last := clampi(ceili((cut[1] - a).dot(d) / d.length_squared() * count), first + 1, count)
 			for i in range(first, last):
 				edges.append([a.lerp(b, float(i) / float(count)), a.lerp(b, float(i + 1) / float(count))])
+		for sub in range(1, CELL_SUBDIV):
+			var f := float(sub) / float(CELL_SUBDIV)
+			var sx := ShoreGeometry.snap(Vector2(lerpf(box.position.x, box.end.x, f), box.position.y)).x
+			var sz := ShoreGeometry.snap(Vector2(box.position.x, lerpf(box.position.y, box.end.y, f))).y
+			edges.append([Vector2(sx, box.position.y), Vector2(sx, box.end.y)])
+			edges.append([Vector2(box.position.x, sz), Vector2(box.end.x, sz)])
 		var pieces := ShoreGeometry.partition(box, edges)
 		var coverage := 0.0
 		for piece in pieces:
@@ -99,6 +105,7 @@ static func build(model: ShorelineModel, abort: BuildAbort = null) -> void:
 ## forced, its block edge met the street's asphalt in angular patches of
 ## another grey.
 const HARD_PAVING_M := 4.0
+const CELL_SUBDIV := 4
 
 ## True when `near` (ShorelineModel.nearest) is a low quay's wall or a bridge's abutment.
 static func _street_of_quay(near: Dictionary) -> bool:

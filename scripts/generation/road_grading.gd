@@ -32,8 +32,25 @@ const NETWORK_MAX_SHIFT_M := 2.0
 ## How far along a road from the bridge it leads onto its embankment is
 ## kept (_keep_embankments), metres.
 const EMBANKMENT_M := 40.0
+const PAVED_SURFACES: Array[String] = ["asphalt", "concrete", "paved",
+	"paving_stones", "sett", "cobblestone", "unhewn_cobblestone", "bricks",
+	"concrete:plates", "stone", "chipseal"]
 ## Test hook: false grades coarse DEMs per road like the rest.
 static var coarse_enabled := true
+
+## True for streets, pedestrian ways and paved cycleways / named promenades
+## that are engineered to a smooth longitudinal grade (leaving unpaved park
+## footpaths, bridges, tunnels and area squares alone).
+static func _graded_way(r: Dictionary) -> bool:
+	if bool(r.get("bridge", false)) or bool(r.get("tunnel", false)) or bool(r.get("area", false)):
+		return false
+	var cls := str(r.get("class", "unclassified"))
+	if RoadBuilder._rank(cls) >= 1 or cls == "pedestrian":
+		return true
+	var surf := str(r.get("surface", "")).to_lower()
+	if cls == "cycleway" and surf in PAVED_SURFACES:
+		return true
+	return cls in ["footway", "path"] and surf in PAVED_SURFACES and str(r.get("name", "")) != ""
 
 ## The per-road profile and stamps run natively (RoadGrader) when the
 ## library is loaded.
@@ -70,9 +87,7 @@ static func grade(surface: PackedFloat32Array, level: PackedFloat32Array,
 		if not (road is Dictionary):
 			continue
 		var r: Dictionary = road
-		if bool(r.get("bridge", false)) or bool(r.get("tunnel", false)):
-			continue
-		if RoadBuilder._rank(str(r.get("class", "unclassified"))) < 1:
+		if not _graded_way(r):
 			continue
 		var pts: PackedVector2Array = r.get("points", PackedVector2Array())
 		if pts.size() < 2:
@@ -88,7 +103,7 @@ static func grade(surface: PackedFloat32Array, level: PackedFloat32Array,
 				s += line[i].distance_to(line[i - 1])
 			arc.append(s)
 			var p := line[i]
-			heights.append(_sample(src, size, step, p))
+			heights.append(_sample_dry(src, level, size, step, p))
 			valid.append(1 if _dry(level, size, step, p) else 0)
 		var prof := _smooth(heights, valid, arc, smooth_m * m2u)
 		_keep_embankments(prof, heights, line, arc, pts, heads, m2u)
@@ -124,8 +139,7 @@ static func grade_network(surface: PackedFloat32Array, level: PackedFloat32Array
 		if not (road is Dictionary):
 			continue
 		var r: Dictionary = road
-		if bool(r.get("bridge", false)) or bool(r.get("tunnel", false)) \
-				or RoadBuilder._rank(str(r.get("class", "unclassified"))) < 1:
+		if not _graded_way(r):
 			continue
 		var pts: PackedVector2Array = r.get("points", PackedVector2Array())
 		if pts.size() < 2:
@@ -393,6 +407,35 @@ static func _dry(level: PackedFloat32Array, size: int, step: float, p: Vector2) 
 	if x < 0 or z < 0 or x >= size or z >= size:
 		return false
 	return is_inf(level[z * size + x])
+
+## Bilinear height of the dry posts around `p`, ignoring carved waterbed
+## neighbours so a waterfront road never pulls its profile down into the water.
+static func _sample_dry(h: PackedFloat32Array, level: PackedFloat32Array,
+		size: int, step: float, p: Vector2) -> float:
+	var hs := float(size) * 0.5
+	var fx := clampf(p.x / step + hs, 0.0, float(size - 1))
+	var fz := clampf(p.y / step + hs, 0.0, float(size - 1))
+	var x0 := mini(int(fx), size - 2)
+	var z0 := mini(int(fz), size - 2)
+	var tx := fx - float(x0)
+	var tz := fz - float(z0)
+	var idxs := [z0 * size + x0, z0 * size + x0 + 1, (z0 + 1) * size + x0, (z0 + 1) * size + x0 + 1]
+	var ws := [(1.0 - tx) * (1.0 - tz), tx * (1.0 - tz), (1.0 - tx) * tz, tx * tz]
+	var sum := 0.0
+	var wsum := 0.0
+	for k in 4:
+		var idx: int = idxs[k]
+		if is_inf(level[idx]):
+			var w: float = ws[k]
+			sum += h[idx] * w
+			wsum += w
+	if wsum > 1e-5:
+		return sum / wsum
+	for k in 4:
+		var idx: int = idxs[k]
+		if is_inf(level[idx]):
+			return h[idx]
+	return _sample(h, size, step, p)
 
 ## Bilinear height of the post grid at world XZ (clamped to the edge).
 static func _sample(h: PackedFloat32Array, size: int, step: float, p: Vector2) -> float:

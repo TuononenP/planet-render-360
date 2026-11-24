@@ -36,6 +36,8 @@ var _terrace := {}
 var _quay_boxes: Array = []
 ## A low quay's walk over the water, and the least upper wall over it, metres.
 const LOW_QUAY_M := 2.4
+## Width over which a natural bank rises from water level to land height, metres.
+const NATURAL_BANK_M := 3.0
 ## A natural bank this much over a quayed river's water is a wall, metres.
 const QUAYED_RISE_M := 4.0
 const QUAY_WALL_MIN_M := 1.5
@@ -574,13 +576,18 @@ func vertex_height(p: Vector2, body: int, bank: Dictionary = {}, quay: int = -1)
 		return bed
 	var h := _grid_height(land, p)
 	bank = nearest(p, 1 if hard_region else 2)
-	if not bank.is_empty() and float(bank["distance"]) < step:
+	if not bank.is_empty():
 		var s: Dictionary = bank["segment"]
-		var d: Vector2 = s["b"] - s["a"]
-		var t := clampf(((bank["at"] as Vector2) - (s["a"] as Vector2)).dot(d) / maxf(d.length_squared(), 0.0001), 0.0, 1.0)
-		var rim := lerpf(float(s["top_a"]), float(s["top_b"]), t) if str(s["kind"]) == "hard" \
-			else domains.level(int(s["body"]), p)
-		h = lerpf(rim, h, clampf(float(bank["distance"]) / step, 0.0, 1.0))
+		var is_hard := str(s["kind"]) == "hard"
+		var reach := step if is_hard else minf(step, NATURAL_BANK_M * WorldScale.metres_to_units())
+		var dist := float(bank["distance"])
+		if dist < reach:
+			var d: Vector2 = s["b"] - s["a"]
+			var t := clampf(((bank["at"] as Vector2) - (s["a"] as Vector2)).dot(d) / maxf(d.length_squared(), 0.0001), 0.0, 1.0)
+			var rim := lerpf(float(s["top_a"]), float(s["top_b"]), t) if is_hard \
+				else domains.level(int(s["body"]), p)
+			var w := clampf(dist / reach, 0.0, 1.0) if is_hard else smoothstep(0.0, reach, dist)
+			h = lerpf(rim, h, w)
 	_vertex_heights[cache_key] = h
 	return h
 

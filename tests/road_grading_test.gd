@@ -199,3 +199,26 @@ func _run() -> void:
 	var w_before := w.duplicate()
 	RoadGrading.grade_areas(w, wet, SIZE, step, [_square(14, 26)])
 	_check(is_equal_approx(w[20 * SIZE + 20], w_before[20 * SIZE + 20]), "a water-carved post is left alone")
+	# Paved waterfront cycleways are graded smooth without pulling down into
+	# adjacent carved waterbed posts, while unpaved park footways stay ungraded.
+	var shore_lvl := _dry()
+	for x in SIZE:
+		shore_lvl[21 * SIZE + x] = 28.0
+	var shore_surf := _surface(func(x: int, z: int) -> float:
+		return 10.0 if z == 21 else 30.0 + 0.9 * sin(float(x) * 1.4))
+	var shore_before := shore_surf.duplicate()
+	var cycleway := {"class": "cycleway", "surface": "asphalt", "width_m": 3.5,
+		"points": PackedVector2Array([_post(2, 20) + Vector2(0.0, step * 0.4),
+			_post(38, 20) + Vector2(0.0, step * 0.4)])}
+	var dirt_path := {"class": "footway", "surface": "dirt", "width_m": 2.0,
+		"points": PackedVector2Array([_post(2, 8), _post(38, 8)])}
+	RoadGrading.grade(shore_surf, shore_lvl, SIZE, step, [cycleway, dirt_path], m)
+	var cyc_lo := INF
+	var cyc_hi := -INF
+	for x in range(8, 33):
+		cyc_lo = minf(cyc_lo, shore_surf[20 * SIZE + x])
+		cyc_hi = maxf(cyc_hi, shore_surf[20 * SIZE + x])
+	_check(cyc_lo > 29.5 and cyc_hi - cyc_lo < 0.5,
+		"paved waterfront cycleway smooths mounds without dipping into carved water (%.2f..%.2f)" % [cyc_lo, cyc_hi])
+	_check(is_equal_approx(shore_surf[8 * SIZE + 15], shore_before[8 * SIZE + 15]),
+		"unpaved dirt footway stays ungraded")
