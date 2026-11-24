@@ -254,6 +254,9 @@ static func _recipe(inputs: Array, loader: Callable) -> Callable:
 	if kind == "ground" and inputs.size() == 6 and inputs[4] is Dictionary and inputs[5] is Color:
 		return func() -> Dictionary: return StoreyComposer.compose_ground(str(inputs[1]), str(inputs[2]),
 			int(inputs[3]), inputs[4], inputs[5], loader)
+	if kind == "blank" and inputs.size() == 5:
+		return func() -> Dictionary: return FacadeComposer.compose_blank(str(inputs[1]), int(inputs[2]),
+			bool(inputs[3]), bool(inputs[4]), loader)
 	return Callable()
 
 static func end_build() -> void:
@@ -362,3 +365,60 @@ static func facade_uv(mat: Material) -> Vector3:
 	if mat != null and mat.has_meta("fc_uv"):
 		return mat.get_meta("fc_uv") as Vector3
 	return Vector3.ZERO
+
+## Windowless masonry counterpart for a tiled StandardMaterial3D facade: same
+## wall photo, tint, UV bay layout and Ultra FacadeShader grain, with no paint,
+## glass roughness, parallax depth or night emission. Returns null for curtain
+## walls or non-tiled facades.
+static func blank_for_facade(mat: Material) -> Material:
+	if not (mat is StandardMaterial3D):
+		return null
+	var src := mat as StandardMaterial3D
+	var uvp := facade_uv(src)
+	var set_name := str(src.get_meta("facade_set", ""))
+	if uvp.z <= 0.0 or set_name == "" or set_name == "glass" \
+			or not MaterialLibrary.PBR_SETS.has(set_name):
+		return null
+	var pattern := str(src.get_meta("facade_pattern", ""))
+	var smooth := src.has_meta("smooth_photo")
+	var turn := set_name == "wood" and pattern == "clapboard"
+	var detail := 1 if (src.normal_enabled and src.normal_texture != null) else 0
+	var wb := float(src.get_meta("warm_bounce", 0.0))
+	var c := src.albedo_color
+	var key := "%s|%d|%d|%d|%.3f,%.3f,%.3f|%.2f" % [
+		set_name, 1 if smooth else 0, 1 if turn else 0, detail, c.r, c.g, c.b, wb]
+	if FacadeMaterials._blank_cache.has(key):
+		return FacadeMaterials._blank_cache[key] as Material
+	var tkey := "blank|%s|%d|%d|%d" % [set_name, 1 if smooth else 0, 1 if turn else 0, detail]
+	var texs: Dictionary
+	if FacadeMaterials._facade_texs.has(tkey):
+		texs = FacadeMaterials._facade_texs[tkey] as Dictionary
+	else:
+		texs = composed(["blank", set_name, detail, smooth, turn], func() -> Dictionary:
+			return FacadeComposer.compose_blank(set_name, detail, smooth, turn,
+				Callable(MaterialLibrary, "_set_image")))
+		FacadeMaterials._facade_texs[tkey] = texs
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = texs["albedo"] as Texture2D
+	m.albedo_color = c
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.metallic = src.metallic
+	if detail >= 1 and texs["normal"] != null:
+		m.normal_texture = texs["normal"] as Texture2D
+		m.normal_enabled = true
+		m.normal_scale = PbrTextures.PHOTO_NORMAL_SCALE
+		m.roughness_texture = texs["rough"] as Texture2D
+		m.roughness = 1.0
+	else:
+		m.roughness = 0.9
+	WallVariety.mark(m)
+	m.set_meta("facade_set", set_name)
+	m.set_meta("fc_uv", uvp)
+	m.set_meta("facade_pattern", pattern)
+	m.set_meta("facade_floor_m", float(src.get_meta("facade_floor_m", 3.3)))
+	if smooth:
+		m.set_meta("smooth_photo", true)
+	if wb > 0.0:
+		m.set_meta("warm_bounce", wb)
+	FacadeMaterials._blank_cache[key] = m
+	return m

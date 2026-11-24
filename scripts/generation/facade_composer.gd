@@ -164,6 +164,24 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 		return FacadePaint.finish(base, null, emit, nor, rgh, depth_fn)
 	return FacadePaint.finish(base, alb, emit, nor, rgh, depth_fn)
 
+## Windowless masonry tile matching compose_tile's wall photo, contrast softening
+## and bay-cell tiling so blank gables, sloped-roof wedges and narrow wall strips
+## join seamlessly with adjacent windowed walls on every tier.
+static func compose_blank(set_name: String, detail: int, smooth: bool,
+		turn: bool, loader: Callable) -> Dictionary:
+	var reps: int = PHOTO_REPS.get(set_name, 1)
+	var alb := _wall_layer(loader, set_name, "diff", reps, turn)
+	if smooth:
+		_soften(alb, STOCKHOLM_KEEP)
+	var nor: Image = null
+	var rgh: Image = null
+	if detail >= 1:
+		nor = _wall_layer(loader, set_name, "nor", reps, turn)
+		rgh = _wall_layer(loader, set_name, "rough", reps, turn)
+		if smooth:
+			_soften(nor, STOCKHOLM_KEEP)
+	return FacadePaint.finish(alb, null, null, nor, rgh)
+
 ## Dirt washed down from each sill (base layer, so it takes the tint).
 static func _sill_streaks(base: Image, ox: int, win: String, hv: float) -> void:
 	var box := _window_box(win)

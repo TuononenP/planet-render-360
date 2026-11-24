@@ -25,6 +25,7 @@ const ROOF_MIN_LUMA := 0.075
 static var _facade_mats: Array = []
 static var _facade_texs: Dictionary = {}
 static var _facade_cache: Dictionary = {}
+static var _blank_cache: Dictionary = {}
 static var _family_first: Dictionary = {}
 static var _ground_cache: Dictionary = {}
 static var _ground_overflows := 0
@@ -39,6 +40,7 @@ static var _roof_mats: Dictionary = {}
 static func begin_build() -> void:
 	_facade_texs.clear()
 	_facade_cache.clear()
+	_blank_cache.clear()
 	_family_first.clear()
 	_ground_cache.clear()
 	_ground_overflows = 0
@@ -634,4 +636,7 @@ static func facade_texs(set_name: String, rows: int, detail: int,
 
 static func facade_uv(mat: Material) -> Vector3:
 	return FacadeTextures.facade_uv(mat)
+
+static func blank_for_facade(mat: Material) -> Material:
+	return FacadeTextures.blank_for_facade(mat)
 
