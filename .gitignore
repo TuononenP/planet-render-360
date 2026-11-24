@@ -83,3 +83,6 @@ native/bin/
 
 # Python bytecode from tools/ and tests/
 __pycache__/
+
+# Local developer API tokens (never commit)
+mapillary_accesstoken.txt

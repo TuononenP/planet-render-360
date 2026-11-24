@@ -262,12 +262,18 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 		_prepare_roofs(ground, ctx, sorted, standing)
 	timings["roof_setup"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
+	var lod2_done := Lod2MeshBuilder.build_corridor(root, data, ground, sorted, standing, ctx)
+	timings["lod2_meshes"] = Time.get_ticks_msec() - t0
+	t0 = Time.get_ticks_msec()
 	for k in sorted.size():
 		var b: Dictionary = sorted[k]
 		if abort != null and abort.requested:
 			break
 		var pos := Vector3(float(b["x"]), 0, float(b["z"]))
 		if standing[k] == 0:
+			continue
+		if lod2_done[k] != 0:
+			placed += 1
 			continue
 		if ShipBuilder.build(root, b, data, ground):
 			placed += 1

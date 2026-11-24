@@ -43,7 +43,7 @@ const KEEP_CONTRAST := {"concrete": 0.4, "stone": 0.7, "render": 0.7}
 const STOCKHOLM_KEEP := 0.3
 ## Cities whose render is smooth plaster (the share above applies): Stockholm's, and Helsinki's, whose
 ## stippled stucco photo turned a shaded ochre front into speckled olive.
-const SMOOTH_PLASTER_CITIES: Array[String] = ["stockholm", "helsinki", "miami"]
+const SMOOTH_PLASTER_CITIES: Array[String] = ["stockholm", "helsinki", "espoo", "turku", "miami"]
 
 static func smooth_plaster(set_name: String, look: Dictionary) -> bool:
 	return set_name == "render" and str(look.get("city", "")) in SMOOTH_PLASTER_CITIES
