@@ -3,16 +3,21 @@ extends RefCounted
 
 ## Hungerford Rail Bridge (John Hawkshaw, 1864) flanked by the twin Golden Jubilee
 ## Cable-Stayed Footbridges (Lifschutz Davidson Sandilands & WSP, 2002; OSM ways
-## 4254121, 186931859, 151744359). 316 m span across the Thames beside the London Eye.
-## Central dark-grey steel lattice-truss railway deck on brick cylinder piers, flanked
-## closely on both sides by sleek white pedestrian decks suspended from outward-leaning
-## 32 m white steel pylons and fan stay cables. Built along +X (`base: sea`).
+## 4254120, 4254123, 256367743). Origin shifted 30 m NW of the river midpoint so
+## the 376 m span suppresses OSM rail ways cleanly from Charing Cross Station
+## (-188 m) across Victoria Embankment (-115 m) to the South Bank rail viaduct
+## (+188 m), while the 316 m twin Golden Jubilee footbridges span -128..+188 m.
+## Built along +X (`base: sea`).
 
-const SPAN_TOTAL := 316.0
-const HALF_L := 158.0
+const RAIL_X0 := -190.0
+const RAIL_X1 := 194.0
+const FOOT_X0 := -128.0
+const FOOT_X1 := 188.0
+const PIER_X0 := -88.0
+const PIER_X1 := 162.0
 const DECK_Y := 10.2
-const RAIL_HALF_W := 7.2
-const FOOT_Z := 12.2
+const RAIL_HALF_W := 11.5
+const FOOT_Z := 16.0
 const PYLON_TOP := 32.0
 
 static func build(model: Node3D) -> void:
@@ -28,58 +33,75 @@ static func build(model: Node3D) -> void:
 	_golden_jubilee_footbridges(lm)
 	lm.commit(model)
 	model.set_meta(LandmarkLights.FLOOD_META, [
-		[Vector3(-75.0, 12.0, 22.0), Vector3(-75.0, 24.0, 12.0), 55.0, 0.85, 50.0],
-		[Vector3(0.0, 12.0, 22.0), Vector3(0.0, 24.0, 12.0), 55.0, 0.9, 50.0],
-		[Vector3(75.0, 12.0, 22.0), Vector3(75.0, 24.0, 12.0), 55.0, 0.85, 50.0],
+		[Vector3(-45.0, 12.0, 26.0), Vector3(-45.0, 24.0, 16.0), 55.0, 0.85, 50.0],
+		[Vector3(35.0, 12.0, 26.0), Vector3(35.0, 24.0, 16.0), 55.0, 0.9, 50.0],
+		[Vector3(115.0, 12.0, 26.0), Vector3(115.0, 24.0, 16.0), 55.0, 0.85, 50.0],
 	])
 
 static func _rail_truss_bridge(lm: LandmarkMesh) -> void:
-	# Railway deck slab
-	lm.box("Deck", Vector3(0.0, DECK_Y, 0.0), Vector3(SPAN_TOTAL, 0.9, RAIL_HALF_W * 2.0))
+	var rail_len := RAIL_X1 - RAIL_X0
+	var rail_mid := (RAIL_X0 + RAIL_X1) * 0.5
+	# Railway deck slab from Charing Cross Station (-190 m) into South Bank viaduct (+194 m)
+	lm.box("Deck", Vector3(rail_mid, DECK_Y, 0.0), Vector3(rail_len, 0.9, RAIL_HALF_W * 2.0))
 	# Three longitudinal steel Warren/lattice truss lines (sides + centre)
-	var bays := 32
-	var dx := SPAN_TOTAL / float(bays)
+	var bays := 36
+	var dx := rail_len / float(bays)
 	var tr_h := 4.4
 	for tz in [-RAIL_HALF_W, 0.0, RAIL_HALF_W]:
 		var z := float(tz)
-		lm.box("Truss", Vector3(0.0, DECK_Y + tr_h, z), Vector3(SPAN_TOTAL, 0.45, 0.45))
-		lm.box("Truss", Vector3(0.0, DECK_Y - 0.3, z), Vector3(SPAN_TOTAL, 0.5, 0.5))
+		lm.box("Truss", Vector3(rail_mid, DECK_Y + tr_h, z), Vector3(rail_len, 0.45, 0.45))
+		lm.box("Truss", Vector3(rail_mid, DECK_Y - 0.3, z), Vector3(rail_len, 0.5, 0.5))
 		for i in bays:
-			var x0 := -HALF_L + float(i) * dx
+			var x0 := RAIL_X0 + float(i) * dx
 			var x1 := x0 + dx
 			lm.beam("Truss", Vector3(x0, DECK_Y, z), Vector3(x1, DECK_Y + tr_h, z), 0.26, 0.26)
 			lm.beam("Truss", Vector3(x1, DECK_Y, z), Vector3(x0, DECK_Y + tr_h, z), 0.26, 0.26)
 			lm.box("Truss", Vector3(x0, DECK_Y + tr_h * 0.5, z), Vector3(0.28, tr_h, 0.28))
-	# Hawkshaw's iconic paired brick cylindrical piers (6 river piers)
+	# South Bank brick bank abutment cleanly beneath the rail deck (clear of Queen's Walk)
+	var ab_h := DECK_Y + 0.65
+	lm.box("Brick", Vector3(192.0, -1.5 + ab_h * 0.5, 0.0),
+		Vector3(6.0, ab_h, RAIL_HALF_W * 2.0 + 3.0))
+	lm.box("Concrete", Vector3(192.0, DECK_Y - 0.65, 0.0),
+		Vector3(6.6, 0.4, RAIL_HALF_W * 2.0 + 3.6))
+	# North approach support piers between Victoria Embankment (-115 m) and Charing Cross (-185 m)
+	for pz in [-RAIL_HALF_W - 0.8, 0.0, RAIL_HALF_W + 0.8]:
+		lm.frustum("Brick", Vector3(-150.0, -1.5, float(pz)), 2.2, 2.0, DECK_Y + 1.0, 12)
+	# Hawkshaw's iconic paired brick cylindrical piers (6 river piers, clear of Victoria Embankment)
 	for i in 6:
-		var px := lerpf(-126.0, 126.0, float(i) / 5.0)
-		for pz in [-RAIL_HALF_W - 0.8, RAIL_HALF_W + 0.8]:
-			lm.frustum("Brick", Vector3(px, -1.5, float(pz)), 2.5, 2.3, DECK_Y + 1.8, 12)
-			lm.box("Concrete", Vector3(px, DECK_Y - 0.1, float(pz)), Vector3(5.2, 0.8, 5.2))
-		lm.box("Brick", Vector3(px, DECK_Y * 0.45, 0.0), Vector3(3.2, DECK_Y, RAIL_HALF_W * 2.0))
+		var px := lerpf(PIER_X0, PIER_X1, float(i) / 5.0)
+		for pz in [-RAIL_HALF_W - 1.3, RAIL_HALF_W + 1.3]:
+			lm.frustum("Brick", Vector3(px, -1.5, float(pz)), 2.5, 2.3, DECK_Y + 1.0, 12)
+			lm.box("Concrete", Vector3(px, DECK_Y - 0.65, float(pz)), Vector3(5.4, 0.7, 5.4))
+		lm.box("Brick", Vector3(px, (DECK_Y - 0.8) * 0.5, 0.0), Vector3(3.2, DECK_Y - 0.8, RAIL_HALF_W * 2.0))
 
 static func _golden_jubilee_footbridges(lm: LandmarkMesh) -> void:
+	var foot_len := FOOT_X1 - FOOT_X0
+	var foot_mid := (FOOT_X0 + FOOT_X1) * 0.5
 	for side in [-1.0, 1.0]:
 		var sz := float(side)
 		var dz := sz * FOOT_Z
 		# Sleek white concrete-and-steel footbridge deck + lit handrail strip
-		lm.box("Concrete", Vector3(0.0, DECK_Y - 0.4, dz), Vector3(SPAN_TOTAL, 0.65, 4.4))
-		lm.box("Steel", Vector3(0.0, DECK_Y + 0.55, dz + sz * 2.1), Vector3(SPAN_TOTAL, 0.14, 0.14))
-		lm.box("Steel", Vector3(0.0, DECK_Y + 0.55, dz - sz * 2.1), Vector3(SPAN_TOTAL, 0.14, 0.14))
-		lm.box("Lamp", Vector3(0.0, DECK_Y + 0.15, dz + sz * 2.05), Vector3(SPAN_TOTAL - 4.0, 0.16, 0.12))
-		# 6 outward-leaning white steel pylons & fan stay cables
+		lm.box("Concrete", Vector3(foot_mid, DECK_Y - 0.4, dz), Vector3(foot_len, 0.65, 4.4))
+		lm.box("Steel", Vector3(foot_mid, DECK_Y + 0.55, dz + sz * 2.1), Vector3(foot_len, 0.14, 0.14))
+		lm.box("Steel", Vector3(foot_mid, DECK_Y + 0.55, dz - sz * 2.1), Vector3(foot_len, 0.14, 0.14))
+		lm.box("Lamp", Vector3(foot_mid, DECK_Y + 0.15, dz + sz * 2.05), Vector3(foot_len - 4.0, 0.16, 0.12))
+		# Solid concrete bank landing stair towers at both ends (Victoria Embankment & Queen's Walk)
+		for ex in [FOOT_X0 + 2.0, FOOT_X1 - 2.0]:
+			var tower_h := DECK_Y + 0.8
+			lm.box("Concrete", Vector3(float(ex), -1.5 + tower_h * 0.5, dz), Vector3(4.2, tower_h, 4.6))
+		# 6 outward-leaning white steel pylons & fan stay cables aligned with the brick piers
 		for i in 6:
-			var px := lerpf(-126.0, 126.0, float(i) / 5.0)
+			var px := lerpf(PIER_X0, PIER_X1, float(i) / 5.0)
 			var base := Vector3(px, -1.0, dz + sz * 1.4)
 			var top := Vector3(px, PYLON_TOP, dz + sz * 8.2)
 			lm.frustum("Concrete", Vector3(px, -1.5, dz + sz * 1.4), 1.8, 1.6, DECK_Y + 1.2, 10)
 			lm.beam("Steel", base, top, 0.95, 0.95)
-			# Backstay down to pier collar
-			lm.beam("Cable", top, Vector3(px, DECK_Y - 0.2, dz - sz * 2.4), 0.16, 0.16)
+			# Backstay anchored directly onto Hawkshaw's brick pier collar
+			lm.beam("Cable", top, Vector3(px, DECK_Y - 0.3, sz * (RAIL_HALF_W + 1.5)), 0.16, 0.16)
 			# Fan of 4 forestays each side along deck
 			for k in range(1, 5):
 				var off := float(k) * 7.5
 				for dir in [-1.0, 1.0]:
-					var tx := clampf(px + float(dir) * off, -HALF_L + 2.0, HALF_L - 2.0)
+					var tx := clampf(px + float(dir) * off, FOOT_X0 + 2.0, FOOT_X1 - 2.0)
 					var anchor := top.lerp(base, float(k - 1) * 0.08)
 					lm.beam("Cable", anchor, Vector3(tx, DECK_Y - 0.2, dz + sz * 2.0), 0.12, 0.12)

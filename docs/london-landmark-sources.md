@@ -51,7 +51,7 @@ Decoded from `assets/osm_snapshots/london_*.osmb` (base `2026-11-02`):
 | --- | --- | --- | ---: | ---: | --- |
 | `county_hall` | County Hall | `51.5019, -0.1188` | 45.0 m | -78.0° | OSM `relation 1789966` (Ralph Knott, 1922) |
 | `westminster_bridge` | Westminster Bridge | `51.5009, -0.1218` | 14.0 m | 2.5° | OSM `ways 216998718, 920237496` (Thomas Page, 1862; 7 green iron arches, 250 m) |
-| `hungerford_golden_jubilee` | Hungerford & Golden Jubilee Bridges | `51.50621, -0.12031` | 32.0 m | 26.0° | OSM `ways 4254121, 186931859, 151744359` (Hawkshaw 1864 + Lifschutz Davidson 2002) |
+| `hungerford_golden_jubilee` | Hungerford & Golden Jubilee Bridges | `51.50631, -0.12072` | 32.0 m | 26.0° | OSM `ways 4254121, 186931859, 151744359` (Hawkshaw 1864 + Lifschutz Davidson 2002) |
 | `millennium_bridge` | Millennium Bridge | `51.5096, -0.0986` | 16.0 m | 92.3° | OSM `ways 7225360, 7225371` (Foster + Arup 2000; 81/144/108 m lateral suspension) |
 | `portcullis_house` | Portcullis House | `51.5015, -0.1247` | 32.0 m | 6.0° | OSM `way 256497249` (Hopkins Architects, 2001) |
 | `whitehall_horse_guards` | Horse Guards & Banqueting House | `51.5047, -0.1270` | 28.0 m | -101.0° | OSM `ways 133153176, 140470549` (William Kent 1759; Inigo Jones 1622) |
