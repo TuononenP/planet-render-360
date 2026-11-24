@@ -15,6 +15,9 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 	if not RenderQuality.ultra_desktop(data.quality_preset) or ground.shoreline == null \
 			or not ground.shoreline.ready:
 		return 0
+	# Historic Venetian *fondamenta* have open Istrian-stone canal edges without modern crash-railings (`VN-9.2`).
+	if CityStyles.city_of_region(CityStyles.region_at(data.latitude, data.longitude)) == "venice":
+		return 0
 	var centre := View360.spawn_xz(data)
 	var m := WorldScale.metres_to_units()
 	var walks := _index(data.roads, centre, m, false)
@@ -61,14 +64,26 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		var mi := MeshInstance3D.new()
 		mi.name = "ShoreRailings"
 		mi.mesh = mesh
-		mi.material_override = StreetProps._fence_material()
+		mi.material_override = _white_rail_material() if _bangkok(data) else StreetProps._fence_material()
 		root.add_child(mi)
 	return count
 
-## Which water carries a rail: tidal bodies, and in Stockholm every body
-## (Mälaren and the Baltic quays are not tidal but are walked edges).
+static var _white_mat: StandardMaterial3D = null
+
+static func _bangkok(data: LocationData) -> bool:
+	return data != null and CityStyles.city_of_region(CityStyles.region_at(data.latitude, data.longitude)) == "bangkok"
+
+static func _white_rail_material() -> StandardMaterial3D:
+	if _white_mat == null:
+		_white_mat = LandmarkMaterials.pbr("render", "#F2EFE6", 2.0)
+	return _white_mat
+
+## Which water carries a rail: tidal bodies, and in Stockholm or Bangkok every
+## urban canal and river body (except ornamental pools).
 static func railed_body(body: Dictionary, data: LocationData) -> bool:
-	return bool(body.get("tidal", false)) or ShoreApron.stockholm(data)
+	if bool(body.get("still_pool", false)):
+		return false
+	return bool(body.get("tidal", false)) or ShoreApron.stockholm(data) or _bangkok(data)
 
 ## A guardrail needs a parallel paved path on its landward side. A mapped
 ## barrier nearby suppresses the inferred rail, including at junctions.

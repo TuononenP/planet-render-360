@@ -24,6 +24,7 @@ const ZONES := [
 	["berlin", "berlin", 52.5200, 13.4050, 12.0],
 	["barcelona", "barcelona", 41.3874, 2.1686, 8.0],
 	["rome", "rome", 41.9028, 12.4964, 9.0],
+	["venice", "venice", 45.4375, 12.3358, 3.0],        # old city + Giudecca
 	["stockholm", "stockholm", 59.3293, 18.0686, 6.0],
 	["stockholm", "stockholm", 59.2760, 17.9060, 1.0], # Skärholmen
 	["stockholm", "stockholm", 59.3920, 17.9170, 1.8], # Tensta / Rinkeby
@@ -472,6 +473,21 @@ const DISTRICTS := [
 	["cairo", "cairo_islamic", 30.0500, 31.2620, 0.6, 25.0],     # al-Muizz
 	["cape_town", "cape_town_bokaap", -33.9210, 18.4150, 0.4, 40.0],  # Bo-Kaap
 	["cape_town", "cape_town_modern", -33.9180, 18.4250, 0.8, 10.0],  # CBD, Foreshore
+	# Venice sestieri & lagoon districts (VN-8.4)
+	["venice", "venice_grand_canal", 45.4316, 12.3315, 0.32, 35.0],   # Lower Grand Canal (Accademia–Salute–Giglio)
+	["venice", "venice_grand_canal", 45.4342, 12.3274, 0.28, 35.0],   # Volta de Canal (Ca' Rezzonico–Ca' Foscari)
+	["venice", "venice_grand_canal", 45.4384, 12.3358, 0.32, 35.0],   # Rialto bend & Fondaco
+	["venice", "venice_grand_canal", 45.4414, 12.3310, 0.35, 35.0],   # Upper Grand Canal (Ca' d'Oro–Ca' Pesaro–Vendramin)
+	["venice", "venice_san_marco", 45.4342, 12.3375, 0.42, 30.0],     # Piazza San Marco, Mercerie, Fenice
+	["venice", "venice_palazzo", 45.4310, 12.3260, 0.55, 25.0],       # Dorsoduro & Zattere
+	["venice", "venice_palazzo", 45.4368, 12.3295, 0.55, 25.0],       # San Polo & Santa Croce
+	["venice", "venice_palazzo", 45.4425, 12.3360, 0.65, 22.0],       # Cannaregio
+	["venice", "venice_ghetto", 45.4452, 12.3264, 0.22, 40.0],        # Ghetto di Venezia (tall 6–7 storey tenements)
+	["venice", "venice_palazzo", 45.4365, 12.3445, 0.65, 22.0],       # Castello West
+	["venice", "venice_arsenale", 45.4345, 12.3535, 0.65, 28.0],      # Arsenale & San Pietro di Castello
+	["venice", "venice_arsenale", 45.4265, 12.3260, 0.70, 22.0],      # Giudecca brick & canal lofts
+	["venice", "venice_modern", 45.4380, 12.3135, 0.60, 40.0],        # Piazzale Roma, Tronchetto, Santa Marta, Marittima
+	["venice", "venice_modern", 45.4275, 12.3110, 0.35, 35.0],        # Sacca Fisola post-war estate
 	["toronto", "toronto_tower", 43.6480, -79.3810, 1.2, 20.0],  # Financial District
 	["montreal", "montreal_old", 45.5050, -73.5550, 0.6, 15.0],  # Vieux-Montréal
 	["montreal", "montreal_tower", 45.5017, -73.5673, 0.8, 10.0],  # Downtown
@@ -579,7 +595,7 @@ static func local_frame(region: String, lat: float, lon: float) -> Dictionary:
 
 ## Cities whose district circles also shape the far fabric
 ## (FarCityBuilder), so the city past the detailed extent keeps them.
-const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki", "miami", "paris"]
+const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki", "miami", "paris", "venice"]
 
 ## The far fabric's district circles for a viewpoint's region, in its
 ## local metre frame: [[era, Vector2 centre, radius_m], ...], the most

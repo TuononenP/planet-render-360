@@ -22,14 +22,16 @@ const PLINTH_M := 1.2
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#ECE6DA", 3.0))
-	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#F4F0E6", 2.0))
-	lm.use("Lead", LandmarkMaterials.pbr("concrete", "#8A8F94", 2.0, 0.5, 0.4))
-	lm.use("Windows", LandmarkMaterials.glass("#2A3338"))
-	lm.use("Steps", LandmarkMaterials.pbr("stone", "#BDB6A8", 2.0))
+	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#EFEBE0", 3.0))
+	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#F6F3EA", 2.0))
+	lm.use("Lead", LandmarkMaterials.pbr("slate", "#8C939A", 2.0, 0.40, 0.42))
+	lm.use("Windows", LandmarkMaterials.glass("#263036"))
+	lm.use("Steps", LandmarkMaterials.pbr("stone", "#C5BEB0", 2.0))
+	lm.use("Gold", LandmarkMaterials.gold())
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE2A6", 2.1))
 	var oct_rot := PI / 8.0
 	# Platform, octagonal body, entablature and attic.
-	lm.frustum("Steps", Vector3.ZERO, OCT_R + 2.5, OCT_R + 2.5, PLINTH_M, 8, oct_rot)
+	lm.frustum("Steps", Vector3(0, -0.5, 0), OCT_R + 2.6, OCT_R + 2.5, PLINTH_M + 0.5, 8, oct_rot)
 	lm.frustum("Stone", Vector3(0, PLINTH_M, 0), OCT_R, OCT_R, BODY_M - PLINTH_M, 8, oct_rot)
 	lm.frustum("Trim", Vector3(0, PLINTH_M, 0), OCT_R + 0.4, OCT_R + 0.35, 1.6, 8, oct_rot)
 	lm.frustum("Trim", Vector3(0, BODY_M - 2.6, 0), OCT_R + 0.3, OCT_R + 0.3, 1.2, 8, oct_rot)
@@ -53,7 +55,16 @@ static func build(model: Node3D) -> void:
 	_canal_front(lm, Vector3(0, 0, apothem))
 	_drum_and_dome(lm)
 	_presbytery(lm)
+	# Warm lantern glow inside main cupola and warm facade floodlights at night
+	lm.frustum("Lamp", Vector3(0, BODY_M + 26.8, 0), 2.35, 2.35, 3.0, 8, oct_rot)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-12.0, 1.5, apothem + 12.0), Vector3(-8.0, 18.0, apothem), 50.0, 1.0],
+		[Vector3(12.0, 1.5, apothem + 12.0), Vector3(8.0, 18.0, apothem), 50.0, 1.0],
+		[Vector3(-22.0, 26.0, 12.0), Vector3(-6.0, 42.0, 0.0), 48.0, 0.9],
+		[Vector3(22.0, 26.0, 12.0), Vector3(6.0, 42.0, 0.0), 48.0, 0.9],
+		[Vector3(0.0, 26.0, -42.0), Vector3(0.0, 36.0, -30.0), 50.0, 0.75],
+	])
 
 ## A chapel front on one octagon face: paired Composite pilasters on
 ## pedestals each side, an entablature, the thermal window (a lunette

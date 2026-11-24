@@ -989,3 +989,56 @@ bridges, Bateaux Mouches, Front de Seine & La Défense skylines, and *La Ville L
   `host_policy_test`, `tools/check_class_size.sh` (996/1000), and batched windowed `screenshot_test` / `world_cache_test`
   pass (Paris Ultra build: 87 landmarks in 35 s on Apple M5 Ultra, Forward+).
 
+### Venice rounds `venice-r1` → `venice-r2` (2026-11-24)
+
+Frames in `visual-plan/reviews/venice-r1-2026-11-24/` (initial pass) and `venice-r2-2026-11-24/` (Ponte dell'Accademia
+preset vantage `45.4318, 12.3290`, golden/noon/night/roofs + 7 open-space `--looks`: Lower Grand Canal / Salute,
+Piazza San Marco, Molo / Bacino north, Rialto Bridge, San Giorgio Maggiore, Zattere / Il Redentore, and Ponte
+dell'Accademia west look, Ultra), plus 4-angle day/night studio sheets in `visual-plan/captures/{vn_lm_r1,vn_lm_r1_night}/`.
+Agent pre-rating: **recognisable** (major leap across the Grand Canal, Piazza San Marco, Bacino di San Marco, Giudecca,
+*fondamenta* canal walls, Venetian watercraft, and golden-stone night lighting; human "photographic" gate AC-18 remains
+open for user sign-off).
+
+- **Delivered:** 63 Venice landmarks verified in `tests/venice_landmarks_test.gd` — 6 realigned & upgraded existing icons
+  (`salute` moved to `(45.43068, 12.33472)` yaw `200°` facing NNE toward San Marco with `ultra_registry_limit: 46` /
+  `ultra_total_limit: 52`, `st_marks_campanile` with patinated copper spire & east-facing Loggetta, `doges_palace` with
+  Porta della Carta & rotated Molo axis, `st_marks_basilica_venice`, `bridge_of_sighs`, `rialto_bridge`, all with warm
+  `LandmarkLights` night illumination) and 57 new bespoke landmarks & bridges (`LandmarkRegistryVenice` /
+  `LandmarkSetVenice` across `VnRegGrandCanal`, `VnRegSanMarco`, `VnRegSestieri`, `VnRegBridges`: `san_giorgio_maggiore`,
+  `punta_della_dogana`, `palazzo_cavalli_franchetti`, `palazzo_barbaro`, `palazzo_contarini_polignac`,
+  `gallerie_accademia`, `palazzo_barbarigo`, `palazzo_venier_guggenheim`, `palazzo_corner_ca_granda`, `ca_dario`,
+  `gritti_palace`, `procuratie_piazza_san_marco`, `biblioteca_marciana`, `torre_orologio`, `colonne_san_marco`,
+  `prigioni_danieli`, `teatro_la_fenice`, `contarini_del_bovolo`, `ca_rezzonico`, `palazzo_grassi`, `ca_foscari`,
+  `fondaco_dei_tedeschi`, `palazzo_camerlenghi`, `rialto_mercato_pescheria`, `ca_doro`, `ca_pesaro`,
+  `fontego_dei_turchi`, `ca_vendramin_calergi`, `stazione_santa_lucia`, `san_simeone_piccolo`, `il_redentore`,
+  `le_zitelle`, `molino_stucky`, `basilica_dei_frari`, `scuola_grande_san_rocco`, `chiesa_santo_stefano`,
+  `chiesa_gesuati`, `squero_san_trovaso`, `santa_maria_miracoli`, `san_zaccaria`, `chiesa_san_moise`,
+  `santa_maria_formosa`, `zanipolo_san_marco`, `arsenale_venezia`, `san_pietro_castello`, `chiesa_gesuiti_orto`,
+  `san_michele_island`, `murano_faro_donato`, plus 6 bespoke bridges: `ponte_accademia`, `ponte_scalzi`,
+  `ponte_costituzione`, `ponte_paglia`, `ponte_guglie`, `ponte_tre_archi`).
+- **Root scorecard defects closed:**
+  - `ArchitectureCitiesVenice.venice_rule` restricts `venice_modern` strictly to Tronchetto / Piazzale Roma / Santa
+    Marta / Marittima / Sacca Fisola — eliminating the modern concrete foreground block beside Ponte dell'Accademia.
+  - Recalibrated sun-washed Venetian lime stucco (`VENICE_PAINT := 0.35`, 7 sestieri rows, 14 Venice districts,
+    `"venice"` in `FAR_DISTRICT_CITIES` and `CityDetail.CITIES` `VERSION := 6`), bringing `venice_vantage` to
+    `luma 0.508`, `sat 0.292`, `colourful 0.181`.
+  - `VeniceWaterfront` builds vertical weathered red-brick & Istrian-stone *fondamenta* canal retaining walls with wet
+    olive-green tidal algae waterline bands, *masegni* coping, spiral-striped *paline*, 3-pile oak *bricole*, ACTV
+    floating *imbarcadero* pontoons, and *campi* Istrian wellheads (*vere da pozzo*) + *ferali* globe lamps; suppresses
+    modern harbour crash-railings along historic *fondamenta*; `WaterSurface.venice_lagoon` applies jade-teal canal &
+    Adriatic blue-green Bacino palettes.
+  - `VeniceVesselModels` adds lacquered black gondolas with *ferro*, yellow-striped ACTV vaporetti, mahogany
+    *motoscafi* water taxis, and *topi* cargo barges on animated Grand Canal & Bacino routes; `QuayFleet.hotel_water`
+    enforces the post-2021 Venice cruise-ship ban across historic canals and the Bacino.
+- **Visual polish from `venice-r1` → `venice-r2`:** removed `"deck_ends": true` on bespoke `VnRegBridges` rows so
+  `ponte_accademia` builds with zero `bridge_param` errors (wooden arch deck & lantern frame the preset vantage);
+  rotated `salute` yaw to `200°` so its triumphal portal faces NNE toward San Marco; added arched Venetian windows to
+  side/rear flanks of `LandmarkVnKit.palazzo_block`, `palazzo_corner_ca_granda`, `biblioteca_marciana`, La Zecca, and
+  `palazzo_camerlenghi`'s angled prow; trimmed Procuratie Vecchie west by 16 m and warmed its stone so `torre_orologio`
+  stands unobstructed in Piazza San Marco.
+- **Verification & performance:** Venice Ultra build **20 s** (`12.384 s` parallel, `3,027` real + `3,021` far
+  buildings, `48` landmarks built, `0` shoreline diagnostics, zero `SCRIPT ERROR` lines on Apple M5 Ultra, Forward+).
+  `venice_landmarks_test`, `city_detail_test`, `bridge_specs_test`, `bridge_select_test`, `coastal_water_test`,
+  `landmark_ultra_lod_test`, `landmark_lights_test`, `landmark_placement_test`, `landmark_list_test`,
+  `vessel_models_test`, `host_policy_test`, `tools/check_class_size.sh` (996/1000), and batched windowed
+  `screenshot_test` / `world_cache_test` pass.

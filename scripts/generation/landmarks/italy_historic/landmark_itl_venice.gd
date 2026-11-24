@@ -26,13 +26,14 @@ const XS := [-20.8, -10.4, 0.0, 10.4, 20.8]
 ## one 43 m.
 static func basilica(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#E4DACA", 3.0))
-	lm.use("Pink", LandmarkMaterials.pbr("limestone", "#CFA997", 3.0))
-	lm.use("Lead", LandmarkMaterials.pbr("concrete", "#8E9496", 2.0, 0.45, 0.35))
+	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#ECE4D6", 3.0))
+	lm.use("Pink", LandmarkMaterials.pbr("limestone", "#D5B19F", 3.0))
+	lm.use("Lead", LandmarkMaterials.pbr("slate", "#8C9398", 2.0, 0.42, 0.40))
 	lm.use("Gold", LandmarkMaterials.gold())
-	lm.use("Blue", LandmarkMaterials.paint("#26437F", 0.5, 0.1))
+	lm.use("Blue", LandmarkMaterials.pbr("stone", "#244382", 2.0, 0.45, 0.15))
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#3E362E", 3.0))
-	lm.use("Col", LandmarkMaterials.pbr("limestone", "#B9B3A5", 2.0))
+	lm.use("Col", LandmarkMaterials.pbr("limestone", "#C4BDB0", 2.0))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE09C", 2.0))
 	# Cross arms, corner chapels, narthex and apse.
 	lm.box("Marble", Vector3(0, ROOF_Y * 0.5, 0), Vector3(12.8, ROOF_Y, 51.2))
 	lm.box("Marble", Vector3(0, ROOF_Y * 0.5, 0), Vector3(51.2, ROOF_Y, 12.8))
@@ -54,7 +55,16 @@ static func basilica(model: Node3D) -> void:
 		_dome(lm, p, 5.2, 4.5, 9.0, 3.0, 2.2)
 	_facade(lm)
 	_upper(lm)
+	# Warm portal lanterns illuminating the five gilt mosaic vaults at night
+	for x in XS:
+		lm.box("Lamp", Vector3(float(x), 8.2, FACADE_Z + 0.35), Vector3(0.5, 0.6, 0.4))
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-18.0, 1.5, FACADE_Z + 12.0), Vector3(-16.0, 16.0, FACADE_Z), 52.0, 0.95],
+		[Vector3(0.0, 1.5, FACADE_Z + 13.0), Vector3(0.0, 20.0, FACADE_Z), 54.0, 1.1],
+		[Vector3(18.0, 1.5, FACADE_Z + 12.0), Vector3(16.0, 16.0, FACADE_Z), 52.0, 0.95],
+		[Vector3(0.0, 22.0, 14.0), Vector3(0.0, 36.0, 0.0), 55.0, 0.85],
+	])
 
 ## A dome: drum with sixteen arched windows between pilasters, onion shell
 ## of lead, open lantern of six colonnettes, bulb and gilt cross.

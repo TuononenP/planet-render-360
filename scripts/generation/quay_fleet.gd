@@ -69,7 +69,8 @@ static func hotel_water(data: LocationData, at: Vector2, m: float) -> bool:
 	if at.distance_to(anchor) <= HOTEL_RADIUS_M * m:
 		return true
 	return (data.latitude >= 51.45 and data.latitude <= 51.53 and data.longitude >= -0.22 and data.longitude <= -0.06) \
-		or WaterSurface.seine(data.latitude, data.longitude)
+		or WaterSurface.seine(data.latitude, data.longitude) \
+		or WaterSurface.venice_lagoon(data.latitude, data.longitude)
 
 ## A Riddarfjärden hotel ship as a LargeShips row.
 static func hotel_ship(centre: Vector3, yaw: float, length: float, beam: float, seed_value: float) -> Array:

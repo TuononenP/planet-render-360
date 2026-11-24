@@ -51,6 +51,10 @@ static func miami_water(lat: float, lon: float) -> bool:
 static func chao_phraya(lat: float, lon: float) -> bool:
 	return lat >= 13.45 and lat <= 13.98 and lon >= 100.35 and lon <= 100.72
 
+## True across the Venetian Lagoon, Grand Canal & Bacino di San Marco (`VN-9.1`).
+static func venice_lagoon(lat: float, lon: float) -> bool:
+	return lat >= 45.36 and lat <= 45.50 and lon >= 12.24 and lon <= 12.44
+
 ## True along the Paris Seine corridor (`PA-8.1`).
 static func seine(lat: float, lon: float) -> bool:
 	return lat >= 48.78 and lat <= 48.94 and lon >= 2.18 and lon <= 2.46
@@ -83,6 +87,14 @@ static func inland_palette(data: LocationData) -> Dictionary:
 			"near_rough": 0.14,
 			"spec": 0.20,
 			"wave_amp": 0.68,
+		}
+	if data != null and venice_lagoon(data.latitude, data.longitude):
+		return {
+			"deep": Color(0.068, 0.142, 0.128, 1.0),
+			"shallow": Color(0.118, 0.205, 0.172, 1.0),
+			"near_rough": 0.10,
+			"spec": 0.26,
+			"wave_amp": 0.48,
 		}
 	return {}
 
@@ -123,6 +135,10 @@ static func sea_palette(data: LocationData) -> Dictionary:
 	elif salt:
 		shallow = Vector3(0.035, 0.095, 0.065)
 		deep = Vector3(0.012, 0.044, 0.038)
+	elif venice_lagoon(lat, lon):
+		# Venetian Lagoon & Bacino di San Marco: jade-teal lagoon shallows into Adriatic blue-green.
+		shallow = Vector3(0.028, 0.128, 0.124)
+		deep = Vector3(0.012, 0.068, 0.082)
 	elif harbour:
 		shallow = Vector3(0.045, 0.065, 0.050)
 		deep = Vector3(0.020, 0.038, 0.030)

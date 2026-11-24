@@ -462,10 +462,7 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			if old or (dist >= 0.0 and dist < 2.5):
 				return "rome"
 		"venice":
-			if lv >= 6 or (roof == "flat" and lv >= 4 and area >= 600.0):
-				return "venice_modern"
-			if old or lv >= 1:
-				return "venice"
+			return ArchitectureCitiesVenice.venice_rule(kind, c)
 		"helsinki":
 			var district := str(c["district"])
 			if _empire(kind, c):

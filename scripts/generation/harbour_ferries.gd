@@ -135,6 +135,7 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: V
 	# Commuter ferries, icebreakers and market boats of rows in view (Helsinki).
 	count += HarbourTraffic.build(root, data, ground, mask)
 	count += _bangkok_boats(root, data, ground, mask, driver, boat_id, m)
+	count += _venice_boats(root, data, ground, mask, driver, boat_id + count, m)
 	if not driver.boats.is_empty():
 		root.add_child(driver)
 	else:
@@ -170,6 +171,45 @@ static func _bangkok_boats(root: Node3D, data: LocationData, ground: GroundTruth
 				"flag": str(row.get("flag", "#E86A1E")),
 			})
 			_commit(root, lm, "BangkokBoat_", site["centre"], site["axis"], ground, length, beam, next_id + added)
+			added += 1
+	return added
+
+static func _venice_boats(root: Node3D, data: LocationData, ground: GroundTruth, mask: VegetationMask,
+		driver: RouteBoatDriver, next_id: int, m: float) -> int:
+	if CityStyles.city_of_region(CityStyles.region_at(data.latitude, data.longitude)) != "venice":
+		return 0
+	var eye := View360.spawn_xz(data)
+	var bridge_list := QuayMoorings.bridges(data, m)
+	var taken: Array = []
+	var added := 0
+	for row: Dictionary in VeniceVesselModels.ROUTES:
+		var pts := PackedVector2Array()
+		for pt in row["points"]:
+			pts.append(WorldScale.xz_from_latlon(float(pt[0]), float(pt[1]), data.latitude, data.longitude) * m)
+		if not HarbourTraffic._any_inside(ground, pts):
+			continue
+		var total := MarinaBuilder._length(pts)
+		var length := float(row["length_m"])
+		var beam := float(row["beam_m"])
+		var model_name := str(row["model"])
+		var shares: Array = row["boats"]
+		for i in shares.size():
+			var site := _route_site(pts, total, float(shares[i]), length, beam, ground, mask, bridge_list, eye, taken, m)
+			if site.is_empty():
+				continue
+			taken.append({"centre": site["centre"]})
+			var axis: Vector2 = site["axis"]
+			if i % 2 == 1:
+				axis = -axis
+			var lm := LandmarkMesh.new()
+			VeniceVesselModels.build(lm, model_name, {"length": length, "beam": beam, "detail": true, "maps": true})
+			var bid := next_id + added
+			_commit(root, lm, "VeniceBoat_", site["centre"], axis, ground, length, beam, bid)
+			var span := _span(pts, total, float(site["t"]), float(site["across"]), length, beam, ground, mask, bridge_list, m)
+			driver.boats.append({"id": bid, "route": str(row["id"]), "pts": pts, "s": site["t"], "lo": span.x, "hi": span.y,
+				"dir": -1.0 if i % 2 == 1 else 1.0, "across": site["across"], "speed": float(row.get("speed", 3.5)) * m,
+				"y": ground.water_level_at((site["centre"] as Vector2).x, (site["centre"] as Vector2).y),
+				"length": length})
 			added += 1
 	return added
 

@@ -97,6 +97,21 @@ static func build_bridge(type: String, deck_m: float, tilt_m: float = 0.0, rise_
 	if type == "westminster_bridge":
 		LandmarkLnWestminsterBridge.build_fitted(model, deck_m, tilt_m, rise_m)
 		return root
+	if type == "pont_de_bir_hakeim":
+		LandmarkPaBridgeBirHakeim.build_fitted(model, deck_m, tilt_m, rise_m)
+		return root
+	if type == "pont_alexandre_iii":
+		LandmarkPaBridgeAlexandreIII.build_fitted(model, deck_m, tilt_m, rise_m)
+		return root
+	if type == "pont_d_iena":
+		LandmarkPaBridgeIena.build_fitted(model, deck_m, tilt_m, rise_m)
+		return root
+	if type == "pont_neuf":
+		LandmarkPaBridgeNeuf.build_fitted(model, deck_m, tilt_m, rise_m)
+		return root
+	if type == "passerelle_debilly":
+		LandmarkPaBridgeDebilly.build_fitted(model, deck_m, tilt_m, rise_m)
+		return root
 	var row := BridgeSpec.fitted(BridgeSpecs.row_for(type), deck_m, tilt_m, rise_m)
 	match type:
 		"br_turku_auransilta": FtBridgeAuransilta.build(model, row)

@@ -15,13 +15,14 @@ extends RefCounted
 ## leans on the base toward the basilica (+Z).
 static func campanile(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Brick", LandmarkMaterials.pbr("brick", "#B3503A", 2.5))
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#E7E0D0", 2.5))
+	lm.use("Brick", LandmarkMaterials.pbr("brick", "#B8563E", 2.5))
+	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#ECE5D5", 2.5))
 	lm.use("Shadow", LandmarkMaterials.pbr("brick", "#6B2E22", 2.5))
-	lm.use("Copper", LandmarkMaterials.paint("#6E9F8B", 0.5, 0.55))
+	lm.use("Copper", LandmarkMaterials.pbr("slate", "#62927E", 2.2, 0.44, 0.50))
 	lm.use("Gold", LandmarkMaterials.gold())
-	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#D8B9A0", 2.0))
+	lm.use("Marble", LandmarkMaterials.pbr("limestone", "#DFC0A8", 2.0))
 	lm.use("Bronze", LandmarkMaterials.pbr("concrete", "#5E5038", 2.0, 0.4, 0.7))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE09E", 2.4))
 	var w := 12.0
 	lm.box("Stone", Vector3(0, 0.45, 0), Vector3(13.0, 0.9, 13.0))
 	lm.box("Stone", Vector3(0, 1.4, 0), Vector3(12.4, 1.0, 12.4))
@@ -117,7 +118,16 @@ static func campanile(model: Node3D) -> void:
 	LandmarkKits.statue_figure(lm, "Gold", Vector3(0, py + 24.4, 0), 4.2, true)
 	lm.box("Gold", Vector3(0, py + 27.2, 0), Vector3(3.2, 0.2, 0.8), Basis(Vector3.UP, 0.6))
 	_loggetta(lm)
+	# Warm night glow inside the belfry cell and architectural floods up shaft, belfry and spire
+	lm.box("Lamp", Vector3(0, by + bh * 0.5, 0), Vector3(7.6, bh * 0.72, 7.6))
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(0.0, 1.8, 19.0), Vector3(0.0, 36.0, 6.0), 46.0, 1.0],
+		[Vector3(0.0, 1.8, -14.0), Vector3(0.0, 42.0, -6.0), 46.0, 0.9],
+		[Vector3(14.0, 1.8, 0.0), Vector3(6.0, 42.0, 0.0), 46.0, 0.9],
+		[Vector3(-14.0, 1.8, 0.0), Vector3(-6.0, 42.0, 0.0), 46.0, 0.9],
+		[Vector3(0.0, 58.0, 12.0), Vector3(0.0, 84.0, 0.0), 42.0, 1.1],
+	])
 
 ## Sansovino's Loggetta: three arches between paired composite columns
 ## with bronze statues in the niches between them, an attic of reliefs
@@ -163,11 +173,12 @@ const UPPER_FLOOR := 13.2
 ## aedicules. The canal (east) and courtyard sides are plain walls.
 static func doge(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Arcade", LandmarkMaterials.pbr("limestone", "#E9E2D2", 3.0))
-	lm.use("Rose", LandmarkMaterials.pbr("limestone", "#E0BDAC", 3.0))
-	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#F5F0E6", 2.0))
+	lm.use("Arcade", LandmarkMaterials.pbr("limestone", "#EEE8D8", 3.0))
+	lm.use("Rose", LandmarkMaterials.pbr("limestone", "#E4C1B0", 3.0))
+	lm.use("Trim", LandmarkMaterials.pbr("limestone", "#F7F3EA", 2.0))
 	lm.use("Shadow", LandmarkMaterials.pbr("stone", "#4A433A", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("slate", "#7B7F80", 2.0))
+	lm.use("Roof", LandmarkMaterials.pbr("slate", "#7E8386", 2.0))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE2A4", 1.85))
 	var hx := 37.5
 	var hz := 35.75
 	var t := 15.0
@@ -226,7 +237,25 @@ static func doge(model: Node3D) -> void:
 			SEuParts.niche(lm, "Trim", "Shadow", c + rt * x, out, 2.6, 5.6, SEuParts.ROUND, 0.3, -1.0, false)
 			SEuParts.niche(lm, "Trim", "Shadow", c + rt * x + Vector3(0, 8.6, 0), out, 1.4, 3.0, SEuParts.POINTED, 0.2)
 			SEuParts.niche(lm, "Trim", "Shadow", c + rt * x + Vector3(0, 15.6, 0), out, 1.5, 4.0, SEuParts.ROUND, 0.2)
+	# Porta della Carta ornate Gothic entrance on NW corner + warm arcade lamps
+	var pc := Vector3(-hx - 0.4, 0.0, -hz + 6.0)
+	lm.box("Trim", pc + Vector3(0, 7.5, 0), Vector3(1.2, 15.0, 9.0))
+	SEuParts.niche(lm, "Trim", "Shadow", pc + Vector3(-0.6, 0.2, 0), Vector3(-1, 0, 0), 3.4, 6.2, SEuParts.POINTED, 0.4)
+	for sz in [-4.2, 4.2]:
+		SEuParts.pinnacle(lm, "Trim", pc + Vector3(-0.3, 14.5, sz), 0.75, 5.5)
+	for i in 6:
+		var lx := lerpf(-hx + 6.0, hx - 6.0, float(i) / 5.0)
+		lm.box("Lamp", Vector3(lx, 5.4, hz - 2.2), Vector3(0.45, 0.55, 0.45))
+		var lz := lerpf(-hz + 6.0, hz - 6.0, float(i) / 5.0)
+		lm.box("Lamp", Vector3(-hx + 2.2, 5.4, lz), Vector3(0.45, 0.55, 0.45))
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-22.0, 1.4, hz + 10.0), Vector3(-22.0, 15.0, hz), 54.0, 0.95],
+		[Vector3(0.0, 1.4, hz + 10.0), Vector3(0.0, 15.0, hz), 54.0, 1.0],
+		[Vector3(22.0, 1.4, hz + 10.0), Vector3(22.0, 15.0, hz), 54.0, 0.95],
+		[Vector3(-hx - 10.0, 1.4, -18.0), Vector3(-hx, 15.0, -18.0), 54.0, 0.9],
+		[Vector3(-hx - 10.0, 1.4, 18.0), Vector3(-hx, 15.0, 18.0), 54.0, 0.9],
+	])
 
 ## One arcaded front centred on `c` (ground), running along `rt`, facing
 ## `out`: `n` ground arches (twice as many in the loggia), the lozenge

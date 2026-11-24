@@ -155,7 +155,7 @@ const COUNTRY_BASE := {
 	"france": "central_europe",
 }
 static var BASE: Dictionary = _merged([COUNTRY_BASE, ArchitectureMountain.BASE, ArchitectureParis.BASE,
-	ArchitectureCitiesEurope.BASE, ArchitectureCitiesWaterfront.BASE,
+	ArchitectureCitiesEurope.BASE, ArchitectureCitiesWaterfront.BASE, ArchitectureCitiesVenice.BASE,
 	ArchitectureCitiesAmericas.BASE, ArchitectureCitiesAsia.BASE, ArchitectureCitiesEastAsia.BASE, ArchitectureCitiesNorth.BASE, ArchitectureCitiesFinland.BASE,
 	ArchitectureCitiesSouth.BASE, ArchitectureCitiesCentral.BASE, ArchitectureCitiesWorld.BASE,
 	ArchitectureCitiesNewWorld.BASE, ArchitectureCitiesFlorida.BASE, ArchitectureCountryEras.BASE])
@@ -318,7 +318,7 @@ const GENERIC := {
 ## city / era files (data-only split), merged once here.
 static var REGIONS: Dictionary = _merged([ArchitectureRegions.REGIONS, ArchitectureMountain.REGIONS,
 	ArchitectureParis.REGIONS, ArchitectureCitiesEurope.REGIONS,
-	ArchitectureCitiesWaterfront.REGIONS, ArchitectureCitiesAmericas.REGIONS,
+	ArchitectureCitiesWaterfront.REGIONS, ArchitectureCitiesVenice.REGIONS, ArchitectureCitiesAmericas.REGIONS,
 	ArchitectureCitiesAsia.REGIONS, ArchitectureCitiesEastAsia.REGIONS, ArchitectureCitiesNorth.REGIONS, ArchitectureCitiesFinland.REGIONS, ArchitectureCitiesSouth.REGIONS,
 	ArchitectureCitiesCentral.REGIONS, ArchitectureCitiesWorld.REGIONS,
 	ArchitectureCitiesNewWorld.REGIONS, ArchitectureCitiesFlorida.REGIONS, ArchitectureCountryEras.REGIONS])

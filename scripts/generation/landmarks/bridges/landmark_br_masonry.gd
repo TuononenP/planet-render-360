@@ -228,11 +228,12 @@ const RI_SHOP_W := 3.25
 
 static func rialto(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
-	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#DDD6C6", 3.0))
-	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#C2BAAB", 2.0))
-	lm.use("Render", LandmarkMaterials.pbr("render", "#D9C7A2", 3.0))
-	lm.use("Roof", LandmarkMaterials.pbr("slate", "#707473", 2.0))
+	lm.use("Stone", LandmarkMaterials.pbr("limestone", "#E7E0D0", 3.0))
+	lm.use("Paving", LandmarkMaterials.pbr("pavement", "#C6BFB0", 2.0))
+	lm.use("Render", LandmarkMaterials.pbr("render", "#E2D1AE", 3.0))
+	lm.use("Roof", LandmarkMaterials.pbr("slate", "#767B7E", 2.0))
 	lm.use("Shadow", LandmarkMaterials.paint("#3A302A", 0.9, 0.0))
+	lm.use("Lamp", LandmarkMaterials.lit("#FFE09C", 2.1))
 	var poly := PackedVector2Array([Vector2(-24.0, 0.0), Vector2(-14.4, 0.0)])
 	poly.append_array(LandmarkBrKit.arch_pts(0.0, 0.8, 14.4, 5.4, 20))
 	poly.append_array(PackedVector2Array([Vector2(14.4, 0.0), Vector2(24.0, 0.0)]))
@@ -278,7 +279,20 @@ static func rialto(model: Node3D) -> void:
 			for i in 6:
 				_ri_shop(lm, s * (RI_PORTICO + RI_SHOP_W * (float(i) + 0.5)), row)
 	_ri_portico(lm)
+	# Warm Venetian arcade lanterns along the Ruga shops and outer balustrades
+	for s in [-1.0, 1.0]:
+		for i in [1, 3, 5]:
+			var lx := float(s) * (RI_PORTICO + RI_SHOP_W * (float(i) + 0.5))
+			var ly := _deck(absf(lx)) + 3.2
+			for rz in [-RI_ROW - 0.15, RI_ROW + 0.15]:
+				lm.box("Lamp", Vector3(lx, ly, rz), Vector3(0.32, 0.42, 0.32))
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(-12.0, 2.5, RI_HALF_W + 7.0), Vector3(-6.0, 8.0, RI_HALF_W), 56.0, 0.9],
+		[Vector3(12.0, 2.5, RI_HALF_W + 7.0), Vector3(6.0, 8.0, RI_HALF_W), 56.0, 0.9],
+		[Vector3(-12.0, 2.5, -RI_HALF_W - 7.0), Vector3(-6.0, 8.0, -RI_HALF_W), 56.0, 0.9],
+		[Vector3(12.0, 2.5, -RI_HALF_W - 7.0), Vector3(6.0, 8.0, -RI_HALF_W), 56.0, 0.9],
+	])
 
 static func _deck(x: float) -> float:
 	return RI_DECK_M - 4.4 * (x / 24.0) * (x / 24.0)

@@ -8,11 +8,12 @@ extends RefCounted
 ## legend as ArchitectureData, documented in docs/architecture-styles.md.
 ## Rows only override what differs from the country row they inherit.
 
-## Faded lagoon stucco: salmon, ochre, rust, pink, cream.
-const VENETIAN := ["#d89a78", "#c8844f", "#b86a4a", "#e0b4a0", "#d8b878", "#e6d2a8", "#c98a6a", "#dcc59a"]
-const ISTRIAN := ["#e8e2d2", "#ddd5c0", "#d4ccb8"]
-const VENETIAN_ROOF := ["#8f5b47", "#85503d", "#9b6349", "#7a4b3b", "#a27258"]
-const VENETIAN_SHUTTER := ["#3f5a3a", "#4a5f3e", "#2f4a3a", "#5a3a2a"]
+## Sun-washed lagoon lime stucco: pale salmon, warm ochre, cream, antique rose.
+const VENETIAN := ["#E6CBB0", "#DFB796", "#D49A7C", "#E9D9BE", "#E4C79B", "#C98468", "#DCD0BC", "#E2BFA8"]
+const ISTRIAN := ["#EFEBE0", "#E7E1D3", "#DDD5C4"]
+const VENETIAN_ROOF := ["#9E6850", "#AE765A", "#8D5B46", "#B58468", "#965F48"]
+const VENETIAN_SHUTTER := ["#354F38", "#3E583D", "#2E4535", "#563829"]
+const VENICE_PAINT := 0.35
 
 ## Gamla stan plaster and the Östermalm / Södermalm blocks around it.
 ## Walls in shade take the cool sky light (the shared lighting is blue-grey there): any plaster that
@@ -48,26 +49,26 @@ const REGIONS := {
 	# Canal-front palazzi and townhouses: 3 to 4 storeys of tinted stucco,
 	# tall french windows, terracotta pitched roofs with many chimneys.
 	"venice": {
-		"apartments": {"w": [["render", VENETIAN], ["stone", ISTRIAN]], "p": [["ornate", 3], ["punched", 3]],
-			"wn": "gothic", "bay": 2.6, "fr": "#e8e2d2", "sh": VENETIAN_SHUTTER, "sp": 0.5, "rl": 0.3,
+		"apartments": {"vt": VENICE_PAINT, "w": [["render", VENETIAN], ["stone", ISTRIAN]], "p": [["ornate", 3], ["punched", 3]],
+			"wn": "gothic", "bay": 2.6, "fr": "#F0EAE0", "sh": VENETIAN_SHUTTER, "sp": 0.5, "rl": 0.3,
 			"r": [["hipped", 3], ["gabled", 2]], "pitch": 0.45,
 			"rf": [["terracotta", VENETIAN_ROOF]], "fh": 3.7, "st": [3, 4], "fix": true,
 			"ch": 0.65, "dm": 0.0, "eq": 0.1, "g": [["render", 3], ["shop", 2], ["none", 1]],
 			"gc": ["#2e3b34", "#5a2a1a", "#283040"], "ev": 0.35,
 			"rv": {"balconette": 0.3, "string_course": true, "awning": 0.2, "chimney_cap": "bell", "altana": 0.3,
-				"awning_colours": ["#e8e4da", "#2a4a3a", "#8a2a1a"]}},
-		"house": {"w": [["render", VENETIAN]], "p": "punched", "wn": "gothic", "bay": 2.6,
-			"fr": "#e8e2d2", "sh": VENETIAN_SHUTTER, "sp": 0.7,
+				"awning_colours": ["#F0ECE2", "#2a4a3a", "#8a2a1a"]}},
+		"house": {"vt": VENICE_PAINT, "w": [["render", VENETIAN]], "p": "punched", "wn": "gothic", "bay": 2.6,
+			"fr": "#F0EAE0", "sh": VENETIAN_SHUTTER, "sp": 0.7,
 			"r": [["hipped", 2], ["gabled", 2]], "pitch": 0.45,
 			"rf": [["terracotta", VENETIAN_ROOF]], "fh": 3.3, "st": [2, 3], "fix": true,
 			"ch": 0.7, "ev": 0.35, "rv": {"string_course": true, "chimney_cap": "bell", "altana": 0.35}},
-		"commercial": {"w": [["render", VENETIAN], ["stone", ISTRIAN]], "p": [["ornate", 2], ["punched", 2]],
-			"wn": "gothic", "bay": 2.8, "fr": "#e8e2d2", "sh": VENETIAN_SHUTTER, "sp": 0.4,
-			"r": [["hipped", 2], ["flat", 1]], "pitch": 0.45,
+		"commercial": {"vt": VENICE_PAINT, "w": [["render", VENETIAN], ["stone", ISTRIAN]], "p": [["ornate", 2], ["punched", 2]],
+			"wn": "gothic", "bay": 2.8, "fr": "#F0EAE0", "sh": VENETIAN_SHUTTER, "sp": 0.4,
+			"r": [["hipped", 2], ["gabled", 1]], "pitch": 0.45,
 			"rf": [["terracotta", VENETIAN_ROOF]], "fh": 3.7, "st": [3, 4], "fix": true,
 			"ch": 0.4, "g": [["shop", 3], ["render", 1]], "ev": 0.35,
 			"rv": {"string_course": true, "awning": 0.4, "chimney_cap": "bell", "altana": 0.2,
-				"awning_colours": ["#e8e4da", "#2a4a3a", "#8a2a1a", "#c8a24a"]}},
+				"awning_colours": ["#F0ECE2", "#2a4a3a", "#8a2a1a", "#c8a24a"]}},
 		"civic": {"w": [["stone", ISTRIAN], ["render", VENETIAN]], "p": "ornate", "wn": "gothic",
 			"r": [["hipped", 2], ["gabled", 1]], "pitch": 0.5,
 			"rf": [["terracotta", VENETIAN_ROOF]], "st": [3, 4], "fix": true, "fh": 4.2,

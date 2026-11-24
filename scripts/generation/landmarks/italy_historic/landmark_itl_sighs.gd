@@ -40,6 +40,10 @@ static func bridge_of_sighs(model: Node3D) -> void:
 		_face(lm, float(sgn))
 	_flanks(lm)
 	lm.commit(model)
+	model.set_meta(LandmarkLights.FLOOD_META, [
+		[Vector3(0.0, 1.5, 8.0), Vector3(0.0, 8.4, HALF_W), 48.0, 0.85],
+		[Vector3(0.0, 1.5, -8.0), Vector3(0.0, 8.4, -HALF_W), 48.0, 0.75],
+	])
 
 ## The flattened arch: soffit and the solid spandrel faces up to the body.
 static func _soffit(lm: LandmarkMesh) -> void:
