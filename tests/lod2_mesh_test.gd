@@ -236,7 +236,24 @@ func _test_wall_layout() -> bool:
 			wg_max_y, wg_above_eave_max_abs_x, wg_blk_v.size()])
 		ok = false
 
-	# 6. FacadeMaterials.blank_for_facade matches facade tint & upgrades via FacadeShader.
+	# 6. Wide 44 m x 19.8 m rectangular wall rotated 3.2 deg off bucket axis: both
+	#    triangles must merge into ONE rectangular patch with identical storey UVs
+	#    (zero diagonal staircase kink across the quad).
+	var ang := deg_to_rad(23.2)
+	var dx := cos(ang) * 44.0
+	var dz := sin(ang) * 44.0
+	var ang_v := [Vector3(0, 0, 0), Vector3(dx, 0, dz), Vector3(dx, 19.8, dz), Vector3(0, 19.8, 0)]
+	var ang_t := [Vector3i(0, 2, 1), Vector3i(0, 3, 2)]
+	var abuf := _wall_buf(ang_v, ang_t)
+	var adec := Lod2WallLayout.decode(abuf, 0, ang_v.size() * 3, ang_v.size(), ang_t.size() * 3,
+		0.0, 0.0, 0.0, 1.0, 3.2, 4.0, 3.3, 0.0, false)
+	var awin_uv: PackedVector2Array = (adec["windowed"] as Array)[2]
+	if awin_uv.size() != 6 or absf(awin_uv[0].y - 6.0) > 0.02 or absf(awin_uv[3].y - 6.0) > 0.02 \
+			or absf(awin_uv[1].y) > 0.02 or absf(awin_uv[5].y) > 0.02:
+		push_error("FAIL: 44 m angled rectangular wall split across diagonal: uvs=%s" % [awin_uv])
+		ok = false
+
+	# 7. FacadeMaterials.blank_for_facade matches facade tint & upgrades via FacadeShader.
 	FacadeMaterials.begin_build()
 	var look := ArchitectureStyle.resolve({"kind": "apartments", "material": "brick", "colour": "#5c342b"},
 		"amsterdam", "urban", 0.3, 120.0)
@@ -253,6 +270,39 @@ func _test_wall_layout() -> bool:
 			or not bool(blk_sh.get_shader_parameter("has_photo")):
 		push_error("FAIL: blank FacadeShader parameters mismatch")
 		ok = false
+
+	# 8. Held skillion gable mesh (MeshArrays.hold, as in BuildingBuilder._extrude_masses)
+	#    keeps explicit roof:direction even on party-bounded rings and dresses vertical
+	#    ramp walls with outward-facing multi-storey windows.
+	var m2u := WorldScale.metres_to_units()
+	var sk_ring := PackedVector2Array([
+		Vector2(0.0, 0.0), Vector2(28.0 * m2u, 0.0),
+		Vector2(28.0 * m2u, 24.0 * m2u), Vector2(0.0, 24.0 * m2u),
+	])
+	var sk_axis := RoofForms.axis_from_tags({"roof_dir": 180.0}, sk_ring)
+	var sk_party := PackedByteArray([1, 1, 1, 1])
+	MeshArrays.hold()
+	var sk_roof := RoofGeometry.form_mesh(sk_ring, 6.0 * m2u, 50.0 * m2u, "skillion",
+		sk_party, false, [], sk_axis)
+	var sk_gables := RoofGeometry.split_gables(sk_roof, sk_ring, PackedByteArray())
+	var sk_dressed := Lod2WallLayout.dress_gable_mesh(sk_gables[0] as ArrayMesh, 6.0 * m2u,
+		3.8 * m2u, 3.2, 4.0, true)
+	MeshArrays.release()
+	if sk_dressed[0] == null or (sk_dressed[0] as ArrayMesh).get_surface_count() != 1:
+		push_error("FAIL: dress_gable_mesh dropped held skillion walls under MeshArrays.hold()")
+		ok = false
+	var sk_roof_v: PackedVector3Array = MeshArrays.surface(sk_roof, 0)[Mesh.ARRAY_VERTEX]
+	var south_max_y := -INF
+	var north_max_y := -INF
+	for p in sk_roof_v:
+		if p.z > 20.0 * m2u:
+			south_max_y = maxf(south_max_y, p.y / m2u)
+		elif p.z < 4.0 * m2u:
+			north_max_y = maxf(north_max_y, p.y / m2u)
+	if south_max_y > 6.5 or north_max_y < 55.5:
+		push_error("FAIL: skillion with explicit roof:direction=180 flipped on party ring (south=%.1f north=%.1f)" % [
+			south_max_y, north_max_y])
+		ok = false
 	return ok
 
 
@@ -264,7 +314,7 @@ func _initialize() -> void:
 			ok = false
 	ok = _test_city("Turku", 60.4495, 22.2675, 2000, 500, true) and ok
 	ok = _test_city("Helsinki", 60.1695, 24.9522, 2000, 25, false) and ok
-	ok = _test_city("Espoo", 60.1775, 24.8050, 1000, 50, true) and ok
+	ok = _test_city("Espoo", 60.1775, 24.8050, 1000, 50, false) and ok
 	ok = _test_city("Amsterdam", 52.37403, 4.88969, 2000, 500, true, false) and ok
 	if ok:
 		print("PASS: lod2_mesh_test")

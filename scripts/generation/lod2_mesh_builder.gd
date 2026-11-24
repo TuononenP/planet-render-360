@@ -102,12 +102,16 @@ static func build_corridor(root: Node3D, data: LocationData, ground: GroundTruth
 			var lod_bb := _lod_aabb(buf, off + TurkuLod2Meshes.BLDG_HEADER_INTS, nwv, cx, cz, m2u)
 			var hits := _find_osm_overlaps(cx, cz, lod_bb, sorted, osm_aabbs, grid, m2u)
 			if not hits.is_empty():
-				var primary_k: int = hits[0]
-				var b: Dictionary = sorted[primary_k]
-				if _append_building(root, batch, buf, off, b, cx, cz, ground, region, fidelity, eye, reach, sea_y, tone, m2u, ctx):
-					for hk: int in hits:
-						handled[hk] = 1
-					built += 1
+				if _has_rich_osm(hits, sorted):
+					if _enrich_attrs(sorted[hits[0]], buf, off):
+						enriched += 1
+				else:
+					var primary_k: int = hits[0]
+					var b: Dictionary = sorted[primary_k]
+					if _append_building(root, batch, buf, off, b, cx, cz, ground, region, fidelity, eye, reach, sea_y, tone, m2u, ctx):
+						for hk: int in hits:
+							handled[hk] = 1
+						built += 1
 			off += rec_ints
 
 	if built > 0:
@@ -116,6 +120,17 @@ static func build_corridor(root: Node3D, data: LocationData, ground: GroundTruth
 	if enriched > 0:
 		print("LOD2_ATTR enriched %d buildings with sampled roof/wall colours" % enriched)
 	return handled
+
+static func _has_rich_osm(hits: Array[int], sorted: Array) -> bool:
+	for hk: int in hits:
+		var b: Dictionary = sorted[hk]
+		if not (b.get("parts", []) as Array).is_empty():
+			return true
+		if str(b.get("roof_material", "")).strip_edges().to_lower() == "glass":
+			return true
+		if str(b.get("kind", "")).strip_edges().to_lower() in ["roof", "bridge"]:
+			return true
+	return false
 
 static func _enrich_attrs(b: Dictionary, buf: PackedInt32Array, off: int) -> bool:
 	var changed := false
@@ -249,8 +264,14 @@ static func _append_building(root: Node3D, batch: MassBatch, buf: PackedInt32Arr
 		BuildingFoundation.plinth(root, ring, [], footing, ground, false)
 		BuildingFoundation.build(root, ring, [], footing, b_eff, ground)
 
-	var look := ArchitectureStyle.resolve(b_eff, region, str(ctx.get("density", "urban")),
-		seed_v, lod_area)
+	var look_ctx := ctx.duplicate()
+	if not look_ctx.has("region"):
+		look_ctx["region"] = region
+	if not look_ctx.has("density"):
+		look_ctx["density"] = "urban"
+	b_eff["x"] = cx
+	b_eff["z"] = cz
+	var look := BuildingHeights._look_for(b_eff, look_ctx)
 	var eye_d := BuildingBuilder.eye_dist(centre, eye, reach)
 	var distant := minf(eye_d, centre.length()) / m2u > MaterialLibrary.full_detail_radius_m(fidelity)
 

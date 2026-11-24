@@ -196,7 +196,7 @@ static func skillion(ring: PackedVector2Array, c: Vector2, top: float, rh: float
 		uvs: PackedVector2Array, axis: Vector2 = Vector2.ZERO) -> void:
 	var u := axis if axis != Vector2.ZERO else RingGeometry.dominant_axis(ring)
 	var v := Vector2(-u.y, u.x)
-	if party.size() == ring.size() and party.has(1):
+	if axis == Vector2.ZERO and party.size() == ring.size() and party.has(1):
 		v = _party_axis(ring, party)
 		if not _end_party(ring, party, v):
 			v = -v

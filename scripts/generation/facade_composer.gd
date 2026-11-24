@@ -25,8 +25,8 @@ const GLASS := Color(0.0273, 0.0423, 0.0513)
 ## read as render; the brightness comes from the reflection instead.
 const SKY_GLASS := Color(0.055, 0.08, 0.105)
 const SKY_GLASS_TOP := Color(0.085, 0.115, 0.145)
-const SPANDREL := Color(0.15, 0.155, 0.16)
-const MULLION := Color(0.36, 0.375, 0.39)
+const SPANDREL := Color(0.058, 0.082, 0.106)
+const MULLION := Color(0.30, 0.315, 0.33)
 const CELL := 128
 const BAYS := 4
 const TILED: Array[String] = ["punched", "strip", "balcony", "clapboard",
@@ -524,20 +524,28 @@ static func _adobe(alb: Image, nor: Image, rgh: Image, ox: int, bay: int,
 ## a light spandrel at the floor line — reads as a glazed tower, not a
 ## black slab.
 static func _curtain(alb: Image, nor: Image, rgh: Image, ox: int, hv: float) -> void:
-	var v := 0.85 + hv * 0.35
-	for y in 96:
-		var sky := SKY_GLASS_TOP.lerp(SKY_GLASS, float(y) / 96.0)
+	var sill := 100
+	var v := 0.90 + hv * 0.22
+	for y in sill:
+		var sky := SKY_GLASS_TOP.lerp(SKY_GLASS, float(y) / float(sill))
 		alb.fill_rect(Rect2i(ox, y, CELL, 1), Color(sky.r * v, sky.g * v, sky.b * v))
-	alb.fill_rect(Rect2i(ox, 96, CELL, 32), SPANDREL)
-	alb.fill_rect(Rect2i(ox, 100, CELL, 2), _lin(Color(0.42, 0.43, 0.44)))
+	alb.fill_rect(Rect2i(ox, sill, CELL, CELL - sill), SPANDREL)
 	alb.fill_rect(Rect2i(ox, 0, 4, CELL), MULLION)
-	alb.fill_rect(Rect2i(ox + CELL / 2 - 1, 0, 3, 96), MULLION)
-	alb.fill_rect(Rect2i(ox, 93, CELL, 4), MULLION)
+	alb.fill_rect(Rect2i(ox + CELL / 2 - 1, 0, 3, sill), MULLION)
+	alb.fill_rect(Rect2i(ox, sill - 3, CELL, 3), MULLION)
+	alb.fill_rect(Rect2i(ox, CELL - 2, CELL, 2), MULLION)
 	alb.fill_rect(Rect2i(ox, 28, CELL, 2), MULLION)
 	if nor != null:
 		nor.fill_rect(Rect2i(ox, 0, 2, CELL), Color(0.38, 0.5, 1.0))
 		nor.fill_rect(Rect2i(ox + 2, 0, 2, CELL), Color(0.62, 0.5, 1.0))
-		nor.fill_rect(Rect2i(ox, 93, CELL, 2), Color(0.5, 0.38, 1.0))
-		nor.fill_rect(Rect2i(ox, 95, CELL, 2), Color(0.5, 0.62, 1.0))
-		rgh.fill_rect(Rect2i(ox, 0, CELL, 96), Color(0.08, 0.08, 0.08))
-		rgh.fill_rect(Rect2i(ox, 96, CELL, 32), Color(0.5, 0.5, 0.5))
+		nor.fill_rect(Rect2i(ox, sill - 3, CELL, 1), Color(0.5, 0.38, 1.0))
+		nor.fill_rect(Rect2i(ox, sill - 2, CELL, 2), Color(0.5, 0.62, 1.0))
+		rgh.fill_rect(Rect2i(ox, 0, CELL, sill), Color(0.08, 0.08, 0.08))
+		# Glazed back-painted spandrel glass keeps partial sky reflection so shaded
+		# curtain walls read as sleek architectural glass instead of dark stripes.
+		rgh.fill_rect(Rect2i(ox, sill, CELL, CELL - sill), Color(0.26, 0.26, 0.26))
+		rgh.fill_rect(Rect2i(ox, 0, 4, CELL), Color(0.42, 0.42, 0.42))
+		rgh.fill_rect(Rect2i(ox + CELL / 2 - 1, 0, 3, sill), Color(0.42, 0.42, 0.42))
+		rgh.fill_rect(Rect2i(ox, sill - 3, CELL, 3), Color(0.42, 0.42, 0.42))
+		rgh.fill_rect(Rect2i(ox, CELL - 2, CELL, 2), Color(0.42, 0.42, 0.42))
+		rgh.fill_rect(Rect2i(ox, 28, CELL, 2), Color(0.42, 0.42, 0.42))

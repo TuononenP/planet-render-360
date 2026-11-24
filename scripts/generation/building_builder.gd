@@ -605,6 +605,7 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		if not mech.is_empty():
 			bands["mech"] = mech
 			bands["louvre"] = FacadeTextures.louvre(1, str(look["wall_set"]) == "glass")
+	var wall_unit_u := float(look.get("floor_h", 3.3)) * WorldScale.metres_to_units()
 	if top - base < 0.05 * WorldScale.metres_to_units():
 		pass  # a part that is only roof (a dome on its drum) has no walls
 	elif ground_mat != null:
@@ -613,9 +614,12 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		var gh_u := fh_u * (1.15 if not shop_materials.is_empty() or str(look.get("ground", "")) in ["shop", "signage"] else 1.0)
 		var g_top := minf(base + sink + gh_u,
 			top - fh_u * 0.6)
+		wall_unit_u = (top - g_top) / float(maxi(upper, 1))
 		_walls(root, ring, base, g_top, ground_mat, (g_top - base) / gh_u, cover, fire, false, shop_materials, bay_scale)
 		BuildingWalls.upper_walls(root, ring, g_top, top, facade, attic_mat, upper, bands, cover, fire, bay_scale)
 	else:
+		if top - base >= wall_unit_u * 0.7:
+			wall_unit_u = (top - base) / maxf(v_rep, 1.0)
 		BuildingWalls.upper_walls(root, ring, base, top, facade, attic_mat, upper, bands, cover, fire, bay_scale)
 	for h in holes:
 		var hc: Array = _party.ring_cover(h, str(mass["key"]), true) if _party != null and mass.has("key") else []
@@ -643,7 +647,8 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		var gable_look := look if not distant and _batch == null \
 			and not bool(b.get("mapped_landmark", false)) else {}
 		roofed = _roof_form(root, job[0], job[1], job[2], shape, roof_mat, party, gable_front, job[6],
-			RoofForms.axis_from_tags(b, ring), gable_look)
+			RoofForms.axis_from_tags(b, ring), gable_look, facade if not gable_look.is_empty() else null,
+			wall_unit_u, bay_scale, fire != null)
 	if not roofed:
 		# No pitched roof built (flat, or no form fits): dormers, stacks and
 		# gables must not stand on a roof that is not there.
@@ -739,15 +744,29 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array, idx: PackedInt32Ar
 static func _roof_form(root: Node3D, ring: PackedVector2Array, top: float,
 		rh: float, shape: String, mat: Material, party: PackedByteArray = PackedByteArray(),
 		gable_front: bool = false, holes: Array = [], axis: Vector2 = Vector2.ZERO,
-		gable_look: Dictionary = {}) -> bool:
+		gable_look: Dictionary = {}, facade: Material = null, unit_u: float = 0.0,
+		bay_scale: float = 1.0, has_firewall: bool = true) -> bool:
 	var key := [ring, top, rh, shape, party, gable_front, holes] if not _roofs.is_empty() else []
 	var mesh := RoofGeometry.mesh_of(_roofs[key]) if axis == Vector2.ZERO and _roofs.has(key) \
 		else RoofGeometry.form_mesh(ring, top, rh, shape, party, gable_front, holes, axis)
 	if mesh != null and not gable_look.is_empty() and shape in RoofGeometry.GABLED:
-		var gables := RoofGeometry.split_gables(mesh, ring, party)
+		var is_glass := str(gable_look.get("wall_set", "")) == "glass"
+		var gables := RoofGeometry.split_gables(mesh, ring,
+			party if has_firewall and not is_glass else PackedByteArray())
 		if gables[0] != null:
-			(gables[0] as ArrayMesh).set_meta(RoofVariety.WALL_TINT, PartyWalls.gable_tint(gable_look))
-			TerrainBuilder._add(root, gables[0], PartyWalls.gable(gable_look))
+			var uvp := FacadeMaterials.facade_uv(facade) if facade != null else Vector3.ZERO
+			if facade != null and uvp.z > 0.0 and unit_u > 0.0 \
+					and (is_glass or (shape == "skillion" and rh >= unit_u * 1.4) or rh >= unit_u * 2.4):
+				var blank_mat := FacadeMaterials.blank_for_facade(facade)
+				var dressed := Lod2WallLayout.dress_gable_mesh(gables[0] as ArrayMesh, top, unit_u,
+					maxf(uvp.x * bay_scale, 1.0), maxf(uvp.y, 1.0), blank_mat != null)
+				if dressed[0] != null:
+					TerrainBuilder._add(root, dressed[0], facade)
+				if dressed[1] != null:
+					TerrainBuilder._add(root, dressed[1], blank_mat if blank_mat != null else facade)
+			else:
+				(gables[0] as ArrayMesh).set_meta(RoofVariety.WALL_TINT, PartyWalls.gable_tint(gable_look))
+				TerrainBuilder._add(root, gables[0], PartyWalls.gable(gable_look))
 		if gables[1] != null:
 			TerrainBuilder._add(root, gables[1], PartyWalls.firewall(gable_look))
 	if mesh != null and _batch != null:

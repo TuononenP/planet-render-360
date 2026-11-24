@@ -516,6 +516,8 @@ static func roof_base_tint(set_name: String) -> Color:
 			return _calib("copper", ArchitectureStyle._lin("#538472"))
 		"sheet_metal":
 			return _calib("sheet_metal", ArchitectureStyle._lin("#555a60"))
+		"grass":
+			return _calib("grass", ArchitectureStyle._lin("#4c6b38"))
 	return Color.WHITE
 
 ## Lift a roof tint so its mean albedo keeps ROOF_MIN_LUMA (no black

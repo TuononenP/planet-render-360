@@ -39,7 +39,7 @@ static func radius_m(preset: int) -> float:
 
 ## Trim kind for a building `dist_m` from the viewpoint.
 static func kind(shape: String, dist_m: float, radius: float = RADIUS_M) -> int:
-	if dist_m > radius:
+	if dist_m > radius or shape == "skillion":
 		return NONE
 	return PARAPET if shape == "flat" else CORNICE
 

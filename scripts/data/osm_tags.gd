@@ -543,6 +543,7 @@ static func _roof_dir(raw: Variant) -> float:
 ## as numbers (0 when absent or out of range).
 static func _roof_tags(tags: Dictionary) -> Dictionary:
 	var roof_h := _tag_metres(tags.get("roof:height", ""), 0.5, 100.0)
+	var roof_min_h := _tag_metres(tags.get("roof:min_height", ""), 0.0, 1000.0)
 	var min_h := _tag_metres(tags.get("min_height", ""), 0.0, 1000.0)
 	return {
 		"roof_shape": str(tags.get("roof:shape", "")),
@@ -552,7 +553,8 @@ static func _roof_tags(tags: Dictionary) -> Dictionary:
 		"roof_dir": _roof_dir(tags.get("roof:direction", "")),
 		"roof_orient": str(tags.get("roof:orientation", "")).strip_edges().to_lower(),
 		"roof_height_m": 0.0 if is_nan(roof_h) else roof_h,
-		"roof_levels": _tag_int(tags.get("roof:levels", 0), 0, 10),
+		"roof_min_height_m": 0.0 if is_nan(roof_min_h) else roof_min_h,
+		"roof_levels": _tag_int(tags.get("roof:levels", 0), 0, 30),
 		"min_height_m": 0.0 if is_nan(min_h) else min_h,
 		"min_level": _tag_int(tags.get("building:min_level", 0), 0, 200),
 	}

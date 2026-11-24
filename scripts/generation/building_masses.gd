@@ -18,7 +18,7 @@ extends RefCounted
 ## Part roof keys that fall back to the parent's when the part leaves
 ## them untagged (OsmTags._roof_tags writes "" / 0 for absent tags).
 const INHERITED_ROOF_KEYS: Array[String] = ["roof_shape", "roof_colour",
-	"roof_material", "roof_height_m", "roof_levels", "roof_dir", "roof_orient"]
+	"roof_material", "roof_height_m", "roof_min_height_m", "roof_levels", "roof_dir", "roof_orient"]
 ## A part this share of the largest can carry a tower's roofline.
 const MAIN_MIN_SHARE := 0.12
 
@@ -353,6 +353,10 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 			var span := BuildingHeights._ring_span_m(ring)
 			roof_tag = clampf(tan(deg_to_rad(angle)) * span * 0.5, 0.8, maxf(span * 0.9, 0.8))
 		var total := float(res["total_m"])
+		var roof_min := float(b_eff.get("roof_min_height_m", 0.0))
+		if roof_min > 0.0 and roof_min < total - 0.5 and shape != "flat" \
+				and (roof_tag <= 0.0 or roof_tag >= total - min_m - 0.5):
+			roof_tag = total - roof_min
 		var rh := BuildingHeights._roof_height_m(shape, BuildingHeights._ring_span_m(ring),
 			roof_tag, float(look["pitch"]))
 		var wall := total
@@ -367,6 +371,8 @@ static func _plan_masses(b: Dictionary, ctx: Dictionary, masses: Array, single: 
 		if min_m > wall - 1.0 and not (rh > 0.0 and min_m <= wall + 0.01):
 			min_m = 0.0
 		var storeys := int(md.get("levels", b.get("levels", 0) if single else 0))
+		if roof_min > 0.0 and storeys <= 1 and wall - min_m >= fh * 1.4:
+			storeys = maxi(1, roundi((wall - min_m) / fh))
 		if storeys > 0 and min_m > 0.0:
 			storeys = maxi(1, storeys - int(md.get("min_level", 0)))
 		if storeys <= 0:

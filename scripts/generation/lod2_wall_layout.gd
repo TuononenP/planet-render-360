@@ -1,34 +1,30 @@
 class_name Lod2WallLayout
 extends RefCounted
 
-## Decodes LoD2.2 wall triangle soups into matched windowed and blank-masonry
-## surfaces so windows are never sliced by gable slopes, pitched roofs, vertical
-## corners, facade steps or narrow wall strips.
+## Decodes LoD2.2 and tall sloped-roof wall triangle soups into matched windowed
+## and blank-cladding surfaces so windows are never sliced by gable slopes,
+## skillion ramps, vertical corners, facade steps or narrow wall strips.
 ##
-## Per connected coplanar wall patch:
+## Per connected coplanar wall patch (clustered using each triangle's own plane
+## normal so wide walls angled off bucket centres never split along diagonals):
 ##   1. Snaps horizontal window bays (`u`) to an integer count across the patch
 ##      width so vertical wall edges and corners always fall on solid piers.
-##   2. Snaps vertical storeys (`y`) to the patch's flat eave height so flat
-##      eaves never chop the top row of windows.
+##   2. Anchors vertical storeys (`y`) consistently so floor lines align across
+##      corners, wing steps and sloped eaves without chopping window rows.
 ##   3. Tests every (bay, storey) cell's safe window box against the 2D wall
 ##      patch; cells that fit wholly inside stay windowed, while cells clipped
-##      by gable slopes, sloped roofs, steps or narrow strips route to blank
-##      masonry with the exact same (u, v) coordinates so brick courses and
-##      weathering continue unbroken across the seam.
+##      by gable/skillion slopes or narrow strips route to blank masonry with
+##      identical (u, v) coordinates so courses continue unbroken across the seam.
 
 const MIN_BAY_M := 1.6
 const MIN_BAY_SHARE := 0.62
 const MIN_WALL_H := 2.2
-## Safe inset inside each (bay, storey) cell (as fraction of bay width / storey
-## height): strict enough that no lintel, pediment, sill or shutter is grazed by
-## a roof slope, loose enough (~15 cm) to tolerate CityJSON vertex rounding.
 const PAD_U := 0.06
 const PAD_Y := 0.05
-## 2D point-in-triangle seam tolerance (m) bridging tiny CityJSON face gaps.
 const SEAM_TOL_M := 0.04
-## Coplanar patch merge tolerances (normal bucket, plane offset, 2D AABB touch).
-const PLANE_OFFSET_M := 0.12
+const PLANE_OFFSET_M := 0.14
 const PATCH_TOUCH_M := 0.08
+const NORMAL_COS_MIN := 0.994
 
 
 static func decode(buf: PackedInt32Array, v_off: int, i_off: int, n_verts: int, n_idx: int,
@@ -41,8 +37,7 @@ static func decode(buf: PackedInt32Array, v_off: int, i_off: int, n_verts: int, 
 	var sink_m := sink_u / m2u if sink_u > 0.0 else 0.0
 	var min_w := maxf(MIN_BAY_M, bay_m * MIN_BAY_SHARE)
 
-	# Pass 1: bucket valid wall triangles by horizontal outward normal.
-	var buckets: Dictionary = {}
+	var raw_tris: Array = []
 	for t in n_tri:
 		var bi := i_off + t * 3
 		var i0 := buf[bi]
@@ -56,19 +51,16 @@ static func decode(buf: PackedInt32Array, v_off: int, i_off: int, n_verts: int, 
 		var p0 := _pt(buf, v0, ox, oy, oz, s, sink_u)
 		var p1 := _pt(buf, v1, ox, oy, oz, s, sink_u)
 		var p2 := _pt(buf, v2, ox, oy, oz, s, sink_u)
-		var n := (p2 - p0).cross(p1 - p0)
-		var nl := n.length()
+		var cross := (p2 - p0).cross(p1 - p0)
+		var nl := cross.length()
 		if nl < 1e-6:
 			continue
-		n /= nl
+		var n := cross / nl
 		var hn := Vector2(n.x, n.z)
 		var hl := hn.length()
-		if hl < 0.15:
+		if hl < 0.75:
 			continue
 		hn /= hl
-		var nk := Vector2i(roundi(hn.x * 12.0), roundi(hn.y * 12.0))
-		if not buckets.has(nk):
-			buckets[nk] = {"hn": hn, "tris": []}
 		var lx0 := float(buf[v0]) * 0.01
 		var ly0 := float(buf[v0 + 1]) * 0.01
 		var lz0 := float(buf[v0 + 2]) * 0.01
@@ -78,66 +70,189 @@ static func decode(buf: PackedInt32Array, v_off: int, i_off: int, n_verts: int, 
 		var lx2 := float(buf[v2]) * 0.01
 		var ly2 := float(buf[v2 + 1]) * 0.01
 		var lz2 := float(buf[v2 + 2]) * 0.01
-		var bkt: Dictionary = buckets[nk]
-		var bhn: Vector2 = bkt["hn"]
-		var tu := Vector2(bhn.y, -bhn.x)
-		var d_plane := (bhn.x * (lx0 + lx1 + lx2) + bhn.y * (lz0 + lz1 + lz2)) / 3.0
-		var u0 := lx0 * tu.x + lz0 * tu.y
-		var u1 := lx1 * tu.x + lz1 * tu.y
-		var u2 := lx2 * tu.x + lz2 * tu.y
-		(bkt["tris"] as Array).append([
-			p0, p1, p2, n,
-			u0, ly0, u1, ly1, u2, ly2,
-			d_plane,
-			minf(u0, minf(u1, u2)), maxf(u0, maxf(u1, u2)),
-			minf(ly0, minf(ly1, ly2)), maxf(ly0, maxf(ly1, ly2)),
+		raw_tris.append([
+			p0, p1, p2, n, hn, nl * 0.5,
+			lx0, ly0, lz0, lx1, ly1, lz1, lx2, ly2, lz2,
 			buf[v0 + 1] <= 40, buf[v1 + 1] <= 40, buf[v2 + 1] <= 40,
 		])
 
-	# Pass 2: cluster coplanar connected patches and lay out uncut windows per patch.
-	for nk in buckets:
-		var tris: Array = (buckets[nk] as Dictionary)["tris"]
-		var patches := _cluster_patches(tris)
-		for patch: Array in patches:
-			_emit_patch(win, blank, patch, bay_m, bays, floor_h, sink_m, min_w, split_blank)
+	for patch: Array in _cluster_coplanar(raw_tris):
+		_emit_patch(win, blank, patch, bay_m, bays, floor_h, sink_m, min_w, split_blank, false)
 
 	return {"windowed": win, "blank": blank}
 
 
-## Groups triangles sharing a normal bucket into connected coplanar patches
-## (within PLANE_OFFSET_M in depth and PATCH_TOUCH_M in 2D (u, y) AABB).
-static func _cluster_patches(tris: Array) -> Array:
-	var m := tris.size()
-	if m <= 1:
-		return [tris] if m == 1 else []
+## Dresses an extracted vertical gable / skillion side-wall mesh (`RoofGeometry.split_gables`)
+## with uncut windows aligned to the base wall's `top_y` datum and `unit_h_u` storey height.
+## Returns `[win_mesh_or_null, blank_mesh_or_null]`.
+static func dress_gable_mesh(gable_mesh: ArrayMesh, top_y: float, unit_h_u: float,
+		bay_m: float, bays: float, split_blank: bool) -> Array:
+	if gable_mesh == null or MeshArrays.surface_count(gable_mesh) == 0:
+		return [null, null]
+	var src := MeshArrays.surface(gable_mesh, 0)
+	var sv: PackedVector3Array = src[Mesh.ARRAY_VERTEX]
+	var sn: PackedVector3Array = src[Mesh.ARRAY_NORMAL]
+	var n_tri := sv.size() / 3
+	if n_tri <= 0:
+		return [null, null]
+	var m2u := WorldScale.metres_to_units()
+	var inv_m := 1.0 / maxf(m2u, 1e-4)
+	var ox := sv[0].x
+	var oz := sv[0].z
+	var raw_tris: Array = []
+	for t in n_tri:
+		var p0 := sv[t * 3]
+		var p1 := sv[t * 3 + 1]
+		var p2 := sv[t * 3 + 2]
+		var cross := (p2 - p0).cross(p1 - p0)
+		if sn.size() == sv.size() and cross.dot(sn[t * 3]) < 0.0:
+			var tmp := p1
+			p1 = p2
+			p2 = tmp
+			cross = -cross
+		var nl := cross.length()
+		if nl < 1e-6:
+			continue
+		var n := cross / nl
+		var hn := Vector2(n.x, n.z)
+		var hl := hn.length()
+		if hl < 0.75:
+			continue
+		hn /= hl
+		raw_tris.append([
+			p0, p1, p2, n, hn, nl * 0.5,
+			(p0.x - ox) * inv_m, (p0.y - top_y) * inv_m, (p0.z - oz) * inv_m,
+			(p1.x - ox) * inv_m, (p1.y - top_y) * inv_m, (p1.z - oz) * inv_m,
+			(p2.x - ox) * inv_m, (p2.y - top_y) * inv_m, (p2.z - oz) * inv_m,
+			false, false, false,
+		])
+	if raw_tris.is_empty():
+		return [null, null]
+	var win := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(), PackedInt32Array()]
+	var blank := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(), PackedInt32Array()]
+	var sh_m := maxf(unit_h_u * inv_m, 2.0)
+	var min_w := maxf(MIN_BAY_M, bay_m * MIN_BAY_SHARE)
+	for patch: Array in _cluster_coplanar(raw_tris):
+		_emit_patch(win, blank, patch, bay_m, bays, sh_m, 0.0, min_w, split_blank, true)
+	return [_to_mesh(win), _to_mesh(blank)]
+
+
+static func _to_mesh(arr: Array) -> ArrayMesh:
+	var verts: PackedVector3Array = arr[0]
+	var idx: PackedInt32Array = arr[3]
+	if verts.is_empty() or idx.is_empty():
+		return null
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = arr[1]
+	arrays[Mesh.ARRAY_TEX_UV] = arr[2]
+	arrays[Mesh.ARRAY_TANGENT] = MassBatch.tangents(verts, arr[1], arr[2], idx)
+	arrays[Mesh.ARRAY_INDEX] = idx
+	return MeshArrays.mesh(arrays)
+
+
+## Clusters coplanar connected triangles using each triangle's own horizontal
+## normal (preventing wide angled walls from splitting across diagonal edges),
+## then projects each cluster onto its area-weighted mean tangent frame `(tu, y)`.
+static func _cluster_coplanar(raw_tris: Array) -> Array:
+	var m := raw_tris.size()
+	if m == 0:
+		return []
 	var parent := PackedInt32Array()
 	parent.resize(m)
+	var cells: Dictionary = {}
+	var meta: Array = []
+	meta.resize(m)
 	for i in m:
 		parent[i] = i
-	for i in m:
-		var a: Array = tris[i]
-		var da := float(a[10])
-		var au0 := float(a[11]) - PATCH_TOUCH_M
-		var au1 := float(a[12]) + PATCH_TOUCH_M
-		var ay0 := float(a[13]) - PATCH_TOUCH_M
-		var ay1 := float(a[14]) + PATCH_TOUCH_M
-		for j in range(i + 1, m):
-			var b: Array = tris[j]
-			if absf(da - float(b[10])) > PLANE_OFFSET_M:
-				continue
-			if au0 <= float(b[12]) and float(b[11]) <= au1 \
-					and ay0 <= float(b[14]) and float(b[13]) <= ay1:
-				var ri := _find(parent, i)
-				var rj := _find(parent, j)
-				if ri != rj:
-					parent[ri] = rj
+		var r: Array = raw_tris[i]
+		var hn: Vector2 = r[4]
+		var x0 := minf(float(r[6]), minf(float(r[9]), float(r[12])))
+		var x1 := maxf(float(r[6]), maxf(float(r[9]), float(r[12])))
+		var y0 := minf(float(r[7]), minf(float(r[10]), float(r[13])))
+		var y1 := maxf(float(r[7]), maxf(float(r[10]), float(r[13])))
+		var z0 := minf(float(r[8]), minf(float(r[11]), float(r[14])))
+		var z1 := maxf(float(r[8]), maxf(float(r[11]), float(r[14])))
+		var cx := (float(r[6]) + float(r[9]) + float(r[12])) / 3.0
+		var cz := (float(r[8]) + float(r[11]) + float(r[14])) / 3.0
+		meta[i] = [hn, Vector2(cx, cz), x0, x1, y0, y1, z0, z1]
+		var nk := Vector2i(roundi(hn.x * 8.0), roundi(hn.y * 8.0))
+		if not cells.has(nk):
+			cells[nk] = []
+		(cells[nk] as Array).append(i)
+
+	for nk: Vector2i in cells:
+		var list_a: Array = cells[nk]
+		for dx in [-1, 0, 1]:
+			for dz in [-1, 0, 1]:
+				var nk2 := Vector2i(nk.x + dx, nk.y + dz)
+				if nk2.x < nk.x or (nk2.x == nk.x and nk2.y < nk.y) or not cells.has(nk2):
+					continue
+				var list_b: Array = cells[nk2]
+				var same_cell := nk == nk2
+				for ia in list_a.size():
+					var i: int = list_a[ia]
+					var ma: Array = meta[i]
+					var hna: Vector2 = ma[0]
+					var ca: Vector2 = ma[1]
+					var ax0 := float(ma[2]) - PATCH_TOUCH_M
+					var ax1 := float(ma[3]) + PATCH_TOUCH_M
+					var ay0 := float(ma[4]) - PATCH_TOUCH_M
+					var ay1 := float(ma[5]) + PATCH_TOUCH_M
+					var az0 := float(ma[6]) - PATCH_TOUCH_M
+					var az1 := float(ma[7]) + PATCH_TOUCH_M
+					var start_b := ia + 1 if same_cell else 0
+					for ib in range(start_b, list_b.size()):
+						var j: int = list_b[ib]
+						var mb: Array = meta[j]
+						if ax0 > float(mb[3]) or float(mb[2]) > ax1 \
+								or ay0 > float(mb[5]) or float(mb[4]) > ay1 \
+								or az0 > float(mb[7]) or float(mb[6]) > az1:
+							continue
+						var hnb: Vector2 = mb[0]
+						if hna.dot(hnb) < NORMAL_COS_MIN:
+							continue
+						var d_xz: Vector2 = (mb[1] as Vector2) - ca
+						if absf(d_xz.dot(hna)) > PLANE_OFFSET_M or absf(d_xz.dot(hnb)) > PLANE_OFFSET_M:
+							continue
+						var ri := _find(parent, i)
+						var rj := _find(parent, j)
+						if ri != rj:
+							parent[ri] = rj
+
 	var comps: Dictionary = {}
 	for i in m:
-		var r := _find(parent, i)
-		if not comps.has(r):
-			comps[r] = []
-		(comps[r] as Array).append(tris[i])
-	return comps.values()
+		var root_i := _find(parent, i)
+		if not comps.has(root_i):
+			comps[root_i] = []
+		(comps[root_i] as Array).append(raw_tris[i])
+
+	var out: Array = []
+	for grp: Array in comps.values():
+		var hsum := Vector2.ZERO
+		for r: Array in grp:
+			hsum += (r[4] as Vector2) * maxf(float(r[5]), 1e-4)
+		var bhn := hsum.normalized() if hsum.length_squared() > 1e-8 else (grp[0][4] as Vector2)
+		var tu := Vector2(bhn.y, -bhn.x)
+		var patch: Array = []
+		for r: Array in grp:
+			var u0 := float(r[6]) * tu.x + float(r[8]) * tu.y
+			var ly0 := float(r[7])
+			var u1 := float(r[9]) * tu.x + float(r[11]) * tu.y
+			var ly1 := float(r[10])
+			var u2 := float(r[12]) * tu.x + float(r[14]) * tu.y
+			var ly2 := float(r[13])
+			patch.append([
+				r[0], r[1], r[2], r[3],
+				u0, ly0, u1, ly1, u2, ly2,
+				0.0,
+				minf(u0, minf(u1, u2)), maxf(u0, maxf(u1, u2)),
+				minf(ly0, minf(ly1, ly2)), maxf(ly0, maxf(ly1, ly2)),
+				r[15], r[16], r[17],
+			])
+		out.append(patch)
+	return out
 
 
 static func _find(parent: PackedInt32Array, x: int) -> int:
@@ -148,7 +263,7 @@ static func _find(parent: PackedInt32Array, x: int) -> int:
 
 
 static func _emit_patch(win: Array, blank: Array, patch: Array, bay_m: float, bays: float,
-		floor_h: float, sink_m: float, min_w: float, split_blank: bool) -> void:
+		floor_h: float, sink_m: float, min_w: float, split_blank: bool, lock_sh: bool) -> void:
 	var u_min := INF
 	var u_max := -INF
 	var y_min := INF
@@ -164,43 +279,41 @@ static func _emit_patch(win: Array, blank: Array, patch: Array, bay_m: float, ba
 		var cx := float(t[8]); var cy := float(t[9])
 		area_sum += absf((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)) * 0.5
 	var span_u := u_max - u_min
-	var y_base := 0.0 if y_min <= 0.6 else y_min
+	var y_base := 0.0 if (lock_sh or y_min <= 0.6) else y_min
 	var span_y := y_max - y_base
-	var dst_blank := blank if split_blank else win
 
-	# Narrow wall strips (pilasters, dormer cheeks, turret facets) or short
-	# parapets cannot hold a full window: emit pure blank masonry with real-world UVs.
-	if split_blank and (span_u < min_w or span_y < MIN_WALL_H):
+	if span_u < min_w or span_y < MIN_WALL_H:
 		var bw_b := maxf(bay_m, 1.0)
-		var sh_b := maxf(floor_h, 2.5)
-		_emit_patch_raw(dst_blank, patch, u_min, bw_b, bays, y_max, sh_b, sink_m)
+		var sh_b := floor_h if lock_sh else maxf(floor_h, 2.5)
+		var u_orig := u_min if split_blank else (u_min - 0.14 * bw_b)
+		var y_anc_b := float(ceili(y_max / sh_b)) * sh_b if lock_sh else y_max
+		_emit_patch_raw(blank if split_blank else win, patch, u_orig, bw_b, bays, y_anc_b, sh_b, sink_m)
 		return
 
-	# Horizontal bay grid snapped to an integer bay count across this patch.
 	var n_cols := maxi(1, roundi(span_u / maxf(bay_m, 1.0)))
 	var bw := span_u / float(n_cols)
 
-	# Fast path for clean rectangular walls (~75% of all LoD2 patches): when the
-	# triangles fill the AABB rectangle and every vertex sits at top or bottom,
-	# every snapped (bay, storey) cell is guaranteed valid with zero clipping.
+	# Fast path for clean rectangular walls: when the triangles fill the AABB
+	# rectangle and every vertex sits at top or bottom, every cell is valid.
 	var aabb_area := span_u * (y_max - y_min)
 	if aabb_area > 0.0 and area_sum >= aabb_area * 0.985 and area_sum <= aabb_area * 1.015 \
+			and (not split_blank or (not lock_sh and y_min <= 0.6)) \
 			and _is_rect_patch(patch, y_min, y_max):
-		var sh_r := _snap_storey_h(span_y, floor_h)
-		var n_st_r := maxi(1, roundi(span_y / sh_r))
-		_emit_patch_raw(win, patch, u_min, bw, bays, y_base + float(n_st_r) * sh_r, sh_r, sink_m)
+		var sh_r := floor_h if (lock_sh or y_min > 0.6) else _snap_storey_h(span_y, floor_h)
+		var y_anc_r := float(ceili(y_max / sh_r)) * sh_r if (lock_sh or y_min > 0.6) \
+			else (y_base + float(maxi(1, roundi(span_y / sh_r))) * sh_r)
+		_emit_patch_raw(win, patch, u_min, bw, bays, y_anc_r, sh_r, sink_m)
 		return
 
 	var tris_2d := _prep_tris_2d(patch)
 
-	# Vertical storey grid anchored to the patch's eave height so flat eaves
-	# never slice the top window row and corners align across gabled/side faces.
-	var eave_y := _find_eave_y(tris_2d, u_min, u_max, n_cols, bw, y_base, y_max)
 	var sh := floor_h
-	if eave_y - y_base >= MIN_WALL_H:
-		var span_e := (y_max - y_base) if (y_max - eave_y <= 0.20) else (eave_y - y_base)
-		sh = _snap_storey_h(span_e, floor_h)
-	var y_origin := y_base
+	var y_origin := 0.0 if (lock_sh or y_min > 0.6) else y_base
+	if not lock_sh and y_min <= 0.6:
+		var eave_y := _find_eave_y(tris_2d, u_min, u_max, n_cols, bw, y_base, y_max)
+		if eave_y - y_base >= MIN_WALL_H:
+			var span_e := (y_max - y_base) if (y_max - eave_y <= 0.20) else (eave_y - y_base)
+			sh = _snap_storey_h(span_e, floor_h)
 	var n_rows := maxi(1, ceili((y_max - y_origin - 1e-4) / sh))
 	var y_anchor := y_origin + float(n_rows) * sh
 
@@ -208,14 +321,16 @@ static func _emit_patch(win: Array, blank: Array, patch: Array, bay_m: float, ba
 		_emit_patch_raw(win, patch, u_min, bw, bays, y_anchor, sh, sink_m)
 		return
 
-	# Evaluate which (row, col) cells safely contain an uncut window opening.
+	var r0 := maxi(0, floori((y_min - y_origin) / sh))
+	var active_rows := maxi(1, n_rows - r0)
 	var valid: Array = []
-	valid.resize(n_rows)
+	valid.resize(active_rows)
 	var any_win := false
 	var any_blank := false
 	var pad_u := bw * PAD_U
 	var pad_y := sh * PAD_Y
-	for r in n_rows:
+	for ar in active_rows:
+		var r := r0 + ar
 		var row_v := PackedByteArray()
 		row_v.resize(n_cols)
 		var yb := y_origin + float(r) * sh
@@ -229,9 +344,8 @@ static func _emit_patch(win: Array, blank: Array, patch: Array, bay_m: float, ba
 				any_win = true
 			else:
 				any_blank = true
-		valid[r] = row_v
+		valid[ar] = row_v
 
-	# Fast paths: uniform patches emit with zero clipping or extra triangles.
 	if not any_win:
 		_emit_patch_raw(blank, patch, u_min, bw, bays, y_anchor, sh, sink_m)
 		return
@@ -239,18 +353,16 @@ static func _emit_patch(win: Array, blank: Array, patch: Array, bay_m: float, ba
 		_emit_patch_raw(win, patch, u_min, bw, bays, y_anchor, sh, sink_m)
 		return
 
-	# Mixed patch: build convex vertex polygons with exact seamless UVs, then
-	# split ONLY along grid lines where cell validity actually transitions.
 	var inv_u := 1.0 / (bw * bays)
 	var inv_v := 1.0 / sh
 	var dv_s := sink_m * inv_v
-	var h_cuts: PackedFloat32Array = PackedFloat32Array()
-	for r in range(1, n_rows):
-		var prev: PackedByteArray = valid[r - 1]
-		var curr: PackedByteArray = valid[r]
+	var h_cuts := PackedFloat32Array()
+	for ar in range(1, active_rows):
+		var prev: PackedByteArray = valid[ar - 1]
+		var curr: PackedByteArray = valid[ar]
 		for c in n_cols:
 			if prev[c] != curr[c]:
-				h_cuts.append(y_origin + float(r) * sh)
+				h_cuts.append(y_origin + float(r0 + ar) * sh)
 				break
 
 	for t: Array in patch:
@@ -268,9 +380,9 @@ static func _emit_patch(win: Array, blank: Array, patch: Array, bay_m: float, ba
 			h_polys = next_h
 		for hp: Array in h_polys:
 			var cy := _poly_mean(hp, 3)
-			var r := clampi(floori((cy - y_origin) / sh), 0, n_rows - 1)
-			var row_v: PackedByteArray = valid[r]
-			var v_cuts: PackedFloat32Array = PackedFloat32Array()
+			var ar := clampi(floori((cy - y_origin) / sh) - r0, 0, active_rows - 1)
+			var row_v: PackedByteArray = valid[ar]
+			var v_cuts := PackedFloat32Array()
 			for c in range(1, n_cols):
 				if row_v[c - 1] != row_v[c]:
 					v_cuts.append(u_min + float(c) * bw)
@@ -320,8 +432,6 @@ static func _emit_patch_raw(dst: Array, patch: Array, u_min: float, bw: float, b
 		k += 3
 
 
-## Precomputes 2D triangle edge vectors and inverse lengths for fast metric
-## point-in-triangle tests.
 static func _prep_tris_2d(patch: Array) -> Array:
 	var out: Array = []
 	for t: Array in patch:
@@ -346,20 +456,23 @@ static func _prep_tris_2d(patch: Array) -> Array:
 	return out
 
 
-## Finds the lowest full-height top height across the patch's outer edges and
-## bay centres — matching the flat eave on rectangular, gabled and stepped walls.
+## Finds the lowest flat/outer eave height: outer vertical edges first, then
+## flat horizontal steps (`|dy/du| <= 0.12`) across interior bay centres so a
+## diagonal slope never pulls the eave height down to a low corner.
 static func _find_eave_y(tris_2d: Array, u_min: float, u_max: float, n_cols: int, bw: float,
 		y_base: float, y_max: float) -> float:
-	var samples := PackedFloat32Array()
-	samples.append(u_min)
-	samples.append(u_max)
-	for c in n_cols:
-		samples.append(u_min + (float(c) + 0.5) * bw)
 	var eave := INF
-	for uq in samples:
+	for uq in [u_min + 0.02, u_max - 0.02]:
 		var ext := _vertical_extent_at_u(tris_2d, uq)
 		if ext.x <= y_base + 0.6 and ext.y - y_base >= MIN_WALL_H:
 			eave = minf(eave, ext.y)
+	for c in n_cols:
+		var uc := u_min + (float(c) + 0.5) * bw
+		var ext_l := _vertical_extent_at_u(tris_2d, uc - 0.15)
+		var ext_r := _vertical_extent_at_u(tris_2d, uc + 0.15)
+		if ext_l.x <= y_base + 0.6 and ext_r.x <= y_base + 0.6 \
+				and ext_l.y - y_base >= MIN_WALL_H and absf(ext_r.y - ext_l.y) <= 0.04:
+			eave = minf(eave, (ext_l.y + ext_r.y) * 0.5)
 	return eave if eave < 1e8 else y_max
 
 
@@ -416,8 +529,6 @@ static func _edge_y_at_u(a: Vector2, b: Vector2, uq: float, lo: float, hi: float
 	return Vector2(lo, hi)
 
 
-## True iff the safe window rectangle [u0, u1] x [y0, y1] lies completely inside
-## the 2D wall patch (4 corners first for fast reject, then edge midpoints & centre).
 static func _rect_inside_patch(tris_2d: Array, u0: float, u1: float, y0: float, y1: float) -> bool:
 	if u1 <= u0 or y1 <= y0:
 		return false
@@ -451,8 +562,6 @@ static func _pt_in_patch(tris_2d: Array, px: float, py: float) -> bool:
 	return false
 
 
-## Splits a convex polygon along axis `coord_idx` (2 = u, 3 = y) at `cut`,
-## appending each non-degenerate resulting polygon to `out`.
 static func _split_poly_append(poly: Array, coord_idx: int, cut: float, out: Array) -> void:
 	var has_lo := false
 	var has_hi := false
