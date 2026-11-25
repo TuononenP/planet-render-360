@@ -150,22 +150,39 @@ func _test_governor_order() -> void:
 	gov._apply()
 	if gov.step != 3 or gov.haze_step != 0 or haze.governor_step != 0:
 		_failures.append("2nd slow window must drop haze before render scale (step=%d haze_step=%d)" % [gov.step, gov.haze_step])
-	# 3rd slow window: now render scale steps down (step 3 -> 2).
+	# 3rd slow window: the effect layer steps down first (SSR 64 -> 32).
+	gov.step = gov.adapt(20.0)
+	gov._apply()
+	if gov.step != 3 or gov.effects_step != 2:
+		_failures.append("3rd slow window should step SSR 64 -> 32 (effects_step 3 -> 2), got step=%d effects=%d" % [gov.step, gov.effects_step])
+	# 4th: volumetric volume 128 -> 64. 5th: SDFGI off, then TAA off.
+	gov.step = gov.adapt(20.0)
+	gov._apply()
+	if gov.effects_step != 1:
+		_failures.append("4th slow window should step volume 128 -> 64 (effects_step 2 -> 1), got %d" % gov.effects_step)
+	gov.step = gov.adapt(20.0)
+	gov._apply()
+	if gov.effects_step != 0:
+		_failures.append("5th slow window should step GI off + TAA off (effects_step 1 -> 0), got %d" % gov.effects_step)
+	# 6th slow window: now render scale steps down (step 3 -> 2).
 	gov.step = gov.adapt(20.0)
 	gov._apply()
 	if gov.step != 2:
-		_failures.append("3rd slow window should step render scale 3 -> 2, got %d" % gov.step)
-	# Recovery past hold: step 2 -> 3 recovers BEFORE haze_step climbs 0 -> 1 -> 2.
-	for _i in 60:
-		gov.step = gov.adapt(90.0)
-		if gov.step == 3 and gov.haze_step == 0:
-			break
-	if gov.step != 3 or gov.haze_step != 0:
-		_failures.append("render scale should recover to step 3 before haze re-enables (step=%d haze=%d)" % [gov.step, gov.haze_step])
+		_failures.append("6th slow window should step render scale 3 -> 2, got %d" % gov.step)
+	var floor_label := QualityGovernor.step_label(3, gov.step, gov.haze_step, gov.haze_ceiling, gov.effects_step)
+	if not floor_label.begins_with("Ultra ·") or not floor_label.contains("SSR 32"):
+		_failures.append("floor label should be Ultra + effect reductions: %s" % floor_label)
+	# Recovery past hold: step 2 -> 3 recovers BEFORE effects/haze climb back.
 	for _i in 200:
 		gov.step = gov.adapt(90.0)
-	if gov.step != 3 or gov.haze_step != 2 or not gov.at_ceiling():
-		_failures.append("healthy GPU should eventually recover full haze_step=2 at ceiling (step=%d haze=%d)" % [gov.step, gov.haze_step])
+		if gov.step == 3 and gov.haze_step == 0 and gov.effects_step == 0:
+			break
+	if gov.step != 3 or gov.haze_step != 0:
+		_failures.append("render scale should recover to step 3 before haze re-enables (step=%d haze=%d effects=%d)" % [gov.step, gov.haze_step, gov.effects_step])
+	for _i in 400:
+		gov.step = gov.adapt(90.0)
+	if gov.step != 3 or gov.haze_step != 2 or gov.effects_step != 3 or not gov.at_ceiling():
+		_failures.append("healthy GPU should eventually recover full haze_step=2 and effects_step=3 at ceiling (step=%d haze=%d effects=%d)" % [gov.step, gov.haze_step, gov.effects_step])
 	haze.free()
 	sun.free()
 	vp.free()

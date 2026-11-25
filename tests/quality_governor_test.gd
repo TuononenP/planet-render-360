@@ -10,6 +10,7 @@ var _failures: Array[String] = []
 func _init() -> void:
 	_test_flap()
 	_test_reaction()
+	_test_effects()
 	_test_preset()
 	if _failures.is_empty():
 		print("QUALITY GOVERNOR OK: hold after a step down, ceiling, GPU-aware first preset")
@@ -82,6 +83,12 @@ func _test_reaction() -> void:
 	var governor := QualityGovernor.new()
 	governor.ceiling_step = 3
 	governor.step = 3
+	# Ultra: the effect layer drains first (SSR 64 -> 32), untouching the render scale.
+	if governor.adapt(12.0) != 3 or governor.effects_step != 2:
+		_failures.append("a slow window should step the effect layer down first (SSR 64 -> 32)")
+	governor.adapt(12.0)
+	governor.adapt(12.0)
+	# Effect layer at its floor: now a slow window steps render scale 3 -> 2.
 	if governor.adapt(12.0) != 2:
 		_failures.append("a slow window should step down at once")
 	governor.step = 2
@@ -107,6 +114,73 @@ func _test_reaction() -> void:
 	if governor.adapt(60.0) != 1:
 		_failures.append("one healthy window after a middling one is not enough to step up")
 	governor.free()
+
+## The Ultra-only effect layer (P1.2): drains after haze and before the
+## render scale, climbs back after it, never below its floor, and never
+## engages on a non-Ultra ceiling.
+func vp_taa_state(governor: QualityGovernor) -> bool:
+	if governor.viewport == null:
+		return true
+	return not governor.viewport.use_taa
+
+func _test_effects() -> void:
+	var governor := QualityGovernor.new()
+	governor.ceiling_step = 3  # Ultra
+	governor.step = 3
+	var vp := SubViewport.new()
+	var env := Environment.new()
+	governor.viewport = vp
+	governor.environment = env
+	governor._apply()
+	if env.ssr_max_steps != 64 or not env.sdfgi_enabled or not env.ssil_enabled:
+		_failures.append("healthy Ultra ceiling should be full SSR + SDFGI + SSIL")
+	# Slow window: the effect layer drains first (SSR 64 -> 32), no render scale move.
+	governor.step = governor.adapt(12.0)
+	governor._apply()
+	if env.ssr_max_steps != 32 or not env.sdfgi_enabled or governor.effects_step != 2:
+		_failures.append("1st slow window: SSR 64 -> 32 (effects_step %d), got ssr=%d sdfgi=%s" % [governor.effects_step, env.ssr_max_steps, str(env.sdfgi_enabled)])
+	# 2nd slow window: volume 128 -> 64; SDFGI stays on.
+	governor.step = governor.adapt(12.0)
+	governor._apply()
+	if governor.effects_step != 1 or not env.sdfgi_enabled:
+		_failures.append("2nd slow window: volume 128 -> 64 (effects_step %d), got sdfgi=%s" % [governor.effects_step, str(env.sdfgi_enabled)])
+	# 3rd slow window: SDFGI + SSIL off, then TAA off (effects_step 1 -> 0).
+	governor.step = governor.adapt(12.0)
+	governor._apply()
+	if governor.effects_step != 0 or env.sdfgi_enabled:
+		_failures.append("3rd slow window: SDFGI off (effects_step %d), got sdfgi=%s" % [governor.effects_step, str(env.sdfgi_enabled)])
+	if env.ssil_enabled:
+		_failures.append("3rd slow window: SSIL off should follow SDFGI off")
+	if not vp_taa_state(governor):
+		_failures.append("3rd slow window: TAA off should follow SDFGI off")
+	# At the layer floor, the render scale takes over the next step.
+	governor.step = governor.adapt(12.0)
+	if governor.step != 2:
+		_failures.append("with the effect layer at its floor, a slow window must step render scale 3 -> 2, got %d" % governor.step)
+	# Step 0 is the floor: nothing moves further.
+	governor.step = 0
+	governor.adapt(12.0)
+	if governor.step != 0:
+		_failures.append("step 0 is the floor")
+	# Recovery against a fresh healthy governor: effects climb back once
+	# the render scale has recovered to the ceiling.
+	for i in 200:
+		governor.step = governor.adapt(90.0)
+		if governor.step == 3 and governor.effects_step == 3:
+			break
+	if governor.step != 3 or governor.effects_step != 3:
+		_failures.append("healthy GPU should recover effects_step=3 at ceiling (step=%d effects=%d)" % [governor.step, governor.effects_step])
+	# Non-Ultra ceiling: the layer never engages (Ultra-only).
+	var other := QualityGovernor.new()
+	other.ceiling_step = 2  # High
+	other.step = 2
+	other.step = other.adapt(12.0)
+	if other.effects_step != QualityGovernor.EFFECTS_MAX:
+		_failures.append("non-Ultra ceiling must never drain the effect layer, got %d" % other.effects_step)
+	if other.step != 1:
+		_failures.append("non-Ultra ceiling should step the render scale 2 -> 1, got %d" % other.step)
+	governor.free()
+	other.free()
 
 func _test_preset() -> void:
 	var apple := "Apple M2 Pro"

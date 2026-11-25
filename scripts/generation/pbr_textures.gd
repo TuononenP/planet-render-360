@@ -20,6 +20,12 @@ const CAP_ULTRA := 128
 
 static func cap() -> int:
 	return CAP_ULTRA if MaterialLibrary.hi_res else CAP
+
+## Raw decoded (never mutated) set maps by file path, shared by every set
+## whose map resolves to the same file (e.g. "concrete" and "roof_concrete").
+## Entries are only cached when the decode succeeded, so a failing set still
+## retries rather than caching a null.
+static var _raw_images := {}
 ## Parallel build stages (WorldBuildGraph), per pool thread: the cache a
 ## stage sees and its rank in the serial stage order. Keys round tint and
 ## repeat, so two stages can ask one key with slightly different values;
@@ -63,40 +69,50 @@ static func _set_image(set_name: String, map_name: String, hi_res: bool = Materi
 		_mutex.unlock()
 		return cached
 	_mutex.unlock()
-	var img: Image = null
-	if ResourceLoader.exists(path):
+	var raw: Image = null
+	_mutex.lock()
+	if _raw_images.has(path):
+		raw = _raw_images[path]
+	_mutex.unlock()
+	if raw == null and ResourceLoader.exists(path):
 		var texture := ResourceLoader.load(path) as Texture2D
 		var loaded := texture.get_image() if texture != null else null
 		if loaded != null and not loaded.is_empty() and loaded.get_width() >= 64:
-			img = loaded
-			if img.is_compressed():
-				img.decompress()
-			img.clear_mipmaps()
-			if map_name == "diff":
-				img.srgb_to_linear()
-				if set_name == "terracotta":
-					_weather_tiles(img)
-				elif set_name == "sheet_metal":
-					RoofMetalMaps.paint(img)
-				elif set_name == "membrane":
-					_destripe(img)
-				elif set_name == "roof_concrete":  # its bands run down the columns
-					img.rotate_90(CLOCKWISE)
-					_destripe(img)
-					img.rotate_90(COUNTERCLOCKWISE)
-			elif map_name == "nor" and set_name == "membrane":
-				_destripe_normal(img, 1)
-			elif map_name == "nor" and set_name == "roof_concrete":
+			if loaded.is_compressed():
+				loaded.decompress()
+			loaded.clear_mipmaps()
+			raw = loaded
+			_mutex.lock()
+			_raw_images[path] = raw
+			_mutex.unlock()
+	var img: Image = null
+	if raw != null:
+		img = raw.duplicate()
+		if map_name == "diff":
+			img.srgb_to_linear()
+			if set_name == "terracotta":
+				_weather_tiles(img)
+			elif set_name == "sheet_metal":
+				RoofMetalMaps.paint(img)
+			elif set_name == "membrane":
+				_destripe(img)
+			elif set_name == "roof_concrete":  # its bands run down the columns
 				img.rotate_90(CLOCKWISE)
-				_destripe_normal(img, 0)
+				_destripe(img)
 				img.rotate_90(COUNTERCLOCKWISE)
-			elif map_name == "rough":
-				if set_name == "slate":
-					_remap_roughness(img, 0.74, 0.94)
-				elif set_name == "sheet_metal":
-					_remap_roughness(img, 0.56, 0.84)
-				elif set_name == "copper":
-					_remap_roughness(img, 0.52, 0.82)
+		elif map_name == "nor" and set_name == "membrane":
+			_destripe_normal(img, 1)
+		elif map_name == "nor" and set_name == "roof_concrete":
+			img.rotate_90(CLOCKWISE)
+			_destripe_normal(img, 0)
+			img.rotate_90(COUNTERCLOCKWISE)
+		elif map_name == "rough":
+			if set_name == "slate":
+				_remap_roughness(img, 0.74, 0.94)
+			elif set_name == "sheet_metal":
+				_remap_roughness(img, 0.56, 0.84)
+			elif set_name == "copper":
+				_remap_roughness(img, 0.52, 0.82)
 	if img == null:
 		_mutex.lock()
 		var has_warned := MaterialLibrary._set_images.has("warned:" + set_name)

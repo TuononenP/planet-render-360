@@ -89,6 +89,17 @@ static func build(root: Node3D, model: ShorelineModel, abort: BuildAbort = null,
 	node.set_meta("shore_transitions", caps.size())
 
 static var _abutment_mat: Material = null
+## The place-independent concrete bridge deck (RoadBuilder FINISH_HEX
+## "deck" never varies by place). The water stage runs before the roads
+## stage, so the abutment must use this, never RoadBuilder._mats["deck"]
+## — which still holds the previous place's finish then (stone on
+## stone-quay places), memoized here for the whole process.
+static var _deck_mat: Material = null
+
+static func _concrete_deck_material() -> Material:
+	if _deck_mat == null:
+		_deck_mat = RoadBuilder._pbr("concrete", RoadBuilder.FINISH_HEX["deck"])
+	return _deck_mat
 
 ## The bridge deck's concrete (RoadBuilder "deck"), mapped in world space:
 ## the shore walls carry no UVs.
@@ -98,7 +109,7 @@ static func abutment_material(data: LocationData = null) -> Material:
 	if QuayBuilder.stone_quays(data):
 		return QuayBuilder.stone_material(data)
 	if _abutment_mat == null:
-		var m := (RoadBuilder._material("deck") as StandardMaterial3D).duplicate() as StandardMaterial3D
+		var m := (_concrete_deck_material() as StandardMaterial3D).duplicate() as StandardMaterial3D
 		m.uv1_triplanar = true
 		m.uv1_world_triplanar = true
 		m.uv1_scale = Vector3.ONE / WorldScale.metres_to_units()

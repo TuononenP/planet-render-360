@@ -12,6 +12,12 @@ extends RefCounted
 const SETS: Array[String] = ["pavement", "concrete", "limestone", "brick",
 	"terracotta", "slate"]
 
+## Roof sets the build asks for wherever a roof is drawn. Roofs cold-decode
+## this family otherwise, on first frame after the build. "glass" is drawn
+## from scratch (StoreyComposer.compose_glass), so it has no photo to prefetch.
+const ROOF_SETS: Array[String] = ["membrane", "roof_concrete", "sheet_metal",
+	"copper", "wood", "grass"]
+
 ## What the last world build read, kept between sessions: the first
 ## build after a launch spent 5-6 s of its buildings stage loading 2K
 ## PBR maps and composing facades (Paris and Helsinki on Ultra).
@@ -30,7 +36,7 @@ static func run(preset: int) -> void:
 	var hi_res := RenderQuality.ultra_desktop(preset)
 	var last := _remembered()
 	var jobs := {}  # "set:map" -> also as a texture
-	for set_name in SETS:
+	for set_name in SETS + ROOF_SETS:
 		for map_name in maps:
 			jobs[set_name + ":" + map_name] = false
 	for key: String in last.get("images", PackedStringArray()):

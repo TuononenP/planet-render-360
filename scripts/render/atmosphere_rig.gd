@@ -151,6 +151,11 @@ var effective_visibility_m := 0.0
 var haziness := 0.0
 var _base_sun_scatter := 0.0
 var _base_vol_density := 0.0
+## Cached values for the _apply_haziness guard (-1 sentinel: never written yet).
+var _last_fog_light_energy := -1.0
+var _last_fog_sun_scatter := -1.0
+var _last_glow_intensity := -1.0
+var _last_vol_density := -1.0
 
 func set_haziness(value: float) -> void:
 	var h := clampf(value, 0.0, 1.0)
@@ -199,11 +204,16 @@ func _process(delta: float) -> void:
 		_probe_due -= delta
 		if _probe_due <= 0.0:
 			# Any property change re-queues an UPDATE_ONCE capture, which
-			# Godot spreads over six frames (one cube face each).
-			probe.intensity = 1.0 if probe.intensity < 1.0 else 0.9999
-			for sp in _street_probes:
-				if sp.visible:
-					sp.intensity = probe.intensity
+			# Godot spreads over six frames (one cube face each). The street
+			# probes re-capture one per frame: five of them in the same
+			# frame spike the frame even though the captures themselves
+			# spread over six frames.
+			_requeue_probe(probe)
+			_probe_queue = _street_probes.duplicate()
+	if _probe_queue.size() > 0:
+		var sp = _probe_queue.pop_front()
+		if sp != null and is_instance_valid(sp) and sp.visible:
+			_requeue_probe(sp)
 	# Lightning writes the sky only while a flash is lit (it dirties the
 	# radiance map); flashes never re-capture the reflection probe.
 	if lightning.active or _flash_on:
@@ -438,7 +448,16 @@ func _build_environment() -> void:
 ## windows at street scale show.
 var probe: ReflectionProbe
 var _probe_due := 0.0
+## Street probes waiting for their re-capture, one per frame after the
+## debounce (the view probe re-captures with the first).
+var _probe_queue: Array = []
 const PROBE_DEBOUNCE_S := 0.4
+
+## Re-queues one UPDATE_ONCE capture (a tiny intensity change).
+func _requeue_probe(p: ReflectionProbe) -> void:
+	if p == null or not is_instance_valid(p):
+		return
+	p.intensity = 1.0 if p.intensity < 1.0 else 0.9999
 ## Lowest capture height of the view probe over the ground: over the
 ## trees and low roofs, so its horizon is the far scenery and sky.
 const VIEW_CAPTURE_AGL_M := 30.0
@@ -714,13 +733,28 @@ func _apply() -> void:
 func _apply_haziness() -> void:
 	if environment == null:
 		return
-	environment.fog_light_energy = lerpf(1.0, 1.04, haziness)
-	environment.fog_sun_scatter = _base_sun_scatter * lerpf(1.0, 1.18, haziness)
+	# Per-property cached-value guard: unchanged values skip the write,
+	# so the per-frame calls while an ease settles stay free.
+	var fog_light_energy := lerpf(1.0, 1.04, haziness)
+	if not is_equal_approx(fog_light_energy, _last_fog_light_energy):
+		environment.fog_light_energy = fog_light_energy
+		_last_fog_light_energy = fog_light_energy
+	var fog_sun_scatter := _base_sun_scatter * lerpf(1.0, 1.18, haziness)
+	if not is_equal_approx(fog_sun_scatter, _last_fog_sun_scatter):
+		environment.fog_sun_scatter = fog_sun_scatter
+		_last_fog_sun_scatter = fog_sun_scatter
 	# Keep glow_hdr_threshold >= 1.0 (PostGrade contract) so the sun-side
 	# sky dome and clouds never trigger wide screen-space bloom.
-	environment.glow_hdr_threshold = PostGrade.GLOW_THRESHOLD
-	environment.glow_intensity = PostGrade.GLOW_INTENSITY * lerpf(1.0, 1.05, haziness)
-	environment.volumetric_fog_density = _base_vol_density * lerpf(1.0, 1.22, haziness)
+	if not is_equal_approx(environment.glow_hdr_threshold, PostGrade.GLOW_THRESHOLD):
+		environment.glow_hdr_threshold = PostGrade.GLOW_THRESHOLD
+	var glow_intensity := PostGrade.GLOW_INTENSITY * lerpf(1.0, 1.05, haziness)
+	if not is_equal_approx(glow_intensity, _last_glow_intensity):
+		environment.glow_intensity = glow_intensity
+		_last_glow_intensity = glow_intensity
+	var vol_density := _base_vol_density * lerpf(1.0, 1.22, haziness)
+	if not is_equal_approx(vol_density, _last_vol_density):
+		environment.volumetric_fog_density = vol_density
+		_last_vol_density = vol_density
 
 ## The moon's place at a local clock hour (see solar_at).
 func moon_at(hour_f: float) -> Dictionary:

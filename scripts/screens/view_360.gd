@@ -123,6 +123,8 @@ var _drone := ViewDrone.new()
 var _streamer := WorldStreamer.new()
 ## More distant detail while the drone flies high (AltitudeReach).
 var _reach := AltitudeReach.new()
+## Spreads the preset-switch LodRing walk over frames (one slice per frame).
+var _lod_spread := LodSpread.new()
 ## A place opens in drone mode (the app sets this; tests and captures
 ## open on foot).
 var start_flying := false
@@ -191,6 +193,7 @@ func _ready() -> void:
 	add_child(_governor)
 	_governor.viewport = _viewport
 	_governor.sun = _sun
+	_governor.environment = _atmos.environment
 	_governor.haze = _haze
 	_governor.set_preset(_quality_preset)
 	sync_haze()
@@ -300,7 +303,7 @@ func set_quality_preset(preset_value: int) -> void:
 	_reach.reset(self, false)
 	if _generated != null and is_instance_valid(_generated):
 		LodRing.city_boost = _data != null and CityDetail.city_at(_data.latitude, _data.longitude) != ""
-		LodRing.apply(_generated, _quality_preset)
+		_lod_spread.begin(_generated, _quality_preset)
 	ViewConditions.sync_quality_fx(self)
 
 ## Replace the generated world in place. The old world is tracked by
@@ -938,6 +941,7 @@ func _process(delta: float) -> void:
 		ViewChrome.layout(self)
 	_tick_near_ground()
 	_reach.tick(self, delta)
+	_lod_spread.tick()
 	if _mover != null and _rig != null and is_visible_in_tree():
 		_mover.tick(delta, Vector2(_rig.position.x, _rig.position.z))
 	ViewConditions.tick_night_fx(self)
