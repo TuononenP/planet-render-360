@@ -18,8 +18,8 @@ static func build(model: Node3D) -> void:
 	lm.use("Canopy", LandmarkMaterials.pbr("concrete", "#ECEBE6", 3.0))
 	lm.use("WarmLamp", LandmarkMaterials.lit("#FFCA7A", 1.9))
 
-	# Base podium & concourse platform.
-	lm.box("Podium", Vector3(0.0, 3.0, 0.0), Vector3(178.0, 6.0, 122.0))
+	# Base podium & concourse platform (trimmed to stay clear of the Marina Reservoir quay).
+	lm.box("Podium", Vector3(0.0, 3.0, 0.0), Vector3(170.0, 6.0, 108.0))
 	lm.box("Glass", Vector3(0.0, 9.0, 0.0), Vector3(44.0, 9.0, 68.0))
 	lm.box("WarmLamp", Vector3(0.0, 8.5, 0.0), Vector3(36.0, 7.0, 58.0))
 

@@ -25,7 +25,7 @@ static func entries() -> Array:
 		return _rows
 	_rows = [
 		# --- Raffles Place Waterfront Wall ---
-		_row("uob_plaza_one_sg", "UOB Plaza One", 1.28550, 103.85010, 280.0, 12.0, 24.0, 6000.0,
+		_row("uob_plaza_one_sg", "UOB Plaza One", 1.28548, 103.85021, 280.0, -49.9, 24.0, 6000.0,
 			"UOB Plaza", 5, ["uob plaza one", "uob plaza"], {
 				"finish": "white_granite", "bay": 3.0, "floor": 4.2, "trim": "#D6D2C8",
 				"walls": {"Glass": ["lowe_blue", 3.0, 4.2]},
@@ -36,7 +36,7 @@ static func entries() -> Array:
 					["shape", "chamfer", 195.0, 256.0, 34.0, 34.0, 7.0, 30.0, 30.0],
 					["louvre", 256.0, 280.0, 26.0, 26.0],
 				]}),
-		_row("uob_plaza_two_sg", "UOB Plaza Two", 1.28525, 103.85060, 162.0, 12.0, 20.0, 5000.0,
+		_row("uob_plaza_two_sg", "UOB Plaza Two", 1.28543, 103.85117, 162.0, -88.8, 20.0, 5000.0,
 			"UOB Plaza", 2, ["uob plaza two"], {
 				"finish": "white_granite", "bay": 3.0, "floor": 4.0, "trim": "#D2CEC4",
 				"ops": [
@@ -110,7 +110,7 @@ static func entries() -> Array:
 					["box", "Green", 0.0, 18.0, 0.0, 44.8, 196.0, 40.8],
 					["box", "Funnel", 0.0, 220.0, 0.0, 26.0, 22.0, 22.0],
 				]}),
-		_row("six_battery_road_sg", "Six Battery Road", 1.28565, 103.85175, 174.0, -68.0, 20.0, 5000.0,
+		_row("six_battery_road_sg", "Six Battery Road", 1.28540, 103.85181, 174.0, -31.5, 20.0, 5000.0,
 			"Six Battery Road", 3, ["six battery road", "6 battery road"], {
 				"finish": "red_granite", "bay": 3.0, "floor": 4.0, "trim": "#8A5E4E",
 				"ops": [

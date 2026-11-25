@@ -18,32 +18,32 @@ static func fullerton_hotel(model: Node3D) -> void:
 	lm.use("Glass", LandmarkMaterials.glass("#3B505E"))
 	lm.use("WarmLamp", LandmarkMaterials.lit("#FFD58C", 1.8))
 
-	# Rusticated ground plinth (y=0..8.5 m).
-	lm.box("Rustic", Vector3(0.0, 4.25, 0.0), Vector3(124.0, 8.5, 74.0))
-	lm.box("Trim", Vector3(0.0, 8.75, 0.0), Vector3(126.0, 0.8, 76.0))
+	# Rusticated ground plinth (y=0..8.5 m), trimmed to stay clear of the curving river quay.
+	lm.box("Rustic", Vector3(0.0, 4.25, 0.0), Vector3(114.0, 8.5, 66.0))
+	lm.box("Trim", Vector3(0.0, 8.75, 0.0), Vector3(116.0, 0.8, 68.0))
 	# Recessed core palazzo body behind giant Doric colonnades (y=8.5..29.5 m).
-	lm.box("Granite", Vector3(0.0, 19.0, 0.0), Vector3(114.0, 21.0, 64.0))
+	lm.box("Granite", Vector3(0.0, 19.0, 0.0), Vector3(104.0, 21.0, 56.0))
 	# Recessed window bands on all 4 faces.
 	for fl: float in [12.0, 17.0, 22.0, 26.5]:
-		lm.box("Glass", Vector3(0.0, fl, 32.2), Vector3(106.0, 2.6, 0.5))
-		lm.box("Glass", Vector3(0.0, fl, -32.2), Vector3(106.0, 2.6, 0.5))
-		lm.box("Glass", Vector3(57.2, fl, 0.0), Vector3(0.5, 2.6, 56.0))
-		lm.box("Glass", Vector3(-57.2, fl, 0.0), Vector3(0.5, 2.6, 56.0))
+		lm.box("Glass", Vector3(0.0, fl, 28.2), Vector3(96.0, 2.6, 0.5))
+		lm.box("Glass", Vector3(0.0, fl, -28.2), Vector3(96.0, 2.6, 0.5))
+		lm.box("Glass", Vector3(52.2, fl, 0.0), Vector3(0.5, 2.6, 48.0))
+		lm.box("Glass", Vector3(-52.2, fl, 0.0), Vector3(0.5, 2.6, 48.0))
 
 	# Giant fluted Doric colonnades ringing all four facades (y=8.5..28.5 m).
-	LandmarkSgKit.colonnade(lm, "Trim", Vector3(-54.0, 8.5, 35.0), Vector3(54.0, 8.5, 35.0), 19.5, 0.95, 16)
-	LandmarkSgKit.colonnade(lm, "Trim", Vector3(-54.0, 8.5, -35.0), Vector3(54.0, 8.5, -35.0), 19.5, 0.95, 16)
-	LandmarkSgKit.colonnade(lm, "Trim", Vector3(59.5, 8.5, -28.0), Vector3(59.5, 8.5, 28.0), 19.5, 0.95, 10)
-	LandmarkSgKit.colonnade(lm, "Trim", Vector3(-59.5, 8.5, -28.0), Vector3(-59.5, 8.5, 28.0), 19.5, 0.95, 10)
+	LandmarkSgKit.colonnade(lm, "Trim", Vector3(-49.0, 8.5, 31.0), Vector3(49.0, 8.5, 31.0), 19.5, 0.90, 16)
+	LandmarkSgKit.colonnade(lm, "Trim", Vector3(-49.0, 8.5, -31.0), Vector3(49.0, 8.5, -31.0), 19.5, 0.90, 16)
+	LandmarkSgKit.colonnade(lm, "Trim", Vector3(54.5, 8.5, -24.0), Vector3(54.5, 8.5, 24.0), 19.5, 0.90, 10)
+	LandmarkSgKit.colonnade(lm, "Trim", Vector3(-54.5, 8.5, -24.0), Vector3(-54.5, 8.5, 24.0), 19.5, 0.90, 10)
 
 	# Heavy neoclassical entablature, cornice, attic storey & roof balustrade (y=28.0..34.0 m).
-	lm.box("Trim", Vector3(0.0, 29.2, 0.0), Vector3(124.0, 2.4, 74.0))
-	lm.box("Granite", Vector3(0.0, 32.0, 0.0), Vector3(118.0, 3.2, 68.0))
-	lm.box("Roof", Vector3(0.0, 33.8, 0.0), Vector3(114.0, 0.8, 64.0))
+	lm.box("Trim", Vector3(0.0, 29.2, 0.0), Vector3(114.0, 2.4, 66.0))
+	lm.box("Granite", Vector3(0.0, 32.0, 0.0), Vector3(108.0, 3.2, 60.0))
+	lm.box("Roof", Vector3(0.0, 33.8, 0.0), Vector3(104.0, 0.8, 56.0))
 	# Central classical pedimented porticoes on long facades.
 	for side: float in [-1.0, 1.0]:
-		lm.box("Trim", Vector3(0.0, 31.8, side * 36.2), Vector3(32.0, 3.6, 3.2))
-		lm.box("WarmLamp", Vector3(0.0, 28.4, side * 35.8), Vector3(112.0, 0.35, 0.35))
+		lm.box("Trim", Vector3(0.0, 31.8, side * 32.2), Vector3(30.0, 3.6, 3.2))
+		lm.box("WarmLamp", Vector3(0.0, 28.4, side * 31.8), Vector3(102.0, 0.35, 0.35))
 	# Iconic Fullerton Rooftop Lighthouse pavilion (reaches 37.0 m).
 	lm.frustum("Trim", Vector3(44.0, 33.8, 0.0), 4.2, 3.8, 2.2, 12)
 	lm.frustum("WarmLamp", Vector3(44.0, 36.0, 0.0), 2.4, 2.2, 1.0, 12)

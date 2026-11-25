@@ -19,10 +19,10 @@ static func entries() -> Array:
 
 		# --- Tier 1 (skyline_priority 9 — visible on Fast+) ---
 		{"type": "esplanade_singapore", "name": "Esplanade – Theatres on the Bay",
-			"lat": 1.28953, "lon": 103.85582, "radius_m": 4500.0,
+			"lat": 1.28966, "lon": 103.85568, "radius_m": 4500.0,
 			"wiki_title": "Esplanade – Theatres on the Bay", "height_m": 35.0, "yaw_deg": -33.0,
-			"skyline_priority": 9, "clear_m": 78.0, "clear_rect_m": [0.0, 0.0, 115.0, 88.0],
-			"model_rects_m": [[0.0, 0.0, 115.0, 88.0]],
+			"skyline_priority": 9, "clear_m": 72.0, "clear_rect_m": [0.0, 0.0, 102.0, 72.0],
+			"model_rects_m": [[0.0, 0.0, 102.0, 72.0]],
 			"kind": "Arts centre", "aliases": ["esplanade", "esplanade singapore", "the esplanade", "durian theatre"]},
 		{"type": "merlion_park", "name": "Merlion Park",
 			"lat": 1.28678, "lon": 103.85450, "radius_m": 4000.0,
@@ -40,10 +40,10 @@ static func entries() -> Array:
 			"skyline_priority": 9, "clear_m": 48.0,
 			"kind": "Museum", "aliases": ["artscience museum", "art science museum"]},
 		{"type": "fullerton_hotel", "name": "The Fullerton Hotel Singapore",
-			"lat": 1.28618, "lon": 103.85309, "radius_m": 4000.0,
+			"lat": 1.28612, "lon": 103.85312, "radius_m": 4000.0,
 			"wiki_title": "The Fullerton Hotel Singapore", "height_m": 37.0, "yaw_deg": -87.0,
-			"skyline_priority": 9, "clear_m": 58.0, "clear_rect_m": [0.0, 0.0, 68.0, 44.0],
-			"model_rects_m": [[0.0, 0.0, 68.0, 44.0]],
+			"skyline_priority": 9, "clear_m": 54.0, "clear_rect_m": [0.0, 0.0, 62.0, 38.0],
+			"model_rects_m": [[0.0, 0.0, 62.0, 38.0]],
 			"kind": "Hotel", "aliases": ["fullerton hotel", "the fullerton hotel", "fullerton building"]},
 
 		# --- Tier 2 (skyline_priority 7 — visible on Balanced+) ---
@@ -59,9 +59,9 @@ static func entries() -> Array:
 			"skyline_priority": 7, "clear_m": 40.0, "tree_clear_m": 75.0,
 			"kind": "Garden", "aliases": ["supertree grove", "supertrees", "gardens by the bay", "ocbc skyway"]},
 		{"type": "gardens_by_the_bay_domes", "name": "Flower Dome & Cloud Forest",
-			"lat": 1.28410, "lon": 103.86540, "radius_m": 5000.0,
+			"lat": 1.28395, "lon": 103.86560, "radius_m": 5000.0,
 			"wiki_title": "Gardens by the Bay", "height_m": 58.0, "yaw_deg": -25.0,
-			"skyline_priority": 7, "clear_m": 75.0, "clear_rect_m": [0.0, 0.0, 105.0, 62.0],
+			"skyline_priority": 7, "clear_m": 75.0, "clear_rect_m": [0.0, 0.0, 96.0, 56.0],
 			"kind": "Conservatory", "aliases": ["flower dome", "cloud forest", "gardens domes"]},
 
 		# --- Tier 4 (skyline_priority 3 — Ultra hero set) ---
