@@ -888,6 +888,465 @@ def _boolean_weld_hand(main_obj, hand_obj, wrist_center, wrist_radius):
     bpy.ops.object.modifier_apply(modifier=sm.name)
 
 
+def _add_profiled_loft(bm, ctrl_pts, rx_list, rz_list, segs=26, up_hint=Vector((0.0, 0.0, 1.0)), belly_flat=0.0, samples_per_seg=12):
+    """Lofts a smooth organic body along `ctrl_pts` with C1-interpolated `(rx, rz)` cross-sections."""
+    pts = _catmull_rom(ctrl_pts, samples_per_seg=samples_per_seg)
+    n_pts = len(pts)
+    n_ctrl = len(rx_list)
+    rings = []
+    prev_side = None
+    for idx, pt in enumerate(pts):
+        u = float(idx) / float(max(1, n_pts - 1)) * float(n_ctrl - 1)
+        i0 = min(n_ctrl - 2, int(u))
+        f = u - i0
+        f_sm = f * f * (3.0 - 2.0 * f)
+        rx = rx_list[i0] * (1.0 - f_sm) + rx_list[i0 + 1] * f_sm
+        rz = rz_list[i0] * (1.0 - f_sm) + rz_list[i0 + 1] * f_sm
+        if idx == 0:
+            tang = (pts[1] - pts[0]).normalized()
+        elif idx == len(pts) - 1:
+            tang = (pts[-1] - pts[-2]).normalized()
+        else:
+            tang = (pts[idx + 1] - pts[idx - 1]).normalized()
+        side = tang.cross(up_hint)
+        if side.length < 1e-4:
+            side = prev_side if prev_side is not None else Vector((1.0, 0.0, 0.0))
+        side.normalize()
+        if prev_side is not None and side.dot(prev_side) < 0.0:
+            side = -side
+        prev_side = side
+        up_v = side.cross(tang).normalized()
+        ring = []
+        for s in range(segs):
+            a = 2.0 * math.pi * s / segs
+            ca, sa = math.cos(a), math.sin(a)
+            if belly_flat > 0.0 and sa < 0.0:
+                sa *= (1.0 - belly_flat)
+            ring.append(bm.verts.new(pt + side * (ca * rx) + up_v * (sa * rz)))
+        rings.append(ring)
+    for j in range(len(rings) - 1):
+        for s in range(segs):
+            s2 = (s + 1) % segs
+            bm.faces.new((rings[j][s], rings[j][s2], rings[j + 1][s2], rings[j + 1][s]))
+    bm.faces.new(rings[0][::-1])
+    bm.faces.new(rings[-1])
+
+
+def _add_ribbed_fin(bm, root_pts, tip_pts, thickness=0.016, n_rays=7, camber_sign=1.0):
+    """Sculpts a ribbed Art Nouveau bronze fin or overarching kelp leaf with scalloped webbing."""
+    r_curve = _catmull_rom(root_pts, samples_per_seg=8)
+    t_curve = _catmull_rom(tip_pts, samples_per_seg=8)
+    n_u = min(len(r_curve), len(t_curve))
+    n_v = 10
+    grid_pos = []
+    grid_neg = []
+    for iu in range(n_u):
+        su = float(iu) / float(max(1, n_u - 1))
+        p_root = r_curve[iu]
+        p_tip = t_curve[iu]
+        iu0 = max(0, iu - 1)
+        iu1 = min(n_u - 1, iu + 1)
+        tang_u = (t_curve[iu1] - t_curve[iu0] + r_curve[iu1] - r_curve[iu0]).normalized()
+        span_v = p_tip - p_root
+        span_dir = span_v.normalized() if span_v.length > 1e-5 else Vector((1.0, 0.0, 0.0))
+        nrm = tang_u.cross(span_dir)
+        if nrm.length < 1e-5:
+            nrm = Vector((0.0, 1.0, 0.0))
+        nrm.normalize()
+
+        ray_phase = su * float(n_rays - 1) * math.pi
+        ray_ridge = abs(math.cos(ray_phase)) ** 1.35
+        scallop = 1.0 - 0.14 * (1.0 - ray_ridge) * _smoothstep(0.0, 0.10, su) * _smoothstep(1.0, 0.90, su)
+        edge_taper = math.sin(su * math.pi) ** 0.28
+
+        row_p, row_n = [], []
+        for iv in range(n_v):
+            sv = float(iv) / float(n_v - 1)
+            camber = camber_sign * 0.018 * math.sin(sv * math.pi)
+            pt = p_root.lerp(p_root + span_v * scallop, sv) + nrm * camber
+            th = thickness * (1.0 - 0.58 * (sv ** 0.85)) * (0.48 + 0.52 * edge_taper) * (0.38 + 1.05 * ray_ridge)
+            row_p.append(bm.verts.new(pt + nrm * th))
+            row_n.append(bm.verts.new(pt - nrm * th))
+        grid_pos.append(row_p)
+        grid_neg.append(row_n)
+
+    for iu in range(n_u - 1):
+        for iv in range(n_v - 1):
+            bm.faces.new((grid_pos[iu][iv], grid_pos[iu + 1][iv], grid_pos[iu + 1][iv + 1], grid_pos[iu][iv + 1]))
+            bm.faces.new((grid_neg[iu][iv], grid_neg[iu][iv + 1], grid_neg[iu + 1][iv + 1], grid_neg[iu + 1][iv]))
+        bm.faces.new((grid_pos[iu][-1], grid_pos[iu + 1][-1], grid_neg[iu + 1][-1], grid_neg[iu][-1]))
+        bm.faces.new((grid_neg[iu][0], grid_neg[iu + 1][0], grid_pos[iu + 1][0], grid_pos[iu][0]))
+    for iv in range(n_v - 1):
+        bm.faces.new((grid_neg[0][iv], grid_pos[0][iv], grid_pos[0][iv + 1], grid_neg[0][iv + 1]))
+        bm.faces.new((grid_pos[-1][iv], grid_neg[-1][iv], grid_neg[-1][iv + 1], grid_pos[-1][iv + 1]))
+
+
+def _build_single_sea_fish(azimuth_deg):
+    """Sculpts one Ville Vallgren grotesque Art Nouveau sea-fish (4-fold Rudier-foundry symmetry)
+    with sinuous S-curved body, flared grotesque upper snout, wide-hinged roaring lower jaw,
+    deep hollow throat cavity, sharp-moated bulging eyes, layered rounded opercula, bold ribbed
+    dorsal/pectoral/pelvic fins, and scrolled bilobed upturned tail."""
+    bm = bmesh.new()
+
+    spine = [
+        (0.86,  0.36, 2.86),
+        (0.79,  0.29, 2.69),
+        (0.61,  0.19, 2.74),
+        (0.44,  0.09, 2.89),
+        (0.34,  0.01, 3.07),
+        (0.36, -0.05, 3.25),
+        (0.46, -0.095, 3.35),
+        (0.55, -0.125, 3.355),
+    ]
+    rx_body = [0.024, 0.048, 0.076, 0.106, 0.128, 0.138, 0.132, 0.098]
+    rz_body = [0.028, 0.054, 0.082, 0.112, 0.134, 0.144, 0.136, 0.102]
+    _add_profiled_loft(bm, spine, rx_body, rz_body, segs=28, up_hint=Vector((0.0, 0.0, 1.0)), belly_flat=0.10, samples_per_seg=14)
+
+    head_c = Vector((0.50, -0.105, 3.355))
+    fwd = Vector((0.91, -0.24, -0.34)).normalized()
+    up_h = Vector((-0.32, 0.08, 0.944)).normalized()
+    side_h = fwd.cross(up_h).normalized()
+    up_h = side_h.cross(fwd).normalized()
+
+    def hpt(f_d, s_d, u_d):
+        return head_c + fwd * f_d + side_h * s_d + up_h * u_d
+
+    # Broad grotesque sea-dragon / catfish upper snout with upturned flared front lip (`357da6f1.jpg`)
+    upper_jaw_pts = [
+        hpt(-0.07, 0.0, 0.024),
+        hpt( 0.03, 0.0, 0.042),
+        hpt( 0.115, 0.0, 0.034),
+        hpt( 0.180, 0.0, 0.020),
+        hpt( 0.212, 0.0, 0.022),
+    ]
+    _add_profiled_loft(bm, upper_jaw_pts, [0.132, 0.124, 0.106, 0.078, 0.048], [0.092, 0.086, 0.068, 0.046, 0.028], segs=24, up_hint=up_h, belly_flat=0.24)
+
+    # Flared curled upper lip & muscular cheek-hinge commissures + snout nostril bosses
+    for sg in (-1.0, 1.0):
+        cheek_bridge = [
+            hpt(-0.01, sg * 0.086, 0.002),
+            hpt( 0.045, sg * 0.080, -0.034),
+            hpt( 0.065, sg * 0.070, -0.074),
+        ]
+        _add_profiled_loft(bm, cheek_bridge, [0.038, 0.034, 0.028], [0.040, 0.036, 0.032], segs=14, up_hint=up_h)
+
+        ulip = [
+            hpt(0.210, sg * 0.024, 0.018),
+            hpt(0.168, sg * 0.066, 0.004),
+            hpt(0.102, sg * 0.086, -0.018),
+            hpt(0.048, sg * 0.086, -0.052),
+        ]
+        _add_profiled_loft(bm, ulip, [0.018, 0.022, 0.023, 0.019], [0.017, 0.021, 0.021, 0.018], segs=14, up_hint=up_h)
+
+        # Raised Art Nouveau snout ridge / nostril boss on top of upper snout
+        snout_ridge = [
+            hpt(0.192, sg * 0.032, 0.034),
+            hpt(0.145, sg * 0.046, 0.044),
+            hpt(0.098, sg * 0.058, 0.052),
+        ]
+        _add_profiled_loft(bm, snout_ridge, [0.013, 0.016, 0.014], [0.012, 0.015, 0.013], segs=12, up_hint=up_h)
+
+    # Wide-hinged roaring lower jaw dropping steeply (~52 deg) with curled chin hook (`357da6f1.jpg`)
+    lower_jaw_pts = [
+        hpt(-0.01, 0.0, -0.050),
+        hpt( 0.048, 0.0, -0.092),
+        hpt( 0.105, 0.0, -0.128),
+        hpt( 0.142, 0.0, -0.134),
+        hpt( 0.148, 0.0, -0.156),
+    ]
+    _add_profiled_loft(bm, lower_jaw_pts, [0.094, 0.080, 0.060, 0.040, 0.022], [0.048, 0.042, 0.034, 0.026, 0.018], segs=20, up_hint=up_h)
+
+    for sg in (-1.0, 1.0):
+        llip = [
+            hpt(0.140, sg * 0.020, -0.130),
+            hpt(0.098, sg * 0.054, -0.110),
+            hpt(0.050, sg * 0.076, -0.068),
+        ]
+        _add_profiled_loft(bm, llip, [0.015, 0.019, 0.018], [0.015, 0.018, 0.017], segs=12, up_hint=up_h)
+
+    # Bulging grotesque eyes + heavy arched supraorbital brows + layered rounded gill covers (opercula)
+    eye_centers = []
+    gill_centers = []
+    for sg in (-1.0, 1.0):
+        eye_c = hpt(0.094, sg * 0.080, 0.054)
+        eye_centers.append((eye_c, sg))
+        ret_e = bmesh.ops.create_icosphere(bm, subdivisions=3, radius=0.027)
+        for v in ret_e["verts"]:
+            v.co += eye_c
+        brow_pts = [
+            hpt(0.136, sg * 0.060, 0.054),
+            hpt(0.094, sg * 0.086, 0.080),
+            hpt(0.046, sg * 0.096, 0.060),
+        ]
+        _add_profiled_loft(bm, brow_pts, [0.016, 0.022, 0.017], [0.016, 0.022, 0.017], segs=12, up_hint=up_h)
+
+        gill_c = hpt(-0.022, sg * 0.112, 0.002)
+        gill_centers.append((gill_c, sg))
+        ret_g = bmesh.ops.create_icosphere(bm, subdivisions=3, radius=1.0)
+        for v in ret_g["verts"]:
+            p = v.co
+            v.co = gill_c + fwd * (p.x * 0.076) + side_h * (p.y * 0.048) + up_h * (p.z * 0.084)
+
+        # Secondary branchiostegal gill-arch fold behind/under main operculum (`357da6f1.jpg` left fish)
+        gill_fold = [
+            hpt(-0.055, sg * 0.108, 0.045),
+            hpt(-0.082, sg * 0.118, -0.018),
+            hpt(-0.068, sg * 0.094, -0.078),
+        ]
+        _add_profiled_loft(bm, gill_fold, [0.016, 0.021, 0.016], [0.016, 0.020, 0.015], segs=12, up_hint=up_h)
+
+    # Radial dorsal fin crest bridging the curved neck into the central kelp rock (no floating wing gap!)
+    dorsal_root = [
+        (0.45, -0.09, 3.39),
+        (0.37, -0.05, 3.33),
+        (0.33,  0.00, 3.20),
+        (0.33,  0.03, 3.05),
+    ]
+    dorsal_tip = [
+        (0.28, -0.07, 3.46),
+        (0.22, -0.03, 3.41),
+        (0.20,  0.01, 3.27),
+        (0.22,  0.04, 3.10),
+    ]
+    _add_ribbed_fin(bm, dorsal_root, dorsal_tip, thickness=0.020, n_rays=8, camber_sign=1.0)
+
+    # Prominent scalloped pectoral fins flaring outward & slightly forward below the rounded opercula (`357da6f1.jpg`)
+    for sg in (-1.0, 1.0):
+        pec_root = [
+            hpt(-0.05, sg * 0.108, -0.032),
+            hpt(-0.10, sg * 0.106, -0.082),
+            hpt(-0.15, sg * 0.096, -0.132),
+        ]
+        pec_tip = [
+            hpt(-0.07, sg * 0.215, -0.042),
+            hpt(-0.16, sg * 0.228, -0.125),
+            hpt(-0.23, sg * 0.182, -0.215),
+        ]
+        _add_ribbed_fin(bm, pec_root, pec_tip, thickness=0.018, n_rays=6, camber_sign=sg * 0.85)
+
+    pelv_root = [(0.50, 0.13, 2.91), (0.62, 0.20, 2.81)]
+    pelv_tip  = [(0.60, 0.10, 2.99), (0.72, 0.18, 2.88)]
+    _add_ribbed_fin(bm, pelv_root, pelv_tip, thickness=0.016, n_rays=5, camber_sign=0.7)
+
+    # Lush scrolled Art Nouveau caudal tail fluke curling upward near the saucer rim
+    tail_root = [
+        (0.73, 0.25, 2.71),
+        (0.81, 0.31, 2.77),
+        (0.86, 0.36, 2.87),
+    ]
+    tail_tip = [
+        (0.81, 0.36, 2.67),
+        (0.94, 0.44, 2.80),
+        (0.90, 0.40, 2.97),
+    ]
+    _add_ribbed_fin(bm, tail_root, tail_tip, thickness=0.017, n_rays=7, camber_sign=1.1)
+    # Inner counter-curling tail scroll lobe (`357da6f1.jpg` bottom-left foreground tail curl)
+    tail_scroll = [
+        (0.76, 0.28, 2.75),
+        (0.82, 0.30, 2.86),
+        (0.78, 0.25, 2.94),
+    ]
+    _add_profiled_loft(bm, tail_scroll, [0.026, 0.020, 0.011], [0.018, 0.014, 0.008], segs=14, up_hint=Vector((0.0, 0.0, 1.0)))
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    m = bpy.data.meshes.new("SeaFishRaw")
+    bm.to_mesh(m)
+    bm.free()
+    fish_obj = bpy.data.objects.new("SeaFish", m)
+    bpy.context.scene.collection.objects.link(fish_obj)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    fish_obj.select_set(True)
+    bpy.context.view_layer.objects.active = fish_obj
+    rem = fish_obj.modifiers.new("FishVoxel", "REMESH")
+    rem.mode = "VOXEL"
+    rem.voxel_size = 0.0046
+    rem.use_smooth_shade = True
+    bpy.ops.object.modifier_apply(modifier=rem.name)
+
+    # Deep hollow roaring throat cavity carved between the upturned upper snout and dropped lower jaw
+    bm_cut = bmesh.new()
+    mouth_entry = hpt(0.175, 0.0, -0.052)
+    throat_deep = hpt(0.028, 0.0, -0.028)
+    cut_pts = [
+        mouth_entry + fwd * 0.07,
+        mouth_entry,
+        mouth_entry.lerp(throat_deep, 0.50),
+        throat_deep,
+    ]
+    _add_profiled_loft(bm_cut, cut_pts, [0.052, 0.048, 0.040, 0.022], [0.062, 0.056, 0.042, 0.022], segs=22, up_hint=up_h)
+    bmesh.ops.recalc_face_normals(bm_cut, faces=bm_cut.faces)
+    cm = bpy.data.meshes.new("MouthCutter")
+    bm_cut.to_mesh(cm)
+    bm_cut.free()
+    cutter = bpy.data.objects.new("MouthCutter", cm)
+    bpy.context.scene.collection.objects.link(cutter)
+
+    bmod = fish_obj.modifiers.new("CarveMouth", "BOOLEAN")
+    bmod.operation = "DIFFERENCE"
+    bmod.object = cutter
+    for solver in ("FLOAT", "EXACT"):
+        try:
+            bmod.solver = solver
+            break
+        except Exception:
+            pass
+    bpy.ops.object.modifier_apply(modifier=bmod.name)
+    bpy.data.objects.remove(cutter, do_unlink=True)
+
+    sm = fish_obj.modifiers.new("FishPolish", "SMOOTH")
+    sm.factor = 0.34
+    sm.iterations = 2
+    bpy.ops.object.modifier_apply(modifier=sm.name)
+
+    # Post-smooth analytical bronze relief pass: crisp circular orbital moats around eyeballs,
+    # sharp operculum rear undercut groove, and nostril pits so dark bronze catches bold highlights!
+    for v in fish_obj.data.vertices:
+        p = v.co
+        for eye_c, sg in eye_centers:
+            dv = p - eye_c
+            r_e = dv.length
+            if 0.012 < r_e < 0.044:
+                n_out = (side_h * sg * 0.82 + up_h * 0.42 + fwd * 0.38).normalized()
+                # Ring moat right around eyeball perimeter (`r_e ~ 0.027`) + extra eyeball pop (`r_e < 0.022`)
+                moat = math.exp(-0.5 * ((r_e - 0.0275) / 0.0048) ** 2)
+                pop = math.exp(-0.5 * (r_e / 0.017) ** 2)
+                v.co += n_out * (0.0055 * pop - 0.0065 * moat)
+        for gill_c, sg in gill_centers:
+            rel = p - gill_c
+            df = rel.dot(fwd)
+            du = rel.dot(up_h)
+            ds = rel.dot(side_h) * sg
+            # Rear/lower arc of the rounded operculum (`df ~ -0.055`)
+            r_arc = math.hypot(df / 0.074, du / 0.082)
+            if df < 0.01 and ds > 0.015 and 0.72 < r_arc < 1.28:
+                groove = math.exp(-0.5 * ((r_arc - 1.02) / 0.09) ** 2) * _smoothstep(0.01, -0.025, df)
+                v.co -= side_h * (sg * 0.0075 * groove)
+        for sg in (-1.0, 1.0):
+            nost_c = hpt(0.172, sg * 0.036, 0.036)
+            dn = (p - nost_c).length
+            if dn < 0.022:
+                v.co -= (up_h * 0.7 + side_h * sg * 0.5 + fwd * 0.5).normalized() * (0.0055 * math.exp(-0.5 * (dn / 0.0075) ** 2))
+    fish_obj.data.update()
+
+    # Protect head & fin relief during decimation
+    vg_f = fish_obj.vertex_groups.new(name="FishDetail")
+    for v in fish_obj.data.vertices:
+        if (v.co - head_c).length < 0.24:
+            vg_f.add([v.index], 0.22, "REPLACE")
+        else:
+            vg_f.add([v.index], 0.65, "REPLACE")
+    _decimate_obj(fish_obj, 5400, vg_name="FishDetail")
+
+    rot_z = Matrix.Rotation(math.radians(azimuth_deg), 4, "Z")
+    fish_obj.matrix_world = rot_z
+    bpy.ops.object.select_all(action="DESELECT")
+    fish_obj.select_set(True)
+    bpy.context.view_layer.objects.active = fish_obj
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+
+    # Water pour emerges from inside the gaping jaws and arcs steeply downward
+    mouth_local = hpt(0.132, 0.0, -0.052)
+    pour_dir_local = (fwd * 0.80 - up_h * 0.60).normalized()
+    mouth_world = rot_z @ mouth_local
+    dir_world = (rot_z.to_3x3() @ pour_dir_local).normalized()
+    return fish_obj, mouth_world, dir_world
+
+
+def _build_kelp_rock_and_sea_fish():
+    """Builds the sculpted bronze kelp-draped rocky base + 4 Art Nouveau sea-fish (`z = 2.66..3.64 m`)."""
+    bm = bmesh.new()
+
+    # Central kelp-draped rock column rising up to z = 3.64 m so it merges seamlessly into
+    # Havis Amanda's foot-rock (`z = 3.38..3.64`) with ZERO dark shadow gap above the fish necks!
+    ret_r = bmesh.ops.create_icosphere(bm, subdivisions=5, radius=1.0)
+    for v in ret_r["verts"]:
+        p = v.co.copy()
+        ang = math.atan2(p.y, p.x)
+        t_h = 0.5 * (p.z + 1.0)
+        n1 = noise.noise(Vector((p.x * 2.4 + 1.3, p.y * 2.4 - 0.8, p.z * 2.8)))
+        n2 = noise.noise(Vector((p.x * 5.2 - 2.1, p.y * 5.2 + 1.7, p.z * 5.0)))
+        kelp_flutes = 0.038 * math.sin(ang * 9.0 + t_h * 6.5 + n1 * 1.6) * _smoothstep(0.92, 0.10, t_h)
+        wave_crest = 0.046 * math.exp(-0.5 * ((t_h - 0.28) / 0.14) ** 2) * (0.5 + 0.5 * math.cos(ang * 4.0 + 3.14))
+        base_r = 0.49 - 0.16 * _smoothstep(0.0, 0.72, t_h) - 0.09 * _smoothstep(0.72, 1.0, t_h)
+        rad = base_r * (1.0 + 0.10 * n1 + 0.04 * n2) + kelp_flutes + wave_crest
+        z = 2.66 + t_h * 0.98
+        v.co = Vector((p.x * rad, p.y * rad, max(2.66, z)))
+
+    ret_b = bmesh.ops.create_icosphere(bm, subdivisions=5, radius=1.0)
+    for v in ret_b["verts"]:
+        p = v.co.copy()
+        n1 = noise.noise(Vector((p.x * 3.0, p.y * 3.0, p.z * 2.0)))
+        v.co = Vector((p.x * (0.85 + 0.04 * n1), p.y * (0.85 + 0.04 * n1), max(2.66, 2.675 + p.z * 0.050)))
+
+    # Broad, rock-fused Art Nouveau swirling wave & bull-kelp scrolls between the 4 fish (`357da6f1.jpg` bottom-center!)
+    # Rooted solidly inside the rock surface (no freestanding stalks or air gaps!) with overarching wave crests.
+    for k in range(4):
+        base_ang = math.radians(-88.0 + 90.0 * k)
+        kelp_specs = [
+            (-0.28,  0.18, 0.54, 0.44, 2.98, 0.072, 0.038),
+            (-0.10,  0.26, 0.56, 0.45, 3.05, 0.082, 0.042),
+            ( 0.08,  0.20, 0.55, 0.44, 3.00, 0.076, 0.040),
+            ( 0.24, -0.16, 0.53, 0.43, 2.92, 0.068, 0.036),
+        ]
+        for da0, swirl, r0, r_top, z_top, w0, th0 in kelp_specs:
+            a0 = base_ang + da0
+            a1 = a0 + swirl * 0.45
+            a2 = a0 + swirl * 0.95
+            a3 = a0 + swirl * 1.30
+            pts_k = [
+                (math.cos(a0) * r0, math.sin(a0) * r0, 2.665),
+                (math.cos(a1) * (0.5 * (r0 + r_top)), math.sin(a1) * (0.5 * (r0 + r_top)), 2.665 + (z_top - 2.665) * 0.48),
+                (math.cos(a2) * r_top, math.sin(a2) * r_top, z_top),
+                (math.cos(a3) * (r_top + 0.042), math.sin(a3) * (r_top + 0.042), z_top - 0.048),
+            ]
+            out_dir = Vector((math.cos(a1), math.sin(a1), 0.12)).normalized()
+            _add_profiled_loft(
+                bm, pts_k,
+                [w0, w0 * 0.88, w0 * 0.68, w0 * 0.36],
+                [th0, th0 * 0.92, th0 * 0.78, th0 * 0.45],
+                segs=18, up_hint=out_dir, samples_per_seg=10,
+            )
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    m = bpy.data.meshes.new("KelpRockBase")
+    bm.to_mesh(m)
+    bm.free()
+    rock_obj = bpy.data.objects.new("KelpRockBase", m)
+    bpy.context.scene.collection.objects.link(rock_obj)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    rock_obj.select_set(True)
+    bpy.context.view_layer.objects.active = rock_obj
+    rem = rock_obj.modifiers.new("RockVoxel", "REMESH")
+    rem.mode = "VOXEL"
+    rem.voxel_size = 0.0065
+    rem.use_smooth_shade = True
+    bpy.ops.object.modifier_apply(modifier=rem.name)
+
+    sm = rock_obj.modifiers.new("RockSmooth", "SMOOTH")
+    sm.factor = 0.40
+    sm.iterations = 3
+    bpy.ops.object.modifier_apply(modifier=sm.name)
+    _decimate_obj(rock_obj, 6200)
+
+    fish_objs = []
+    fish_spouts = []
+    for az in (-42.0, -132.0, 138.0, 48.0):
+        fo, mp, md = _build_single_sea_fish(az)
+        fish_objs.append(fo)
+        fish_spouts.append((az, mp, md))
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in [rock_obj] + fish_objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = rock_obj
+    bpy.ops.object.join()
+    base_assembly = bpy.context.view_layer.objects.active
+    base_assembly.name = "HavisFishKelpBase"
+    return base_assembly, fish_spouts
+
+
 def _build_right_hand_on_hip():
     """Sculpts Havis Amanda's graceful RIGHT HAND resting softly over her right hip drapery."""
     bm = bmesh.new()
@@ -1149,8 +1608,19 @@ def extract_havis_amanda():
 
     bm = bmesh.new()
     bm.from_mesh(body.data)
-    del_verts = [v for v in bm.verts if v.co.z < 2.66 or math.hypot(v.co.x, v.co.y) > 1.25]
+    del_verts = [v for v in bm.verts if v.co.z < 3.36 or math.hypot(v.co.x, v.co.y) > 0.85]
     bmesh.ops.delete(bm, geom=del_verts, context="VERTS")
+    res_bot = bmesh.ops.bisect_plane(
+        bm,
+        geom=bm.verts[:] + bm.edges[:] + bm.faces[:],
+        plane_co=Vector((0.0, 0.0, 3.38)),
+        plane_no=Vector((0.0, 0.0, 1.0)),
+        clear_inner=True,
+    )
+    cut_bot = [g for g in res_bot["geom_cut"] if isinstance(g, bmesh.types.BMEdge)]
+    if cut_bot:
+        bmesh.ops.holes_fill(bm, edges=cut_bot, sides=200)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(body.data)
     bm.free()
 
@@ -1168,8 +1638,17 @@ def extract_havis_amanda():
     bpy.ops.mesh.delete(type="VERT")
     bpy.ops.object.mode_set(mode="OBJECT")
 
+    # Smoothly tuck any outer melted fish remnants below Havis Amanda's ankles (`z = 3.38..3.53`)
+    # inside the sculpted kelp rock column so there are ZERO jagged edges or seams!
     for v in body.data.vertices:
         p = v.co
+        if p.z <= 3.53:
+            r_xy = math.hypot(p.x, p.y)
+            r_cap = 0.24 + 0.15 * _smoothstep(3.38, 3.53, p.z)
+            if r_xy > r_cap and r_xy > 1e-5:
+                s_in = r_cap / r_xy
+                v.co.x *= s_in
+                v.co.y *= s_in
         if p.z >= 5.238 and p.x > 0.056 and p.y < 0.005:
             lh_m = _smoothstep(5.238, 5.276, p.z) * _smoothstep(0.056, 0.105, p.x) * _smoothstep(0.005, -0.045, p.y)
             v.co.x += (0.058 - v.co.x) * 0.85 * lh_m
@@ -1222,10 +1701,10 @@ def extract_havis_amanda():
         if near_rn or near_ln or near_nv or p.z >= 5.22:
             vg_dec.add([v.index], 0.05, "REPLACE")
         elif p.z >= 3.55:
-            vg_dec.add([v.index], 0.38, "REPLACE")
+            vg_dec.add([v.index], 0.35, "REPLACE")
         else:
-            vg_dec.add([v.index], 1.00, "REPLACE")
-    _decimate_obj(body, 25000, vg_name="WomanProtect")
+            vg_dec.add([v.index], 0.80, "REPLACE")
+    _decimate_obj(body, 21000, vg_name="WomanProtect")
 
     head_scale = 1.33
     head_rot = Euler((math.radians(8.5), math.radians(12.5), math.radians(55.0)), "XYZ")
@@ -1248,6 +1727,7 @@ def extract_havis_amanda():
 
     lhand = _build_left_hand_under_chin(chin_world, body)
     rhand = _build_right_hand_on_hip()
+    fish_kelp_base, fish_spouts = _build_kelp_rock_and_sea_fish()
 
     bpy.ops.object.select_all(action="DESELECT")
     body.select_set(True)
@@ -1278,9 +1758,26 @@ def extract_havis_amanda():
 
     _boolean_weld_hand(welded, lhand, (0.126, -0.105, 5.228), 0.044)
     _boolean_weld_hand(welded, rhand, (-0.210, -0.075, 4.655), 0.048)
-    obj = welded
 
-    finalize_and_export(obj, "havis_amanda_figure", target_tris=72000, rot_deg=(0.0, 0.0, 0.0), norm_axis="Z")
+    bpy.ops.object.select_all(action="DESELECT")
+    welded.select_set(True)
+    fish_kelp_base.select_set(True)
+    bpy.context.view_layer.objects.active = welded
+    bpy.ops.object.join()
+    obj = bpy.context.view_layer.objects.active
+
+    # Compute exact pre-normalization bounds so we can print normalized Godot fish mouth coords!
+    all_vs = [v.co.copy() for v in obj.data.vertices]
+    mn_f = Vector((min(v.x for v in all_vs), min(v.y for v in all_vs), min(v.z for v in all_vs)))
+    mx_f = Vector((max(v.x for v in all_vs), max(v.y for v in all_vs), max(v.z for v in all_vs)))
+    sc_f = 1.0 / max(mx_f.z - mn_f.z, 1e-5)
+    cx_f, cy_f = 0.5 * (mn_f.x + mx_f.x), 0.5 * (mn_f.y + mx_f.y)
+    for az, mp, md in fish_spouts:
+        mp_n = Vector(((mp.x - cx_f) * sc_f, (mp.z - mn_f.z) * sc_f, -(mp.y - cy_f) * sc_f))
+        md_n = Vector((md.x, md.z, -md.y)).normalized()
+        print(f"[fish_spout] az={az:+6.1f} mouth_godot=({mp_n.x:+.4f}, {mp_n.y:+.4f}, {mp_n.z:+.4f}) dir_godot=({md_n.x:+.4f}, {md_n.y:+.4f}, {md_n.z:+.4f})", flush=True)
+
+    finalize_and_export(obj, "havis_amanda_figure", target_tris=96000, rot_deg=(0.0, 0.0, 0.0), norm_axis="Z")
 
     # 2. Real sculpted dark-bronze rocky seaweed pedestal + fluted drum + beaded capital frieze (z = 0.58..2.38 m)
     clear_scene()

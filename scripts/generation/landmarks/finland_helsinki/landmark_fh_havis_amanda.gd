@@ -73,6 +73,11 @@ static func _sea_lions_and_fish(lm: LandmarkMesh, fk: FountainKit) -> void:
 		Vector2(0.74, 0.0), Vector2(0.71, 0.14), Vector2(0.56, 0.36),
 		Vector2(0.66, 0.52), Vector2(0.58, lobe_h), Vector2(0.0, lobe_h),
 	])
+	var fig_base := Vector3(0.0, 2.30, 0.0)
+	var fig_scale := 2.72
+	var fig_yaw := 0.20
+	var mouth_ref := Vector3(0.1243, 0.2176, 0.1732)
+	var dir_ref := Vector3(0.3033, -0.8361, 0.4571)
 	for i in 4:
 		var a := TAU * float(i) / 4.0 + PI * 0.25
 		var d := Vector3(cos(a), 0.0, sin(a))
@@ -85,20 +90,13 @@ static func _sea_lions_and_fish(lm: LandmarkMesh, fk: FountainKit) -> void:
 		fk.arc_stream(mouth, land, 0.58, 0.055, 0.16)
 		fk.splash_ring(land, 0.85, 0.82)
 
-		# Four sea-fish parabolic arcs spouting out from the scanned fish mouths on the saucer
-		var fa := a + PI * 0.25
-		var fd := Vector3(cos(fa), 0.0, sin(fa))
-		var fish_mouth := fd * 0.68 + Vector3(0.0, 2.96, 0.0)
-		var fish_land := fd * 3.15 + Vector3(0.0, wat_y, 0.0)
-		fk.arc_stream(fish_mouth, fish_land, 0.28, 0.045, 0.13)
-		fk.splash_ring(fish_land, 0.72, 0.76)
+		# Steep natural gravity pour emerging from inside each sculpted sea-fish's gaping
+		# jaws onto the upper bronze saucer (y = 2.35 m) — zero water cannons below saucer.
+		var q_rot := Basis(Vector3.UP, fig_yaw + TAU * float(i) / 4.0)
+		var fish_mouth := fig_base + (q_rot * mouth_ref) * fig_scale
+		var fish_dir := q_rot * dir_ref
+		var fish_land := Vector3(fish_mouth.x + fish_dir.x * 0.64, 2.35, fish_mouth.z + fish_dir.z * 0.64)
+		fk.arc_stream(fish_mouth, fish_land, 0.015, 0.036, 0.082)
+		fk.splash_ring(fish_land, 0.22, 0.58)
 
-	# Delicate sparse overflow streams dripping off the dark-bronze upper saucer rim so the
-	# sculpted rocky bronze pedestal and fluted drum stay clearly visible behind the spray
-	for k in 16:
-		var oa := TAU * float(k) / 16.0 + 0.12
-		var od := Vector3(cos(oa), 0.0, sin(oa))
-		fk.arc_stream(od * 1.64 + Vector3(0.0, 2.34, 0.0), od * 1.98 + Vector3(0.0, wat_y, 0.0),
-			0.03, 0.014, 0.075)
-	fk.splash_ring(Vector3(0.0, wat_y, 0.0), 2.25, 0.55)
-	fk.mist_emitter(Vector3(0.0, wat_y + 0.25, 0.0), 1.1, 0.75, 3)
+	fk.mist_emitter(Vector3(0.0, 2.42, 0.0), 0.55, 0.65, 2)
