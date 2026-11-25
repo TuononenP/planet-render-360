@@ -59,10 +59,22 @@ static func venice_lagoon(lat: float, lon: float) -> bool:
 static func seine(lat: float, lon: float) -> bool:
 	return lat >= 48.78 and lat <= 48.94 and lon >= 2.18 and lon <= 2.46
 
+## True over Singapore, Marina Reservoir, Singapore River & Singapore Strait (`SG-6.2`).
+static func singapore_water(lat: float, lon: float) -> bool:
+	return lat >= 1.15 and lat <= 1.48 and lon >= 103.60 and lon <= 104.10
+
 ## Inland river and canal colours (`WaterShader` `deep_color` / `shallow_color`
 ## and surface chop/roughness). Silty olive-brown for Bangkok's Chao Phraya & khlongs;
-## muted olive-jade for the Paris Seine; default green-grey elsewhere.
+## calm emerald-slate Marina Reservoir & Singapore River; muted olive-jade for Paris Seine.
 static func inland_palette(data: LocationData) -> Dictionary:
+	if data != null and singapore_water(data.latitude, data.longitude):
+		return {
+			"deep": Color(0.068, 0.132, 0.128, 1.0),
+			"shallow": Color(0.118, 0.194, 0.168, 1.0),
+			"near_rough": 0.11,
+			"spec": 0.24,
+			"wave_amp": 0.56,
+		}
 	if data != null and chao_phraya(data.latitude, data.longitude):
 		return {
 			"deep": Color(0.158, 0.166, 0.098, 1.0),
@@ -134,6 +146,10 @@ static func sea_palette(data: LocationData) -> Dictionary:
 		# Tidal Thames: silty olive-brown-grey estuary water.
 		shallow = Vector3(0.068, 0.066, 0.042)
 		deep = Vector3(0.036, 0.040, 0.026)
+	elif singapore_water(lat, lon):
+		# Singapore Strait & Marina Bay: calm tropical green-slate water.
+		shallow = Vector3(0.028, 0.138, 0.126)
+		deep = Vector3(0.012, 0.064, 0.072)
 	elif miami_water(lat, lon):
 		if lon >= -80.142:
 			shallow = Vector3(0.015, 0.228, 0.238)

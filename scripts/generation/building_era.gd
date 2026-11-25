@@ -606,12 +606,7 @@ static func _rules(city: String, kind: String, c: Dictionary) -> String:
 			if lv >= 10:
 				return "hong_kong"
 		"singapore":
-			if lv >= 1 and lv <= 4:
-				return "sg_shophouse"
-			if lv >= 30 or (kind == "commercial" and lv >= 8):
-				return "sg_tower"
-			if lv >= 5:
-				return "singapore"
+			return ArchitectureCitiesSingapore.singapore_rule(kind, c)
 		"seoul":
 			return ArchitectureCitiesEastAsia.seoul_rule(kind, c)
 		"bangkok":

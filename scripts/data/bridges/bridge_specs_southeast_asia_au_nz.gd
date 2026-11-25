@@ -7,73 +7,43 @@ extends RefCounted
 
 static func rows() -> Array:
 	return [
-		{"id": "br_singapore_cavenagh_bridge", "cc": "SG", "name": "Cavenagh Bridge", "wiki": "Cavenagh Bridge",
-			"aliases": ["cavenagh bridge singapore"], "lat": 1.28657, "lon": 103.85235, "bearing": 150.4, "st": "susp",
-			"spans": [9.15, 60.96, 9.14], "width": 9.45, "clear": 3.5, "tower": 10.0, "material": "steel",
-			"base": "water", "tier": 2, "conf": 1,
-			"src": "en Wikipedia (79.25 m total, 60.96 m main; Ordish-Lefeuvre stayed-suspension hybrid, article " +
-				"calls it cable-stayed), OSM pedestrian way 62 m bearing 150.4; side-span split, deck width " +
-				"(wiki says 9.45 m, doubtful) 4 m, pylon height and clear estimated; hybrid system not " +
-				"represented | verified: Wikipedia and OSM relation tag both give width 9.45 m, main span " +
-				"60.96 m, length 79.25 m; OSM way 534684103 62 m bearing 150.5 mid 1.28657,103.85235 confirms " +
-				"centre/bearing; stays conf 1 (Ordish-Lefeuvre stayed-suspension hybrid, single 60.96 m span, " +
-				"not representable) | round 2: round 2: nothing new; Ordish-Lefeuvre stayed-suspension hybrid " +
-				"not representable"},
-		{"id": "br_singapore_anderson_bridge", "cc": "SG", "name": "Anderson Bridge", "wiki": "Anderson Bridge (Singapore)",
-			"aliases": ["anderson bridge singapore"], "lat": 1.2872, "lon": 103.85302, "bearing": 128.6, "st": "truss",
-			"spans": [21.5, 27.0, 21.5], "width": 23.0, "clear": 4.5, "rise": 3.0, "material": "steel", "base": "water",
-			"tier": 2, "conf": 1,
-			"src": "en Wikipedia (70 m, 23 m wide, 1910, three-span steel), OSM way 'Fullerton Road' 70 m " +
-				"bearing 128.6; span split, truss depth and clear guessed | verified: OSM ways 29377119 / " +
-				"448084959 (70 m, bearing 128.8 / 309.0, mid 1.2873,103.8530) confirm centre/bearing; " +
-				"Wikipedia 70 m x 23 m, 'three large girders' (Structurae calls it a through truss, Roots " +
-				"says steel arches encased in concrete); no source gives the span split or the structure type " +
-				"| round 2: round 2: Roots.sg (Singapore River Bridges): span 204 ft (61.2 m), two roadways " +
-				"of 31.5 ft; sources disagree on type (Pratt truss girder / bowstring arch / three steel " +
-				"arches) and Wikipedia gives 70 m x 23 m; no span split"},
-		{"id": "br_singapore_elgin_bridge", "cc": "SG", "name": "Elgin Bridge", "wiki": "Elgin Bridge (Singapore)",
-			"aliases": ["elgin bridge singapore"], "lat": 1.28907, "lon": 103.8493, "bearing": 32.5, "st": "arch_deck",
-			"spans": [18.5, 29.0, 18.5], "width": 25.0, "clear": 4.5, "rise": 3.0, "material": "steel", "base": "water",
-			"tier": 2, "conf": 1,
-			"src": "en Wikipedia (1929, 25 m wide, 'arch bridge' but also described as box girder; length given " +
-				"as 46 m), OSM way 'North Bridge Road' 66 m bearing 32.5; three-arch split and rise guessed | " +
-				"verified: OSM ways 474832236 / 21998973 (66 m, bearing 212.7 = 32.7 reversed, mid " +
-				"1.28904,103.84934) confirm centre/bearing; sources conflict on size (Wikipedia/Structurae 46 " +
-				"m x 25 m, Roots ~140 ft = 42.7 m river span; Wikipedia calls it both arch and box girder, " +
-				"Roots/NLB: three steel bowstring arches encased in concrete); span split unsourced | round " +
-				"2: round 2: not searched beyond round 1 (type and sizes conflict)"},
+		# Cavenagh, Anderson, Elgin and Helix bridges are built as bespoke Singapore landmarks
+		# in `SgRegBay` / `SgRegHeritage` (`LandmarkSetSingapore`).
 		{"id": "br_singapore_jubilee_bridge", "cc": "SG", "name": "Jubilee Bridge", "wiki": "Jubilee Bridge, Singapore",
 			"aliases": ["jubilee bridge singapore"], "lat": 1.28796, "lon": 103.85444, "bearing": 10.9,
 			"st": "haunched", "spans": [59.0, 95.0, 59.0], "width": 6.0, "clear": 6.0, "material": "concrete",
-			"base": "water", "tier": 3, "conf": 2, "mid_depth": 1.5, "pier_depth": 3.5,
-			"src": "en Wikipedia (balanced cantilever pedestrian bridge, 95 m main span, 220 m, 6 m wide), OSM " +
-				"way 212 m bearing 10.9; side spans = (220-95)/2 assumed, clear estimated | verified: " +
-				"Wikipedia (main span 95 m, 220 m, 6 m wide; cites Structurae/Footbridge 2017 paper), " +
-				"Structurae data via search snippet (59-95-59 m, girder 1.5-3.5 m deep), Arup project page " +
-				"(deck 1.5 m at midspan, 3.5 m over the columns), trendsideas (220 m, 6 m wide, precast post- " +
-				"tensioned deck on two blade pylons deepening over the pylons); OSM Jubilee Bridge ways chain " +
-				"1.28699,103.85442 to 1.28888,103.85476, 210 m, straight part bearing 10.5-11.1; " +
-				"centre/bearing unchanged; clear (6 m) still an estimate"},
+			"base": "water", "tier": 2, "conf": 2, "mid_depth": 1.5, "pier_depth": 3.5,
+			"src": "en Wikipedia / Structurae / Arup (59-95-59 m balanced cantilever pedestrian bridge, 220 m, 6 m wide, 1.5-3.5 m depth); OSM Jubilee Bridge ways 1.28699,103.85442 to 1.28888,103.85476"},
 		{"id": "br_singapore_esplanade_bridge", "cc": "SG", "name": "Esplanade Bridge", "wiki": "Esplanade Bridge",
 			"aliases": ["esplanade bridge singapore"], "lat": 1.28796, "lon": 103.85418, "bearing": 11.4,
-			"st": "arch_deck", "spans": [37.3, 37.3, 37.3, 37.3, 37.3, 37.3, 37.3], "width": 46.0, "clear": 4.0,
-			"rise": 2.0, "material": "concrete", "base": "sea", "tier": 3, "conf": 1,
-			"src": "en Wikipedia (7 spans, 261 m; width 46 m in infobox but 70 m in text; low concrete arches), " +
-				"OSM ways 292 m bearing 11.4; equal spans, rise, clear guessed | verified: OSM Esplanade " +
-				"Drive ways 1313321640+35037536+763010995 chain 293 m, bearing 190.9 (=10.9), centre " +
-				"1.28796,103.85418 confirm centre/bearing; Wikipedia 261 m (infobox 280 m, width 46 m infobox " +
-				"/ 70 m text, 7 spans), Structurae search snippet 260 m with 7 arches; equal spans not stated " +
-				"by a source | round 2: round 2: not searched beyond round 1; equal spans still not stated by " +
-				"a source"},
-		{"id": "br_singapore_helix_bridge", "cc": "SG", "name": "Helix Bridge", "wiki": "Helix Bridge",
-			"aliases": ["double helix bridge", "the helix singapore"], "lat": 1.2876, "lon": 103.86052, "bearing": 1.3,
-			"st": "girder", "spans": [56.0, 56.0, 56.0, 56.0, 56.0], "width": 6.5, "clear": 6.0, "material": "steel",
-			"base": "sea", "tier": 2, "conf": 1,
-			"src": "en Wikipedia (280 m pedestrian bridge, stainless-steel double helix); OSM 292 m bearing 1.3; " +
-				"helical tube structure cannot be represented, spans/width/clear guessed | verified: " +
-				"Structurae lists it as a stainless-steel double-helix pedestrian bridge, OSM 'The Helix' way " +
-				"164881537 186 m bearing 175.7; helical tube structure still not representable | round 2: " +
-				"round 2: nothing new; double-helix tube not representable"},
+			"st": "arch_deck", "spans": [37.3, 37.3, 37.3, 37.3, 37.3, 37.3, 37.3], "width": 46.0, "clear": 4.2,
+			"rise": 2.2, "material": "concrete", "base": "water", "tier": 1, "conf": 2,
+			"src": "en Wikipedia / Structurae (261 m, 7 low concrete arches, 46 m wide); OSM Esplanade Drive ways 1313321640+35037536+763010995, mid 1.28796,103.85418, bearing 11.4"},
+		{"id": "br_singapore_coleman_bridge", "cc": "SG", "name": "Coleman Bridge", "wiki": "Coleman Bridge, Singapore",
+			"aliases": ["coleman bridge singapore"], "lat": 1.28965, "lon": 103.84825, "bearing": 26.5,
+			"st": "arch_deck", "spans": [25.0, 25.0, 25.0], "width": 22.0, "clear": 4.0, "rise": 2.2,
+			"material": "concrete", "base": "water", "tier": 2, "conf": 2,
+			"src": "en Wikipedia / Roots.sg (75 m, 3 arches, 1886 neoclassical balustrade replica widened 1990, Hill Street - New Bridge Road)"},
+		{"id": "br_singapore_read_bridge", "cc": "SG", "name": "Read Bridge", "wiki": "Read Bridge",
+			"aliases": ["read bridge singapore", "malacca bridge"], "lat": 1.28980, "lon": 103.84585, "bearing": 168.0,
+			"st": "girder", "spans": [48.0], "width": 8.0, "clear": 3.8, "material": "steel",
+			"base": "water", "tier": 2, "conf": 2,
+			"src": "en Wikipedia / Roots.sg (1889 iron girder pedestrian bridge at Clarke Quay, 48 m span)"},
+		{"id": "br_singapore_ord_bridge", "cc": "SG", "name": "Ord Bridge", "wiki": "Ord Bridge",
+			"aliases": ["ord bridge singapore"], "lat": 1.29020, "lon": 103.84420, "bearing": 14.0,
+			"st": "truss", "spans": [52.0], "width": 6.5, "clear": 3.8, "rise": 3.4, "material": "steel",
+			"steel_hex": "#ECEBE6", "base": "water", "tier": 3, "conf": 2,
+			"src": "en Wikipedia / OSM way 688756545 (1886 white steel truss footbridge at Clarke Quay, 52 m span)"},
+		{"id": "br_singapore_alkaff_bridge", "cc": "SG", "name": "Alkaff Bridge", "wiki": "Alkaff Bridge",
+			"aliases": ["alkaff bridge singapore"], "lat": 1.28955, "lon": 103.84095, "bearing": 22.0,
+			"st": "truss", "spans": [55.0], "width": 6.0, "clear": 4.0, "rise": 4.2, "material": "steel",
+			"steel_hex": "#E25238", "base": "water", "tier": 3, "conf": 2,
+			"src": "en Wikipedia (1999 55 m tongkang-shaped steel truss footbridge painted in Pacita Abad's vibrant multicolour scheme at Robertson Quay)"},
+		{"id": "br_singapore_benjamin_sheares_bridge", "cc": "SG", "name": "Benjamin Sheares Bridge", "wiki": "Benjamin Sheares Bridge",
+			"aliases": ["benjamin sheares bridge singapore"], "lat": 1.28820, "lon": 103.86490, "bearing": 36.0,
+			"st": "girder", "spans": [90.0, 110.0, 110.0, 110.0, 90.0], "width": 34.0, "clear": 20.0,
+			"material": "concrete", "base": "water", "tier": 2, "conf": 2,
+			"src": "en Wikipedia (1981 1.8 km elevated concrete expressway viaduct framing east Marina Bay, 20 m navigational clearance over Marina Channel)"},
 		{"id": "br_singapore_merdeka_bridge", "cc": "SG", "name": "Merdeka Bridge", "wiki": "Merdeka Bridge, Singapore",
 			"aliases": ["merdeka bridge singapore"], "lat": 1.3042, "lon": 103.86865, "bearing": 57.5, "st": "girder",
 			"spans": [24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384, 24.384],

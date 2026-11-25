@@ -189,6 +189,20 @@ const SPECIES := {
 		"tint": "tropical", "evergreen": true},
 	"banana": {"gen": "palm", "h": 4.8, "h_var": 0.20, "fronds": 10, "frond_len": 2.4,
 		"trunk_r": 0.14, "leaf": "palm", "bark": "palm", "tint": "tamarind", "evergreen": true},
+	# Singapore Garden City signature species (SG-6.1): yellow flame (Peltophorum),
+	# heritage tembusu (Cyrtophyllum, spreading rugged crown), sea almond (Terminalia, tiered whorls).
+	"yellow_flame": {"gen": "broad", "h": 15.0, "h_var": 0.20, "bole": 0.30, "crown_r": 0.52,
+		"leader": 0.24, "branches": 8, "trunk_r": 0.36, "up": 0.58, "droop": 0.08,
+		"clusters": 60, "card": 3.0, "leaf": "birch", "bark": "furrowed",
+		"tint": "golden_shower", "evergreen": true, "flat_top": true},
+	"tembusu": {"gen": "broad", "h": 18.0, "h_var": 0.22, "bole": 0.28, "crown_r": 0.50,
+		"leader": 0.42, "branches": 8, "trunk_r": 0.46, "up": 0.44, "droop": 0.12,
+		"clusters": 64, "card": 3.2, "leaf": "broad", "bark": "furrowed",
+		"tint": "tropical", "evergreen": true},
+	"sea_almond": {"gen": "broad", "h": 14.0, "h_var": 0.20, "bole": 0.34, "crown_r": 0.54,
+		"leader": 0.65, "branches": 9, "trunk_r": 0.30, "up": 0.25, "droop": 0.04,
+		"clusters": 58, "card": 3.1, "leaf": "broad", "bark": "plane",
+		"tint": "tropical", "evergreen": true, "flat_top": true},
 }
 
 ## Season tints (sRGB), applied over the near-neutral leaf atlases:
@@ -350,6 +364,20 @@ static func mix(biome: String, setting: String) -> Array:
 	match biome:
 		"tropical":
 			return [["palm", 0.45], ["tropical", 0.55]]
+		"singapore":
+			# Garden City (SG-6.1): wide-umbrella rain tree avenues, angsana/pradu, yellow flame,
+			# heritage tembusu & banyan in parks, sea almond & coconut palms on the coast.
+			if setting == "street":
+				return [["rain_tree", 0.38], ["pradu", 0.18], ["yellow_flame", 0.14], ["mahogany", 0.12],
+					["royal_palm", 0.10], ["areca_palm", 0.08]]
+			if setting == "shore":
+				return [["sea_almond", 0.32], ["coconut_palm", 0.28], ["rain_tree", 0.20], ["mangrove", 0.12],
+					["royal_palm", 0.08]]
+			if setting == "forest":
+				return [["tembusu", 0.28], ["banyan", 0.24], ["tropical", 0.22], ["rain_tree", 0.16],
+					["areca_palm", 0.10]]
+			return [["rain_tree", 0.30], ["tembusu", 0.20], ["banyan", 0.16], ["yellow_flame", 0.12],
+				["royal_palm", 0.12], ["frangipani", 0.10]]
 		"miami":
 			if setting == "street":
 				return [["royal_palm", 0.34], ["coconut_palm", 0.16], ["sabal_palm", 0.14], ["live_oak", 0.16],
@@ -450,6 +478,8 @@ const GENUS := {
 	"conoarpus": "mangrove", "conocarpus": "mangrove",
 	"bursera": "tropical", "swietenia": "mahogany",
 	"samanea": "rain_tree", "albizia": "rain_tree", "pterocarpus": "pradu",
+	"peltophorum": "yellow_flame", "khaya": "mahogany", "syzygium": "tembusu",
+	"terminalia": "sea_almond", "cyrtophyllum": "tembusu", "fagraea": "tembusu",
 	"tamarindus": "tamarind", "cassia": "golden_shower", "plumeria": "frangipani",
 	"mangifera": "mango", "musa": "banana", "dypsis": "areca_palm",
 }

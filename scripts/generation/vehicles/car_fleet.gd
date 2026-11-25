@@ -40,10 +40,14 @@ const FLEETS := {
 		"kinds": ["sedan", "sedan", "sedan", "pickup", "pickup", "compact_suv", "compact_suv", "van", "minivan", "tuk_tuk"],
 		"paint": [WHITE, WHITE, WHITE, WHITE, SILVER, SILVER, SILVER, GREY, GREY, BLACK, BLUE, RED],
 	},
+	"singapore": {
+		"kinds": ["sedan", "sedan", "sedan", "compact_suv", "compact_suv", "suv", "minivan", "minivan", "hatch"],
+		"paint": [WHITE, WHITE, WHITE, BLACK, BLACK, SILVER, SILVER, GREY, GREY, BLUE, RED],
+	},
 }
 const COUNTRY_FLEET := {
 	"US": "north_america", "CA": "north_america", "MX": "north_america", "AU": "north_america",
-	"JP": "japan", "TH": "thailand",
+	"JP": "japan", "TH": "thailand", "SG": "singapore",
 	"FI": "nordic", "SE": "nordic", "NO": "nordic", "DK": "nordic", "IS": "nordic", "EE": "nordic",
 	"PT": "south_europe", "ES": "south_europe", "IT": "south_europe", "GR": "south_europe",
 	"MT": "south_europe", "HR": "south_europe", "TR": "south_europe",
@@ -58,7 +62,7 @@ const REGION_FLEET := {
 	"madrid": "south_europe", "barcelona": "south_europe", "rome": "south_europe", "milan": "south_europe",
 	"florence": "south_europe", "athens": "south_europe", "london": "europe", "paris": "europe",
 	"berlin": "europe", "amsterdam": "europe", "vienna": "europe", "brussels": "europe",
-	"dublin": "europe", "edinburgh": "europe", "miami": "north_america", "bangkok": "thailand",
+	"dublin": "europe", "edinburgh": "europe", "miami": "north_america", "bangkok": "thailand", "singapore": "singapore",
 }
 const TAXI_SHARE := 0.05
 ## The share of slots a sports coupe takes (in bolder paint than the fleet's).
@@ -80,6 +84,13 @@ const TAXIS := {
 		Color(0.04, 0.28, 0.72),  # bright blue
 		Color(0.88, 0.30, 0.04),  # orange
 		TAXI_YELLOW,              # yellow
+	]},
+	"singapore": {"kind": "taxi", "share": 0.08, "paint": [
+		Color(0.03, 0.22, 0.68),  # ComfortDelGro cobalt blue
+		Color(0.03, 0.22, 0.68),  # ComfortDelGro cobalt blue
+		TAXI_YELLOW,              # CityCab yellow
+		Color(0.76, 0.08, 0.08),  # Trans-Cab red
+		SILVER,                   # Prime silver
 	]},
 }
 

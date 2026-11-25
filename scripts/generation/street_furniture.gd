@@ -54,7 +54,11 @@ static func furniture_family(region: String, country: String, city: String = "")
 		return "miami"
 	if city == "haussmann":
 		return "paris"
+	if city == "singapore" or city.begins_with("sg_"):
+		return "sg"
 	var iso := country.to_upper()
+	if iso == "SG":
+		return "sg"
 	if iso == "FI":
 		return "nordic"
 	if iso == "SE":
@@ -89,7 +93,7 @@ static func mesh_key(kind: String, family: String) -> String:
 ## Whether mapped subway entrances are drawn in `family`: New York's
 ## stairwells, Stockholm's blue T sign, London's Underground roundel, and Paris's Guimard arch.
 static func shows_entrances(family: String) -> bool:
-	return family in ["nyc", "nordic_se", "uk", "paris"]
+	return family in ["nyc", "nordic_se", "uk", "paris", "sg"]
 
 ## Adds the furniture under one "StreetFurniture" node of `root` on
 ## desktop Ultra. Returns the number of items placed.

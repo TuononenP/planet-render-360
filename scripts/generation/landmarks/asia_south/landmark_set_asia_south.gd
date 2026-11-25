@@ -35,8 +35,6 @@ static func build(model: Node3D, type: String) -> bool:
 			LandmarkSeaStupas.borobudur(model)
 		"petronas_towers":
 			LandmarkSeaTowers.petronas(model)
-		"marina_bay_sands":
-			LandmarkSeaTowers.marina_bay_sands(model)
 		"monas":
 			LandmarkSeaTowers.monas(model)
 		_:

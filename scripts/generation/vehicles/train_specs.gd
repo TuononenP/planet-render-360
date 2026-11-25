@@ -74,6 +74,9 @@ const LIVERIES := {
 	# South Florida's commuter line (Tri-Rail): ocean-blue lower, palm-green waist band, white upper.
 	"tri_rail": {"lower": Color(0.08, 0.46, 0.76), "band": Color(0.16, 0.62, 0.36), "upper": WHITE,
 		"door": Color(0.08, 0.46, 0.76), "pillar": TramSpecs.DARK, "roof": ROOF, "inner": WHITE, "gauge": 1.435},
+	# Singapore MRT (SMRT / SBS Transit): crisp white body, vivid red waist stripe, dark window band.
+	"singapore_mrt": {"lower": WHITE, "band": Color(0.78, 0.10, 0.12), "upper": WHITE,
+		"door": WHITE, "pillar": TramSpecs.DARK, "roof": Color(0.76, 0.78, 0.80), "inner": WHITE, "gauge": 1.435},
 	# Dutch Railways (NS Intercity / Sprinter): iconic bright yellow body with dark navy-blue window band.
 	"ns_yellow": {"lower": Color(0.98, 0.78, 0.08), "band": Color(0.0, 0.19, 0.51), "upper": Color(0.98, 0.78, 0.08),
 		"door": WHITE, "cab": Color(0.98, 0.78, 0.08), "pillar": TramSpecs.DARK, "roof": ROOF,
@@ -150,8 +153,8 @@ const KIND := {
 
 ## The regions whose metro runs on surface or viaduct track (Helsinki's,
 ## Stockholm's tunnelbana, Miami's Metrorail, Paris's elevated Métro Line 6) and the livery of each.
-const METRO_REGIONS: Array[String] = ["helsinki", "espoo", "stockholm", "miami", "haussmann"]
-const METRO_LIVERY := {"stockholm": "stockholm_metro", "miami": "miami_metrorail", "haussmann": "paris_metro"}
+const METRO_REGIONS: Array[String] = ["helsinki", "espoo", "stockholm", "miami", "haussmann", "singapore"]
+const METRO_LIVERY := {"stockholm": "stockholm_metro", "miami": "miami_metrorail", "haussmann": "paris_metro", "singapore": "singapore_mrt"}
 
 ## Whether a metro runs on `rail` in CityStyles region `region`: open
 ## (or roofed) mapped subway track at or above ground in Helsinki,

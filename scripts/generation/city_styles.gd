@@ -279,11 +279,29 @@ const DISTRICTS := [
 	["hong_kong", "hk_tenement", 22.3300, 114.1620, 1.2, 6.0],   # Sham Shui Po
 	["hong_kong", "hk_tenement", 22.3190, 114.1700, 0.8, 4.0],   # Mong Kok
 	["hong_kong", "hk_office", 22.2830, 114.1585, 0.8, 20.0],    # Central
-	["singapore", "sg_shophouse", 1.2830, 103.8440, 0.7, 20.0],  # Chinatown
-	["singapore", "sg_shophouse", 1.3020, 103.8590, 0.5, 20.0],  # Kampong Glam
-	["singapore", "sg_shophouse", 1.3066, 103.8518, 0.6, 20.0],  # Little India
-	["singapore", "sg_shophouse", 1.3120, 103.9010, 0.8, 10.0],  # Joo Chiat
-	["singapore", "sg_tower", 1.2840, 103.8510, 1.0, 20.0],      # CBD
+	["singapore", "sg_shophouse", 1.2830, 103.8440, 0.55, 20.0], # Chinatown / Pagoda St
+	["singapore", "sg_shophouse", 1.2810, 103.8475, 0.35, 20.0], # Telok Ayer
+	["singapore", "sg_shophouse", 1.2785, 103.8435, 0.35, 18.0], # Tanjong Pagar / Duxton
+	["singapore", "sg_shophouse", 1.2815, 103.8458, 0.25, 20.0], # Ann Siang / Club St
+	["singapore", "sg_shophouse", 1.2865, 103.8492, 0.28, 22.0], # Boat Quay
+	["singapore", "sg_shophouse", 1.2905, 103.8462, 0.30, 20.0], # Clarke Quay
+	["singapore", "sg_shophouse", 1.3020, 103.8590, 0.48, 20.0], # Kampong Glam / Arab St
+	["singapore", "sg_shophouse", 1.3066, 103.8518, 0.55, 20.0], # Little India
+	["singapore", "sg_shophouse", 1.3120, 103.9010, 0.80, 12.0], # Katong / Joo Chiat
+	["singapore", "sg_shophouse", 1.3018, 103.8388, 0.25, 18.0], # Emerald Hill
+	["singapore", "sg_colonial", 1.2905, 103.8515, 0.52, 24.0],  # Civic District & Padang
+	["singapore", "sg_colonial", 1.2955, 103.8500, 0.42, 16.0],  # Bras Basah / Museum Precinct
+	["singapore", "sg_tower", 1.2840, 103.8510, 0.62, 22.0],     # Raffles Place CBD
+	["singapore", "sg_tower", 1.2795, 103.8535, 0.65, 22.0],     # Marina Bay / Downtown Core
+	["singapore", "sg_tower", 1.2765, 103.8465, 0.50, 20.0],     # Shenton Way / Tanjong Pagar
+	["singapore", "sg_mall", 1.2935, 103.8575, 0.55, 18.0],      # Marina Centre / Suntec
+	["singapore", "sg_mall", 1.3040, 103.8325, 0.85, 20.0],      # Orchard Road
+	["singapore", "sg_mall", 1.2995, 103.8555, 0.45, 18.0],      # Bugis
+	["singapore", "sg_artdeco", 1.2848, 103.8330, 0.48, 22.0],   # Tiong Bahru
+	["singapore", "sg_condo", 1.2940, 103.8380, 0.75, 16.0],     # River Valley / Robertson Quay
+	["singapore", "sg_hdb_slab", 1.3340, 103.8490, 1.10, 16.0],  # Toa Payoh
+	["singapore", "sg_hdb_slab", 1.2945, 103.8060, 1.10, 16.0],  # Queenstown
+	["singapore", "sg_hdb_slab", 1.3125, 103.8635, 0.90, 16.0],  # Kallang / Bendemeer
 	["seoul", "seoul_palace", 37.5783, 126.9770, 0.25, 40.0],    # Gyeongbokgung, Heungnyemun to Gyeonghoeru
 	["seoul", "seoul_palace", 37.5815, 126.9770, 0.22, 40.0],    # Gyeongbokgung, north courts
 	["seoul", "seoul_palace", 37.5794, 126.9910, 0.3, 40.0],     # Changdeokgung
@@ -606,7 +624,7 @@ static func local_frame(region: String, lat: float, lon: float) -> Dictionary:
 
 ## Cities whose district circles also shape the far fabric
 ## (FarCityBuilder), so the city past the detailed extent keeps them.
-const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki", "miami", "paris", "venice"]
+const FAR_DISTRICT_CITIES := ["stockholm", "bangkok", "turku", "helsinki", "miami", "paris", "venice", "singapore"]
 
 ## The far fabric's district circles for a viewpoint's region, in its
 ## local metre frame: [[era, Vector2 centre, radius_m], ...], the most

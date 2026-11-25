@@ -99,6 +99,9 @@ func _rig_checks(failures: Array[String]) -> void:
 	rig.set_place(51.5018, -0.1196)
 	if absf(rig.utc_offset_h - 0.0) > 0.01:
 		failures.append("London pre-weather UTC offset should be 0.0, got %.1f" % rig.utc_offset_h)
+	rig.set_place(1.28967, 103.85007)
+	if absf(rig.utc_offset_h - 8.0) > 0.01:
+		failures.append("Singapore pre-weather UTC offset should be +8.0, got %.1f" % rig.utc_offset_h)
 	rig.free()
 
 ## The real moon: phase from the date, light from where it stands.

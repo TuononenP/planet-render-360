@@ -58,6 +58,12 @@ const BUS_PAINT := {
 		Color(0.86, 0.64, 0.05),  # yellow mini/private bus
 		Color(0.03, 0.14, 0.44),  # Thai Smile Bus dark-blue electric
 	],
+	"singapore": [
+		Color(0.14, 0.46, 0.18),  # LTA Lush Green
+		Color(0.14, 0.46, 0.18),  # LTA Lush Green
+		Color(0.72, 0.10, 0.12),  # SBS Transit red
+		Color(0.84, 0.56, 0.06),  # SMRT ochre
+	],
 }
 const BUS_PALETTE := [Color(0.82, 0.82, 0.8), Color(0.5, 0.04, 0.04), Color(0.05, 0.2, 0.45),
 	Color(0.85, 0.64, 0.05), Color(0.08, 0.36, 0.2)]
@@ -214,7 +220,7 @@ static func plan_buses(data: LocationData, ground: GroundTruth, m2u: float, trai
 	var region := CityStyles.region_at(data.latitude, data.longitude)
 	var city := CityStyles.city_of_region(region)
 	var bus_key := "bangkok" if region.begins_with("bangkok") else (city if city != "" else region)
-	var bus_kind := "bus_double" if bus_key == "london" else "bus"
+	var bus_kind := "bus_double" if bus_key in ["london", "singapore"] else "bus"
 	var paint_entry: Variant = BUS_PAINT.get(bus_key, BUS_PALETTE[absi(hash(data.country + bus_key)) % BUS_PALETTE.size()])
 	var length := CarSpecs.length_m(bus_kind) * m2u
 	var spots: Array = []
@@ -300,14 +306,15 @@ static func footprints(data: LocationData, ground: GroundTruth, m2u: float) -> A
 static var _bus_meshes := {}
 
 ## The bus mesh, its windows and destination sign lit at night like a tram's.
-static func bus_mesh(far: bool) -> ArrayMesh:
-	if not _bus_meshes.has(far):
-		var m := CarModel.mesh("bus", far).duplicate() as ArrayMesh
+static func bus_mesh(far: bool, kind: String = "bus") -> ArrayMesh:
+	var cache_key := "%s_%s" % [kind, "far" if far else "near"]
+	if not _bus_meshes.has(cache_key):
+		var m := CarModel.mesh(kind, far).duplicate() as ArrayMesh
 		for i in m.get_surface_count():
 			if m.surface_get_name(i) in ["Glass", "HeadLamp", "TailLamp", "Board"]:
 				m.surface_set_material(i, TramModel.material(m.surface_get_name(i)))
-		_bus_meshes[far] = m
-	return _bus_meshes[far]
+		_bus_meshes[cache_key] = m
+	return _bus_meshes[cache_key]
 
 ## Builds the trams and buses under `root`; returns how many trains stand.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
@@ -321,12 +328,13 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
 		depot.name = "Buses"
 		for i in buses.size():
 			var one: Array = [buses[i]]
-			var near := ParkedCars._add_batch(depot, one, bus_mesh(false), "Bus%d_near" % i, 0.0, DETAIL_M)
-			var far := ParkedCars._add_batch(depot, one, bus_mesh(true), "Bus%d_far" % i, DETAIL_M, 0.0)
-			var bounds := ParkedCars._batch_bounds(one, bus_mesh(false).get_aabb().merge(bus_mesh(true).get_aabb()))
+			var bkind := str((buses[i] as Array)[2])
+			var near := ParkedCars._add_batch(depot, one, bus_mesh(false, bkind), "Bus%d_near" % i, 0.0, DETAIL_M)
+			var far := ParkedCars._add_batch(depot, one, bus_mesh(true, bkind), "Bus%d_far" % i, DETAIL_M, 0.0)
+			var bounds := ParkedCars._batch_bounds(one, bus_mesh(false, bkind).get_aabb().merge(bus_mesh(true, bkind).get_aabb()))
 			near.custom_aabb = bounds
 			far.custom_aabb = bounds
-			ParkedCars._add_batch(depot, one, _shadow(CarSpecs.length_m("bus"), CarSpecs.width_m("bus")),
+			ParkedCars._add_batch(depot, one, _shadow(CarSpecs.length_m(bkind), CarSpecs.width_m(bkind)),
 				"Bus%d_shadow" % i, 0.0, DETAIL_M * 2.0)
 		root.add_child(depot)
 	if trains.is_empty():

@@ -171,6 +171,12 @@ const ROWS := [
 	{"id": "amsterdam", "label": "Amsterdam", "name": "Amsterdam, The Netherlands",
 		"lat": 52.37403, "lon": 4.88969, "eye_lat": 52.37295, "eye_lon": 4.89330,
 		"eye_m": 6.0, "bearing": 276.0, "pitch": 5.0, "clear": false},
+	# Merlion Park waterfront looking east-southeast across Marina Bay toward
+	# Marina Bay Sands, ArtScience Museum, Helix Bridge, Esplanade and Singapore Flyer;
+	# origin matches the bundled Singapore capital snapshot (1.28967, 103.85007).
+	{"id": "singapore", "label": "Singapore", "name": "Singapore",
+		"lat": 1.28967, "lon": 103.85007, "eye_lat": 1.28640, "eye_lon": 103.85450,
+		"eye_m": 6.0, "bearing": 102.0, "pitch": 4.0, "clear": false},
 ]
 
 ## Index of the starting place in ROWS (and in LocationData.quick_picks()).

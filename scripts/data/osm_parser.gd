@@ -375,6 +375,7 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 	HelsinkiNotable.apply(buildings)
 	TurkuNotable.apply(buildings)
 	MiamiNotable.apply(buildings)
+	SingaporeNotable.apply(buildings)
 	SuomenlinnaSite.apply(buildings, barriers, c_lat, c_lon, landmarks)
 	_monument_landmarks(buildings, landmarks)
 	LandmarkFidelity.mark(buildings, landmarks)
