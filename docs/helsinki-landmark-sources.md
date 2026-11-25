@@ -449,7 +449,12 @@ were scraped from File pages, not the API: spot-check them. Two GFDL images were
 - **cable_factory:** photos show buff brick all round (red band removed); eaves 22.4 m and plant 28 m
   estimated, LoD2 up to 36 m.
 - **salmisaari_power_plant:** brick, piers, chimney detail; coal gantry not modelled.
-- **loyly_helsinki:** roof 6.9 m LoD2; sloped slatted hill; real slopes steeper.
+- **loyly_helsinki:** rebuilt from CityGML `100522546S` (6.95 m sauna lookout, 5.65 m twin sea-lobe crowns,
+  3.55 m restaurant terrace), OSM ways `625576876`/`466092407`/`1307741294`/`625576877`/`1307741299`–`306`,
+  HSY 2023 orthophoto and drone refs: ESE seaward orientation corrected, faceted 3D pine-lamella cloak,
+  clear-glass railings, two-flight roof stairs + rooftop amphitheatre, five cowled flues to 8.6 m, four-tier
+  overwater sun deck with avanto sea stairs, parasols and SSW pavilion, and `LandmarkStairCut` terrace hold
+  shaving the 8.2 m LiDAR roof mound.
 - **hietalahti_market_hall:** ridge 12.2 m; matches photos well.
 - **hotel_kalastajatorppa:** two OSM wings, rough; 1936 restaurant not modelled.
 - **lauttasaari_church / manor:** church improved (nave 17 m not separated from 10 m halls); manor colour

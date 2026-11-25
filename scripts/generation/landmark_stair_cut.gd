@@ -84,6 +84,10 @@ static func terraces() -> Dictionary:
 		# the horizontal reflecting pool, stepped parterre walls and cascade head
 		# without pulling down the Palais de Chaillot belvedere bluff above z = -56 m.
 		"fontaine_de_varsovie": {"x0": -33.5, "x1": 33.5, "z0": -54.0, "z1": 78.0, "feather_m": 10.0},
+		# Löyly Helsinki: Helsinki's 1 m bare-earth LiDAR retains an 8.2 m mound over
+		# the walkable wooden roof and a 2.9 m shelf under the overwater deck; hold
+		# the footprint under y = 0 and step down toward the Baltic Sea on the ESE side.
+		"loyly_helsinki": {"x0": -21.0, "x1": 34.0, "z0": -26.0, "z1": 42.0, "feather_m": 6.0},
 	}
 
 static func _cut_terraces(surface: PackedFloat32Array, size: int, step: float, data: LocationData) -> void:
@@ -144,6 +148,11 @@ static func terrace_hold_m(type: String, l: Vector2) -> float:
 			return base_y
 		var slope_top := lerpf(7.2, 2.2, clampf((l.y + 38.0) / 104.0, 0.0, 1.0))
 		return lerpf(base_y, slope_top, clampf((ax - 24.8) / 8.7, 0.0, 1.0))
+	if type == "loyly_helsinki":
+		# Seaward axis ESE (+0.9017, +0.4324): keep dry land just below y = 0 and
+		# fall below the stepped overwater sun deck on the sea side (s > 6 m).
+		var sea_s := l.x * 0.901689 + l.y * 0.432386
+		return lerpf(0.20, -1.70, clampf((sea_s - 6.0) / 18.0, 0.0, 1.0))
 	return 0.0
 
 ## The cut's model-local rect (x, z), metres.
