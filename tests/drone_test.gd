@@ -242,12 +242,16 @@ func _flight() -> void:
 	for i in 30 * 80:
 		view._drone.process(view, dt)
 	var xz := Vector2(view._rig.position.x, view._rig.position.z)
-	_check(view._rig.position.y >= ViewDrone.floor_y(data.buildings, view._ground, xz) - ViewDrone.BOB_M - 0.5,
-		"and the descent stops at the floor: %s" % (view._rig.position.y - view._ground.height_at_world(xz.x, xz.y)))
+	var ground_agl := view._rig.position.y - view._ground.height_at_world(xz.x, xz.y)
+	_check(ground_agl >= ViewDrone.AGL_MIN_M - 0.05 and ground_agl <= ViewDrone.AGL_MIN_M + 0.15,
+		"descent lands the drone on the ground: %.2f m" % ground_agl)
+	_check(view._drone.altitude.value_text() == "0 m",
+		"the altitude readout shows 0 m on touchdown: " + view._drone.altitude.value_text())
 	view._drone.stick_aux = Vector2.ZERO
 
-	# Fly out past the walking area, to the roam edge, low and boosted
-	# straight at a tower across the way: never inside it.
+	# Fly low and boosted straight at a tower across the way: stops outside
+	# its wall (never inside it); then climb over its roof and fly on past
+	# the walking area to the roam edge.
 	var roof := view._ground.height_at_world(0.0, -400.0) + 80.0
 	data.buildings.append({"x": 0.0, "z": -400.0, "height": 80.0, "footprint": PackedVector2Array([
 		Vector2(-300, -415), Vector2(300, -415), Vector2(300, -385), Vector2(-300, -385)])})
@@ -259,17 +263,37 @@ func _flight() -> void:
 	Input.parse_input_event(shift)
 	Input.flush_buffered_events()
 	_check(Input.is_key_pressed(KEY_SHIFT), "Shift is held for the boosted run")
+	var entered_wall := false
+	for i in 30 * 15:
+		view._drone.process(view, dt)
+		var q := view._rig.position
+		if q.z < -385.0 + ViewDrone.AGL_MIN_M - 0.05 and absf(q.x) <= 300.0 and q.y < roof:
+			entered_wall = true
+	_check(not entered_wall and absf(view._rig.position.z - (-385.0 + ViewDrone.AGL_MIN_M)) < 0.25,
+		"flying low at a tower stops outside its wall: %s" % view._rig.position)
+	# Climb above the tower, then fly across its roof (pressing descend over
+	# the roof to verify the roof holds it) and on to the roam edge.
+	view._drone.stick_move = Vector2.ZERO
+	view._drone.stick_aux = Vector2(0, -1)
+	for i in 30 * 2:
+		view._drone.process(view, dt)
+	view._drone.stick_aux = Vector2.ZERO
+	view._drone.stick_move = Vector2(0, -1)
 	var lowest := INF
-	for i in 30 * 120:
+	for i in 30 * 40:
+		var z_now := view._rig.position.z
+		view._drone.stick_aux = Vector2(0, 1) if absf(z_now + 400.0) <= 12.0 else Vector2.ZERO
 		view._drone.process(view, dt)
 		var q := view._rig.position
 		if absf(q.z + 400.0) <= 15.0 and absf(q.x) <= 300.0:
 			lowest = minf(lowest, q.y - roof)
+	view._drone.stick_aux = Vector2.ZERO
 	view._drone.stick_move = Vector2.ZERO
 	shift.pressed = false
 	Input.parse_input_event(shift)
 	Input.flush_buffered_events()
-	_check(lowest != INF and lowest >= 1.0, "flying low at a tower clears its roof: %s m" % lowest)
+	_check(lowest != INF and lowest >= ViewDrone.AGL_MIN_M - 0.05,
+		"flying over a tower clears its roof: %s m" % lowest)
 	xz = Vector2(view._rig.position.x, view._rig.position.z)
 	_check(xz.length() > View360.IN_PLACE_M and xz.length() <= ViewDrone.EDGE_M + 0.01,
 		"the drone roams past the walking area, up to its edge: %s" % xz.length())

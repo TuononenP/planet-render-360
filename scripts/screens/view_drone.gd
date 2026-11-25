@@ -4,12 +4,14 @@ extends RefCounted
 ## Drone mode (G, or the drone button): the camera hovers over the whole
 ## detailed ground instead of walking. W A S D (or the left stick) fly
 ## with momentum, so the drone eases in and drifts to a stop; E / Q (or
-## the right stick up and down) climb and descend, and the right stick
-## turns; Shift boosts. The drone holds its height over the terrain as it
-## flies, never drops below AGL_MIN_M or the roofs beside it, and bobs
-## gently while it hovers (still under Reduce motion). One instance per
-## view; steering, floor and roam rules are static so tests can drive
-## them. ViewChrome builds the button, readout and sticks into it.
+## the right stick up and down) climb and descend all the way down to the
+## ground, and the right stick turns; Shift boosts. The drone holds its
+## height over the terrain as it flies, settles onto the ground (or onto
+## roofs and decks) without sinking into any terrain, building, statue,
+## vehicle or prop (DroneObstacles), and bobs gently while hovering in open
+## air (still on touchdown and under Reduce motion). One instance per view;
+## steering, floor and roam rules are static so tests can drive them.
+## ViewChrome builds the button, readout and sticks into it.
 
 ## Cruise (full-stick) speed: 100 km/h. Shift still sprints past it
 ## at BOOST_MULT, as before.
@@ -18,14 +20,18 @@ const BOOST_MULT := 3.0
 ## Climb and descent speed (m/s); Shift multiplies it by BOOST_MULT too.
 const CLIMB_MPS := 20.0
 ## Per second: how fast the drone reaches the wished speed, and how fast
-## it drifts to a stop with nothing held.
+## it drifts to a stop in the air or when resting on a surface.
 const ACCEL := 3.0
 const DRAG := 1.6
-## Height over the terrain (metres): the lowest it hovers, and its ceiling.
-const AGL_MIN_M := 8.0
+const GROUND_DRAG := 8.0
+## Height over the surface (metres): landing clearance (camera sphere
+## radius, outside the 0.25 m near plane) and its ceiling.
+const AGL_MIN_M := DroneObstacles.RADIUS_M
 const AGL_MAX_M := 500.0
+## Clearance band over a supporting surface across which hover bob fades to 0.
+const BOB_SETTLE_M := 2.0
 ## Height the drone starts at on takeoff: high enough to take the
-## place in (roofs beside it can still push the floor higher).
+## place in (roofs directly under it can still push the floor higher).
 const START_AGL_M := 100.0
 ## Roam radius, inside the ±1200 m detailed ground (GroundTruth.extent_m).
 const EDGE_M := 1100.0
@@ -37,14 +43,6 @@ const BANK_MAX := 0.06
 const LAND_PITCH := 0.3
 ## Right stick turn rate, radians per second.
 const YAW_RATE := 1.2
-## The roof floor is re-measured this often, under the drone and where
-## it will be LOOKAHEAD_S on, so it rises before it reaches a tower;
-## the readout refreshes at 5 Hz.
-const FLOOR_EVERY_S := 0.12
-const LOOKAHEAD_S := 1.0
-## The buildings the floor checks are those within reach of where the
-## drone was last NEAR_REFRESH_M ago, re-gathered as it flies on.
-const NEAR_REFRESH_M := 150.0
 const READOUT_EVERY_S := 0.2
 ## Below this speed (m/s) the drone counts as hovering.
 const SETTLED_MPS := 0.05
@@ -67,13 +65,8 @@ var sticks: DroneSticks
 var _vel := Vector2.ZERO
 var _agl := 30.0
 var _clock := 0.0
-var _floor_clock := 0.0
-var _floor_target := -INF
-var _floor_here := -INF
-var _near: Array = []
-var _spans := PackedVector3Array()
-var _spans_for: LocationData
-var _near_at := Vector2.INF
+var _on_surface := false
+var _obstacles := DroneObstacles.new()
 var _readout_clock := 0.0
 var _moving := false
 var _probe_at := Vector3.INF
@@ -89,11 +82,10 @@ static func steer(vel: Vector2, wish: Vector2, delta: float, boost: bool = false
 	var target := wish.limit_length(1.0) * CRUISE_MPS * (BOOST_MULT if boost else 1.0)
 	return vel.lerp(target, 1.0 - exp(-ACCEL * delta))
 
-## Lowest Y the drone may hover at over `xz`: AGL_MIN_M over the terrain,
-## and View360's roof clearance over `buildings` beside it.
+## Lowest Y the drone may descend to over `xz` from above: AGL_MIN_M over
+## the terrain/water, or over the roof of any building directly beneath `xz`.
 static func floor_y(buildings: Array, ground: GroundTruth, xz: Vector2) -> float:
-	return maxf(ground.height_at_world(xz.x, xz.y) + AGL_MIN_M,
-		View360.roof_clearance_among(buildings, ground, xz))
+	return DroneObstacles.floor_among(buildings, ground, xz)
 
 ## Each building's centre and reach (its farthest corner from the
 ## centre) as (x, z, reach), -1 reach for one without a footprint.
@@ -153,15 +145,14 @@ func enter(v: View360) -> void:
 	v._walk.stick_aux = Vector2.ZERO
 	_vel = Vector2.ZERO
 	_clock = 0.0
-	_floor_clock = 0.0
+	_on_surface = false
 	_moving = false
-	_near_at = Vector2.INF
 	_probe_at = v._rig.position if v._rig != null else Vector3.INF
 	if v._ground != null and v._rig != null:
 		# Take off to START_AGL_M (keeping a higher stance it already has):
 		# process() eases the camera up to it over the first second.
-		_agl = clampf(maxf(v._rig.position.y - v._ground.height_at_world(v._rig.position.x, v._rig.position.z),
-			START_AGL_M), AGL_MIN_M, AGL_MAX_M)
+		var surf := DroneObstacles.surface_y(v._data, v._ground, Vector2(v._rig.position.x, v._rig.position.z))
+		_agl = clampf(maxf(v._rig.position.y - surf, START_AGL_M), AGL_MIN_M, AGL_MAX_M)
 	sync_hud(v)
 	_update_readout(v)
 
@@ -172,9 +163,10 @@ func exit(v: View360, glide_home: bool = true) -> void:
 	stick_move = Vector2.ZERO
 	stick_aux = Vector2.ZERO
 	_vel = Vector2.ZERO
+	_on_surface = false
 	if v._rig != null and v._rig.camera != null:
 		v._rig.camera.rotation.z = 0.0
-	_near.clear()
+	_obstacles.invalidate()
 	sync_hud(v)
 	if not glide_home or v._data == null or v._ground == null or v._rig == null:
 		return
@@ -232,51 +224,83 @@ func process(v: View360, delta: float) -> void:
 			_resync = true
 			return
 		v._visit_tween.kill()
-	var here := Vector2(v._rig.position.x, v._rig.position.z)
-	var ground_y := v._ground.height_at_world(here.x, here.y)
+	var pos0 := v._rig.position
+	var here := Vector2(pos0.x, pos0.z)
+	var surf_here := DroneObstacles.surface_y(v._data, v._ground, here)
 	if _resync:
 		_resync = false
 		_vel = Vector2.ZERO
-		_agl = clampf(v._rig.position.y - ground_y, AGL_MIN_M, AGL_MAX_M)
+		_agl = clampf(pos0.y - surf_here, AGL_MIN_M, AGL_MAX_M)
 	if stick_aux.x != 0.0:
 		v._rig.set_look(v._rig.yaw - stick_aux.x * YAW_RATE * delta, v._rig.pitch)
 	var yaw := v._rig.yaw
 	var forward := Vector2(-sin(yaw), -cos(yaw))
 	var right := Vector2(cos(yaw), -sin(yaw))
-	_vel = steer(_vel, forward * fwd + right * side, delta, boost)
+	var wish := forward * fwd + right * side
+	if _on_surface and wish.length_squared() < 0.0001 and climb <= 0.0:
+		_vel *= exp(-GROUND_DRAG * delta)
+		if _vel.length() < 0.02:
+			_vel = Vector2.ZERO
+	else:
+		_vel = steer(_vel, wish, delta, boost)
 	if v._streamer.enabled:
 		_vel = WorldStreamer.capped_velocity(_vel, here)
-	var next := v.stream_roam(here, here + _vel * delta)
-	if delta > 0.0:
-		_vel = (next - here) / delta
-	ground_y = v._ground.height_at_world(next.x, next.y)
+	var desired_xz := v.stream_roam(here, here + _vel * delta)
+	if delta > 0.0 and desired_xz.distance_to(here + _vel * delta) > 0.0005:
+		_vel = (desired_xz - here) / delta
+
+	var surf_next := DroneObstacles.surface_y(v._data, v._ground, desired_xz)
 	if climb != 0.0:
-		# Climb from where the drone is, not from a floor it rose above.
-		var now := v._rig.position.y - ground_y
+		var now := pos0.y - surf_next
 		_agl = maxf(_agl, now) if climb > 0.0 else minf(_agl, now)
 		_agl = clampf(_agl + climb * CLIMB_MPS * (BOOST_MULT if boost else 1.0) * delta,
 			AGL_MIN_M, AGL_MAX_M)
-	_floor_clock -= delta
-	if _floor_clock <= 0.0:
-		_floor_clock = FLOOR_EVERY_S
-		var ahead := v.stream_roam(next, next + _vel * LOOKAHEAD_S)
-		if next.distance_to(_near_at) > NEAR_REFRESH_M:
-			if _spans_for != v._data or _spans.size() != v._data.buildings.size():
-				_spans_for = v._data
-				_spans = reaches(v._data.buildings)
-			_near_at = next
-			_near = nearby(v._data.buildings, _spans, next, View360.CLEAR_RADIUS_M + NEAR_REFRESH_M
-				+ CRUISE_MPS * BOOST_MULT * LOOKAHEAD_S)
-		_floor_here = floor_y(_near, v._ground, next)
-		_floor_target = maxf(_floor_here, floor_y(_near, v._ground, ahead))
+	var support := _obstacles.support_y(v, desired_xz, pos0.y)
+	var clearance := maxf(pos0.y - support, AGL_MIN_M)
+	var bob_k := clampf((clearance - AGL_MIN_M) / BOB_SETTLE_M, 0.0, 1.0)
 	_clock += delta
-	var target := maxf(_floor_target, ground_y + _agl) + bob(_clock)
-	var y := lerpf(v._rig.position.y, target, 1.0 - exp(-6.0 * delta))
-	# Never inside a roof: the clearance over the roofs here may be eased
-	# into, the roofs themselves not.
-	var hard := maxf(ground_y + 1.0, _floor_here - View360.CLEAR_ABOVE_M + 1.0)
-	v._rig.position = Vector3(next.x, maxf(y, hard), next.y)
-	var bank := 0.0 if UiPrefs.reduce_motion \
+	var bob_y := bob(_clock) * bob_k
+	var target_y := clampf(surf_next + _agl, support + AGL_MIN_M, surf_next + AGL_MAX_M) + bob_y
+	var desired_y := lerpf(pos0.y, target_y, 1.0 - exp(-6.0 * delta))
+	if absf(desired_y - target_y) < 0.01:
+		desired_y = target_y
+
+	var res := _obstacles.sweep(pos0, Vector3(desired_xz.x, desired_y, desired_xz.y), v)
+	var final_pos: Vector3 = res["pos"]
+	var final_xz := Vector2(final_pos.x, final_pos.z)
+	var clamped_xz := v.stream_roam(here, final_xz)
+	if clamped_xz != final_xz:
+		var retry := _obstacles.sweep(pos0, Vector3(clamped_xz.x, final_pos.y, clamped_xz.y), v)
+		var rp: Vector3 = retry["pos"]
+		var rxz := Vector2(rp.x, rp.z)
+		if v.stream_roam(here, rxz) == rxz:
+			final_pos = rp
+			final_xz = rxz
+		else:
+			final_pos = Vector3(here.x, rp.y, here.y)
+			final_xz = here
+
+	if bool(res["hit_wall"]):
+		var n_xz: Vector2 = res["normal_xz"]
+		if n_xz.length_squared() > 1e-6 and _vel.dot(n_xz) < 0.0:
+			_vel -= n_xz * _vel.dot(n_xz)
+		if delta > 0.0:
+			var actual_step := (final_xz - here).length()
+			var max_v := actual_step / delta
+			if _vel.length() > max_v + 0.5:
+				_vel = _vel.limit_length(max_v)
+
+	var surf_final := DroneObstacles.surface_y(v._data, v._ground, final_xz)
+	if bool(res["hit_floor"]) and climb <= 0.0:
+		_agl = clampf(maxf(_agl, final_pos.y - bob_y - surf_final), AGL_MIN_M, AGL_MAX_M)
+	if bool(res["hit_ceil"]) and climb >= 0.0:
+		_agl = clampf(minf(_agl, final_pos.y - bob_y - surf_final), AGL_MIN_M, AGL_MAX_M)
+	var support_final := _obstacles.support_y(v, final_xz, final_pos.y)
+	_on_surface = (final_pos.y - (support_final + AGL_MIN_M)) <= 0.08 \
+		and (surf_final + _agl) <= (support_final + AGL_MIN_M + 0.12)
+	v._rig.position = final_pos
+
+	var bank := 0.0 if UiPrefs.reduce_motion or _on_surface \
 		else -BANK_MAX * clampf(_vel.dot(right) / CRUISE_MPS, -1.0, 1.0)
 	if v._rig.camera != null:
 		v._rig.camera.rotation.z = lerpf(v._rig.camera.rotation.z, bank, 1.0 - exp(-4.0 * delta))
@@ -294,10 +318,11 @@ func process(v: View360, delta: float) -> void:
 		_readout_clock = READOUT_EVERY_S
 		_update_readout(v)
 
-## Altitude over the ground and ground speed, as the readout shows them.
+## Altitude over the surface (0 m when landed on the ground) and ground speed.
 func _update_readout(v: View360) -> void:
 	if altitude == null or v._ground == null or v._rig == null:
 		return
 	var p := v._rig.position
-	altitude.set_value(UiTheme.elevation(maxf(p.y - v._ground.height_at_world(p.x, p.z), 0.0)))
+	var raw := maxf(p.y - DroneObstacles.surface_y(v._data, v._ground, Vector2(p.x, p.z)), 0.0)
+	altitude.set_value(UiTheme.elevation(0.0 if raw <= AGL_MIN_M + 0.1 else raw))
 	speed.set_value(UiTheme.speed(_vel.length()))

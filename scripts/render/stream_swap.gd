@@ -33,9 +33,7 @@ static func seat(v: View360, data: LocationData, new_xz: Vector2, agl: float) ->
 	v._walk._spans_for = null
 	v._walk._near_at = Vector2.INF
 	v._walk._near.clear()
-	v._drone._spans_for = null
-	v._drone._near_at = Vector2.INF
-	v._drone._near.clear()
+	v._drone._obstacles.invalidate()
 	if v._drone.on:
 		# Momentum is frame-relative and survives the recentre: only
 		# the height-over-ground and floor caches are re-derived. A
@@ -45,6 +43,3 @@ static func seat(v: View360, data: LocationData, new_xz: Vector2, agl: float) ->
 		v._drone._agl = clampf(agl, ViewDrone.AGL_MIN_M, ViewDrone.AGL_MAX_M)
 	else:
 		v._drone._resync = true
-	v._drone._floor_clock = 0.0
-	v._drone._floor_here = -INF
-	v._drone._floor_target = -INF

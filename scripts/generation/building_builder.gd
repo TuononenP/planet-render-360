@@ -120,6 +120,7 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 	# Placed infill footprints: boxes are sited only against real
 	# buildings, and two overlapping ones of one default height z-fought.
 	var placed: Array[PackedVector2Array] = []
+	var infill_prisms: Array = []
 	# 2x the preset count, in a 9-98 ring: the foreground roofscape
 	# must reach the frame bottom (PRD §4.2), not start past a hole.
 	for i in RenderSettings.procedural_buildings_for(data.quality_preset) * 2:
@@ -178,7 +179,9 @@ static func _buildings(root: Node3D, data: LocationData, ground: GroundTruth,
 			Vector2(pos.x, pos.z), shape, rh_m * m2u, b, ctx,
 			maxi(1, roundi(total_m / float(look["floor_h"]))) if matched \
 				else int(look["storeys"]), look)
+		infill_prisms.append({"ring": ring, "y_lo": gy - 1.0 * m2u, "y_hi": gy + total_m * m2u})
 		last_stats["infill"] = int(last_stats.get("infill", 0)) + 1
+	data.set_meta(&"infill_prisms", infill_prisms)
 
 ## Rotated rectangle footprint (internal units) for procedural masses.
 ## Squared distance from `b` to the nearer of the camera and the view's
