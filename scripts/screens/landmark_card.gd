@@ -66,7 +66,7 @@ func _init(fetcher: WikiFetcher, header: bool = true, go: bool = true) -> void:
 	add_child(_photo_box)
 	_photo = TextureRect.new()
 	_photo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_photo_box.add_child(_photo)
 	_credit = _wrapped("", "caption", UiTheme.MUTED)
 	_credit.visible = false
