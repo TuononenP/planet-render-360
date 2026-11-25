@@ -157,6 +157,33 @@ func _init() -> void:
 			[{"highway": "primary"}, false], [{"highway": "construction"}, false]]:
 		if OsmTags.unbuilt_highway(c[0]) != c[1]:
 			failures.append("unbuilt_highway(%s) should be %s" % [c[0], c[1]])
+	# Demolished or planned buildings, bridges, piers, and railways are never rendered,
+	# while standing buildings (including ruins or those with disused shops) are kept.
+	for c in [[{"building": "demolished"}, true], [{"building": "proposed"}, true],
+			[{"building": "planned"}, true], [{"building": "construction"}, true],
+			[{"building": "yes", "demolished": "yes"}, true], [{"building": "yes", "demolished:building": "yes"}, true],
+			[{"man_made": "bridge", "proposed": "yes"}, true], [{"bridge": "proposed", "highway": "primary"}, true],
+			[{"man_made": "bridge", "proposed:bridge": "yes"}, true], [{"railway": "planned"}, true],
+			[{"man_made": "pier", "status": "demolished"}, true],
+			[{"building": "ruins"}, false], [{"building": "yes", "disused:shop": "yes"}, false],
+			[{"building": "commercial", "proposed": "no"}, false], [{"highway": "primary", "bridge": "yes"}, false]]:
+		if OsmTags.unbuilt_or_demolished(c[0]) != c[1]:
+			failures.append("unbuilt_or_demolished(%s) should be %s" % [c[0], c[1]])
+	# End-to-end parser check: demolished/planned buildings and bridges emit zero features.
+	var demo_json := JSON.stringify({"elements": [
+		{"type": "way", "id": 1, "tags": {"building": "demolished"},
+			"geometry": [{"lat": 60.15, "lon": 24.93}, {"lat": 60.1501, "lon": 24.93},
+				{"lat": 60.1501, "lon": 24.9301}, {"lat": 60.15, "lon": 24.9301}, {"lat": 60.15, "lon": 24.93}]},
+		{"type": "way", "id": 2, "tags": {"man_made": "bridge", "proposed": "yes"},
+			"geometry": [{"lat": 60.15, "lon": 24.93}, {"lat": 60.1501, "lon": 24.93},
+				{"lat": 60.1501, "lon": 24.9301}, {"lat": 60.15, "lon": 24.9301}, {"lat": 60.15, "lon": 24.93}]},
+		{"type": "way", "id": 3, "tags": {"highway": "primary", "bridge": "proposed"},
+			"geometry": [{"lat": 60.15, "lon": 24.93}, {"lat": 60.1502, "lon": 24.9302}]},
+	]})
+	var parsed := OsmParser.parse_features(demo_json, 60.15, 24.93)
+	if not (parsed["buildings"] as Array).is_empty() or not (parsed["bridge_areas"] as Array).is_empty() \
+			or not (parsed["roads"] as Array).is_empty():
+		failures.append("demolished/planned OSM elements must not produce buildings, bridges or roads")
 	if failures.is_empty():
 		print("ROAD BRIDGE DECKS OK")
 		quit(0)

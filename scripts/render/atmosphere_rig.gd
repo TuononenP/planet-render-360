@@ -520,7 +520,9 @@ func _set_street_probes(on: bool) -> void:
 		sp.box_projection = true
 		sp.blend_distance = 20.0 * units_per_metre
 		sp.max_distance = 600.0 * units_per_metre
-		sp.enable_shadows = true
+		# Near-ground probe shadow passes on Forward+/Metal can emit NaNs into
+		# the radiance cubemap, turning nearby asphalt, gravel and timber black.
+		sp.enable_shadows = false
 		sp.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
 		add_child(sp)
 		_street_probes.append(sp)

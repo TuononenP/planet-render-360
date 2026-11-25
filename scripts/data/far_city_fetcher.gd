@@ -329,7 +329,7 @@ static func parse(text: String, c_lat: float, c_lon: float) -> Dictionary:
 		seen[key] = true
 		var raw_tags: Variant = el.get("tags", {})
 		var tags: Dictionary = raw_tags if raw_tags is Dictionary else {}
-		if str(tags.get("building", "")) == "construction" or str(tags.get("building:part", "")) == "construction":
+		if OsmTags.unbuilt_or_demolished(tags):
 			continue
 		var lu := str(tags.get("landuse", ""))
 		var rings := _rings(el, c_lat, c_lon)

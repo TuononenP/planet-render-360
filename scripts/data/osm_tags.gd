@@ -784,6 +784,46 @@ static func buried_waterway(tags: Dictionary) -> bool:
 	return _tag_truthy(tags.get("tunnel", "")) or underground(tags) \
 		or _tag_truthy(tags.get("covered", ""))
 
+## Lifecycle values meaning nothing stands there (planned/proposed or gone).
+const UNBUILT_VALUES := ["proposed", "planned", "demolished", "razed", "destroyed", "removed"]
+## Feature keys whose value in UNBUILT_VALUES marks the element absent.
+const LIFECYCLE_FEATURE_KEYS := ["building", "building:part", "highway", "railway",
+	"bridge", "man_made", "barrier", "aeroway", "waterway", "landuse", "leisure", "amenity"]
+## Standalone lifecycle tags that mark an element absent when truthy/non-"no".
+const LIFECYCLE_FLAG_KEYS := ["demolished", "razed", "destroyed", "removed", "proposed", "planned"]
+## Prefixed lifecycle keys on physical structures (e.g. demolished:building=yes,
+## proposed:bridge=yes), ignoring tenancy tags like disused:shop on standing buildings.
+const LIFECYCLE_PREFIXES := ["demolished:", "razed:", "destroyed:", "removed:", "proposed:", "planned:"]
+const LIFECYCLE_STRUCTURES := ["building", "building:part", "bridge", "highway",
+	"railway", "man_made", "barrier", "aeroway", "waterway", "pier", "tower"]
+
+## True when an OSM element is demolished/razed/destroyed/removed or only
+## planned/proposed (or a building/bridge under construction): nothing to render.
+static func unbuilt_or_demolished(tags: Dictionary) -> bool:
+	for k in LIFECYCLE_FLAG_KEYS:
+		if tags.has(k):
+			var v := str(tags[k]).strip_edges().to_lower()
+			if v != "" and v not in ["no", "false", "0"]:
+				return true
+	if str(tags.get("lifecycle", "")).strip_edges().to_lower() in UNBUILT_VALUES \
+			or str(tags.get("status", "")).strip_edges().to_lower() in UNBUILT_VALUES:
+		return true
+	for k in LIFECYCLE_FEATURE_KEYS:
+		if tags.has(k) and str(tags[k]).strip_edges().to_lower() in UNBUILT_VALUES:
+			return true
+	if str(tags.get("building", "")).strip_edges().to_lower() == "construction" \
+			or str(tags.get("building:part", "")).strip_edges().to_lower() == "construction" \
+			or str(tags.get("bridge", "")).strip_edges().to_lower() == "construction":
+		return true
+	for prefix: String in LIFECYCLE_PREFIXES:
+		for feat: String in LIFECYCLE_STRUCTURES:
+			var key: String = prefix + feat
+			if tags.has(key):
+				var v := str(tags[key]).strip_edges().to_lower()
+				if v != "" and v not in ["no", "false", "0"]:
+					return true
+	return false
+
 ## A highway that is not built (proposed, planned, also as
 ## highway=construction + construction=proposed) or no longer there
 ## (abandoned, disused, razed, demolished): mapped, but nothing to draw.

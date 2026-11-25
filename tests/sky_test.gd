@@ -143,8 +143,9 @@ func _init() -> void:
 	rig.ground_at = func(x: float, _z: float) -> float: return x * 0.1
 	rig.set_probe_origin(Vector3(10.0, 31.0, 0.0) * um)
 	if rig._street_probes.size() != AtmosphereRig.STREET_PROBE_OFFSETS.size() \
-			or not rig._street_probes[0].box_projection:
-		failures.append("street probes should be box-projected")
+			or not rig._street_probes[0].box_projection \
+			or rig._street_probes[0].enable_shadows:
+		failures.append("street probes should be box-projected with shadows off")
 	for sp: ReflectionProbe in rig._street_probes:
 		var street := sp.position.x * 0.1
 		var bottom := sp.position.y - sp.size.y * 0.5

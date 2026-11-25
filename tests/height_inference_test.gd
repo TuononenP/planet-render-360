@@ -34,6 +34,19 @@ func _init() -> void:
 	var tl := BuildingHeights._look_for(tagged, ctx)
 	if absf(float(BuildingHeights._resolve_total(tagged, tagged, ctx, {}, tl)["total_m"]) - 45.0) > 0.01:
 		failures.append("a tagged retail height must be kept")
+	# Small untagged commercial footprints (kiosks, containers) stay single-storey
+	# even among tall commercial neighbours, while explicitly tagged ones keep their height.
+	var kiosk := {"x": 80.0, "z": 0.0, "size_x": 5.6, "size_z": 2.5, "height": 10.0,
+		"height_source": "default", "kind": "commercial", "levels": 0}
+	var kl := BuildingHeights._look_for(kiosk, ctx)
+	var kh := float(BuildingHeights._resolve_total(kiosk, kiosk, ctx, {}, kl)["total_m"])
+	if kh > float(kl["floor_h"]) + 0.01:
+		failures.append("a 14 m² untagged commercial kiosk must stay 1 storey, got %.1f m" % kh)
+	var tagged_kiosk := {"x": 80.0, "z": 0.0, "size_x": 5.6, "size_z": 2.5, "height": 18.0,
+		"height_source": "tag_height", "kind": "commercial", "levels": 0}
+	var tkl := BuildingHeights._look_for(tagged_kiosk, ctx)
+	if absf(float(BuildingHeights._resolve_total(tagged_kiosk, tagged_kiosk, ctx, {}, tkl)["total_m"]) - 18.0) > 0.01:
+		failures.append("a tagged small-footprint height must be kept")
 	if failures.is_empty():
 		print("HEIGHT INFERENCE OK: office follows towers (%.0f m), retail/warehouse/parking stay low, tags kept" % res["office"])
 		quit(0)

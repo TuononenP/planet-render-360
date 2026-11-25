@@ -65,6 +65,8 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 			seen[key] = true
 		var raw_tags: Variant = el.get("tags", {})
 		var el_tags: Dictionary = raw_tags if raw_tags is Dictionary else {}
+		if OsmTags.unbuilt_or_demolished(el_tags):
+			continue
 		var source_id := "%s:%d" % [el.get("type", "way"), int(el.get("id", 0))]
 		var source_starts := [buildings.size(), roads.size(), land.size()]
 		var shore_kind := str(el_tags.get("man_made", ""))
@@ -83,10 +85,6 @@ static func parse_features(text: String, c_lat: float, c_lon: float) -> Dictiona
 					"material": str(el_tags.get("material", el_tags.get("surface", ""))),
 					"height_m": OsmTags._tag_metres(el_tags.get("height", ""), 0.1, 30.0)})
 		if (el_tags.has("building") or el_tags.has("building:part")) and OsmTags.underground(el_tags):
-			continue
-		# Construction footprints can carry the planned final height. Treating
-		# that as an existing tower invents a skyline years before completion.
-		if str(el_tags.get("building", "")) == "construction" or str(el_tags.get("building:part", "")) == "construction":
 			continue
 		# The is_in country area: tags only, no geometry.
 		if str(el.get("type", "")) == "area":

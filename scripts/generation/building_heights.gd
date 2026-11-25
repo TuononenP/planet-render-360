@@ -105,6 +105,11 @@ static func _height_context(data: LocationData) -> Dictionary:
 const LOW_RISE_USES := ["retail", "supermarket", "warehouse", "industrial", "garage",
 	"garages", "parking", "kiosk", "service", "shed", "hangar", "barn"]
 const LOW_RISE_STOREYS := 4.0
+## Small untagged footprints (kiosks, booths, containers) are never
+## multi-storey towers even when tagged building=commercial among tall
+## neighbours. Religious and civic footprints (chapels, towers) are exempt.
+const SMALL_FOOTPRINT_1F_M2 := 25.0
+const SMALL_FOOTPRINT_2F_M2 := 45.0
 ## Roof allowance over a heritage zone's storey cap.
 const ZONE_ROOF_M := 4.0
 
@@ -147,6 +152,13 @@ static func _resolve_total(m: Dictionary, b: Dictionary, ctx: Dictionary,
 	# an untagged Dubai Mall block 61 m tall beside the vantage.
 	if str(m.get("kind", b.get("kind", ""))) in LOW_RISE_USES:
 		est["total_m"] = minf(float(est["total_m"]), LOW_RISE_STOREYS * float(look["floor_h"]))
+	var area_m2 := _area_m2(m)
+	var style_kind := str(look.get("kind", ""))
+	if area_m2 > 0.0 and style_kind not in ["religious", "civic"]:
+		if area_m2 < SMALL_FOOTPRINT_1F_M2:
+			est["total_m"] = minf(float(est["total_m"]), float(look["floor_h"]))
+		elif area_m2 < SMALL_FOOTPRINT_2F_M2:
+			est["total_m"] = minf(float(est["total_m"]), 2.0 * float(look["floor_h"]))
 	# A heritage zone (HeritageZones) caps what the map does not say.
 	if b.has("zone_storeys"):
 		est["total_m"] = minf(float(est["total_m"]),
