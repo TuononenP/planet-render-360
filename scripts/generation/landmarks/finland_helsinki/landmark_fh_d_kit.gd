@@ -26,10 +26,26 @@ static func runs(p: PackedVector2Array) -> Array:
 
 ## `p` grown outward by `d` metres with mitred corners (cornices, plinths).
 static func grow(p: PackedVector2Array, d: float) -> PackedVector2Array:
-	var res := Geometry2D.offset_polygon(p, d, Geometry2D.JOIN_MITER)
-	if res.is_empty():
+	if p.size() < 3:
 		return p
-	return res[0]
+	var cw := Geometry2D.is_polygon_clockwise(p)
+	var ccw := p.duplicate()
+	if cw:
+		ccw.reverse()
+	var best := PackedVector2Array()
+	var best_area := 0.0
+	for piece in Geometry2D.offset_polygon(ccw, d, Geometry2D.JOIN_MITER):
+		if Geometry2D.is_polygon_clockwise(piece):
+			continue
+		var area := absf(RingGeometry.signed_area(piece))
+		if area > best_area:
+			best_area = area
+			best = piece
+	if best.is_empty():
+		return p
+	if cw:
+		best.reverse()
+	return best
 
 ## A solid ring slab of the outline grown by `d`, from y to y + h.
 static func slab(lm: LandmarkMesh, key: String, p: PackedVector2Array, d: float, y: float, h: float) -> void:

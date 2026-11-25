@@ -265,8 +265,9 @@ static func bay_dormers(batch: BuildingDetail.Batch, ring: PackedVector2Array,
 			if not RingGeometry.point_in_ring(p, ring):
 				continue
 			var w := minf(1.15 * m, step * 0.7)
-			batch.add("box", BuildingDetail._xf(basis, Vector3(p.x, y0 + hd * 0.5, p.y),
-				Vector3(w, hd, depth)), roof_mat)
+			var body_h := (y0 + hd) - top
+			batch.add("box", BuildingDetail._xf(basis, Vector3(p.x, top + body_h * 0.5, p.y),
+				Vector3(w, body_h, depth)), roof_mat)
 			batch.add("pyramid", BuildingDetail._xf(basis, Vector3(p.x, y0 + hd + 0.25 * m, p.y),
 				Vector3(w * 1.15, 0.5 * m, depth * 1.1)), roof_mat)
 			# Zinc cheeks and front (the roof material), a slim stone surround

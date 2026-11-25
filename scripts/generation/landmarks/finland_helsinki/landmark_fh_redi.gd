@@ -120,7 +120,7 @@ static func build(model: Node3D) -> void:
 	# Glass park pavilion and roof plant close at the registered height.
 	U.blk(lm, "Glass", -52.0, 16.5, -30.0, 20.0, 2.6, 11.0)
 	U.blk(lm, "Trim", -52.0, 19.1, -30.0, 21.0, 0.4, 12.0)
-	U.blk(lm, "Roof", 60.0, 18.5, -20.0, 22.0, 1.5, 16.0)
+	U.blk(lm, "Roof", 60.0, 16.5, -20.0, 22.0, 3.5, 16.0)
 	lm.commit(model)
 	var warm := Color(1.0, 0.88, 0.72)
 	model.set_meta(LandmarkLights.FLOOD_META, [

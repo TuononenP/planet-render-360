@@ -52,8 +52,19 @@ static func build(model: Node3D) -> void:
 	LandmarkFrKit.rect(lm, "Plaster", -19.0, 19.0, 2.0, 18.0, 2.2, 12.2)
 	LandmarkFrParts.band(lm, "Trim", -19.0, 19.0, 2.0, 18.0, 6.8, 0.36, 0.14)
 	LandmarkFrParts.cornice_ring(lm, "Trim", -19.0, 19.0, 2.0, 18.0, 11.6, 0.62)
-	# Steep 2-tier Baroque mansard roof (12.2 -> 16.4 -> 19.4 m) with copper ridge & dormers.
-	LandmarkFrKit.hip(lm, "Roof", -19.0, 19.0, 2.0, 18.0, 12.2, 5.2, 0.55)
+	# Steep 2-tier Baroque mansard roof (12.2 -> 15.8 -> 19.4 m) with copper ridge & dormers.
+	var b0 := Vector3(-19.55, 12.2, 1.45)
+	var b1 := Vector3(19.55, 12.2, 1.45)
+	var b2 := Vector3(19.55, 12.2, 18.55)
+	var b3 := Vector3(-19.55, 12.2, 18.55)
+	var t0 := Vector3(-15.2, 15.85, 4.6)
+	var t1 := Vector3(15.2, 15.85, 4.6)
+	var t2 := Vector3(15.2, 15.85, 15.4)
+	var t3 := Vector3(-15.2, 15.85, 15.4)
+	LandmarkFrKit.face(lm, "Roof", [b0, b1, t1, t0])
+	LandmarkFrKit.face(lm, "Roof", [b1, b2, t2, t1])
+	LandmarkFrKit.face(lm, "Roof", [b2, b3, t3, t2])
+	LandmarkFrKit.face(lm, "Roof", [b3, b0, t0, t3])
 	LandmarkFrKit.hip(lm, "Roof", -15.2, 15.2, 4.6, 15.4, 15.8, 3.6, 0.30)
 	lm.beam("Copper", Vector3(-11.0, 19.42, 10.0), Vector3(11.0, 19.42, 10.0), 0.20, 0.24)
 	for dx: float in [-11.5, -5.8, 5.8, 11.5]:

@@ -158,5 +158,5 @@ static func _roofs(lm: LandmarkMesh) -> void:
 	for p in [Vector2(-34.0, 14.0), Vector2(-14.0, 14.0), Vector2(14.0, 14.0), Vector2(32.0, 14.0),
 			Vector2(-30.0, -43.0), Vector2(0.0, -43.0), Vector2(28.0, -43.0), Vector2(-38.0, -15.0),
 			Vector2(-3.0, -15.0), Vector2(32.0, -15.0)]:
-		U.blk(lm, "Wall", p.x, EAVE + 1.6, p.y, 1.6, 2.0, 1.6)
+		U.blk(lm, "Wall", p.x, EAVE, p.y, 1.6, 3.6, 1.6)
 		U.blk(lm, "Trim", p.x, EAVE + 3.5, p.y, 1.9, 0.25, 1.9)

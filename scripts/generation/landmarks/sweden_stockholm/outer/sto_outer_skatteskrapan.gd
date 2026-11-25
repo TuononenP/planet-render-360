@@ -136,12 +136,12 @@ static func _crown(lm: LandmarkMesh, kit: SkyKit) -> void:
 
 ## Plant boxes and the two radio masts on the wing roofs.
 static func _roofs(lm: LandmarkMesh) -> void:
-	for p in [[Vector2(-18.0, 6.5), 3.5], [Vector2(16.0, 3.0), 3.0], [Vector2(12.0, 15.0), 3.0],
+	for p in [[Vector2(-18.0, 6.5), 3.5], [Vector2(12.0, -8.0), 3.0], [Vector2(12.0, 15.0), 3.0],
 			[Vector2(-9.0, -15.5), 3.0]]:
 		var c: Vector2 = p[0]
 		var s: float = p[1]
-		lm.box("Plant", Vector3(c.x, BODY + 1.4, c.y), Vector3(s, 1.8, s * 0.8), Basis(Vector3.UP, -0.25), 0.0)
-		lm.box("Roof", Vector3(c.x, BODY + 2.35, c.y), Vector3(s + 0.3, 0.1, s * 0.8 + 0.3), Basis(Vector3.UP, -0.25), 0.0)
+		lm.box("Plant", Vector3(c.x, BODY + 0.9, c.y), Vector3(s, 1.8, s * 0.8), Basis(Vector3.UP, -0.25), 0.0)
+		lm.box("Roof", Vector3(c.x, BODY + 1.85, c.y), Vector3(s + 0.3, 0.1, s * 0.8 + 0.3), Basis(Vector3.UP, -0.25), 0.0)
 	var m := Vector2(12.5, 10.5)
 	lm.beam("Mast", Vector3(m.x, BODY, m.y), Vector3(m.x, TOP + 0.5, m.y), 0.1, 0.1)
 	lm.beam("Mast", Vector3(m.x + 1.6, BODY, m.y - 0.8), Vector3(m.x + 1.6, TOP, m.y - 0.8), 0.1, 0.1)

@@ -143,8 +143,9 @@ static func _porch(lm: LandmarkMesh) -> void:
 static func _roof(lm: LandmarkMesh) -> void:
 	var cx := (XL + XR) * 0.5
 	U.hip(lm, "Roof", Vector3(cx, EAVE, (12.0 + ZF) * 0.5), XR - XL + 0.8, ZF - 12.0 + 0.8, 1.6, 0.92)
-	var dc := Vector3(-0.2, EAVE + 2.6, 24.0)
-	lm.frustum("Trim", dc, 3.4, 3.4, 3.8, 24)
+	var dc := Vector3(-0.2, EAVE + 1.5, 24.0)
+	var drum_y0 := EAVE + 0.6
+	lm.frustum("Trim", Vector3(dc.x, drum_y0, dc.z), 3.4, 3.4, (dc.y + 3.8) - drum_y0, 24)
 	for k in 8:
 		var an := TAU * (float(k) + 0.5) / 8.0
 		var d := Vector3(cos(an), 0, sin(an))
@@ -155,6 +156,6 @@ static func _roof(lm: LandmarkMesh) -> void:
 	lm.lathe("Gilt", dc + Vector3(0, 8.5, 0), U.ball(0.3), 8)
 	lm.box("Gilt", dc + Vector3(0, 9.7, 0), Vector3(0.1, 1.4, 0.1))
 	for s in [-1.0, 1.0]:
-		var sc := Vector3(s * 12.5, EAVE + 2.0, 24.0)
-		lm.frustum("Trim", sc, 1.1, 1.1, 1.4, 12)
+		var sc := Vector3(s * 12.5, EAVE + 1.45, 24.0)
+		lm.frustum("Trim", Vector3(sc.x, drum_y0, sc.z), 1.1, 1.1, (sc.y + 1.4) - drum_y0, 12)
 		lm.lathe("Dome", sc + Vector3(0, 1.4, 0), U.dome_prof(1.15, 1.0), 12)

@@ -85,13 +85,23 @@ static func outline(type: String) -> PackedVector2Array:
 ## `poly` grown (delta > 0) or shrunk (delta < 0) by `delta` metres: the
 ## largest resulting piece, empty when the polygon vanishes.
 static func offset(poly: PackedVector2Array, delta: float) -> PackedVector2Array:
+	if poly.size() < 3:
+		return PackedVector2Array()
+	var cw := Geometry2D.is_polygon_clockwise(poly)
+	var ccw := poly.duplicate()
+	if cw:
+		ccw.reverse()
 	var best := PackedVector2Array()
 	var best_area := 0.0
-	for piece in Geometry2D.offset_polygon(poly, delta, Geometry2D.JOIN_MITER):
+	for piece in Geometry2D.offset_polygon(ccw, delta, Geometry2D.JOIN_MITER):
+		if Geometry2D.is_polygon_clockwise(piece):
+			continue
 		var area := absf(area_of(piece))
 		if area > best_area:
 			best_area = area
 			best = piece
+	if cw and best.size() >= 3:
+		best.reverse()
 	return best
 
 ## Signed shoelace area of `poly`.

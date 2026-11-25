@@ -790,18 +790,22 @@ static func _standing_top(footing: Dictionary, height_world: float, b: Dictionar
 
 ## [floor, height lost to the plinth] of the standing mass of `masses`
 ## that a raised mass at `centre` rests on: the one whose ring holds it,
-## else the first. Empty when nothing stands on the ground.
+## else the nearest standing mass. Empty when nothing stands on the ground.
 static func _seat_under(masses: Array, centre: Vector2, ground: GroundTruth, ctx: Dictionary) -> Array:
 	var m2u := WorldScale.metres_to_units()
 	var best: Array = []
+	var best_d := INF
 	for m in masses:
 		var md := m as Dictionary
 		if float(md.get("min_m", 0.0)) > 0.0:
 			continue
-		var inside := Geometry2D.is_point_in_polygon(centre, md["ring"])
-		if not best.is_empty() and not inside:
+		var ring: PackedVector2Array = md["ring"]
+		var inside := Geometry2D.is_point_in_polygon(centre, ring)
+		var d := 0.0 if inside else centre.distance_squared_to(md["centre"] as Vector2)
+		if not best.is_empty() and not inside and d >= best_d:
 			continue
-		var footing := BuildingFoundation.sample(ground, md["ring"], md["centre"], float(ctx.get("sea_y", -INF)),
+		best_d = d
+		var footing := BuildingFoundation.sample(ground, ring, md["centre"], float(ctx.get("sea_y", -INF)),
 			float(md.get(BuildingTerraces.PLINTH_KEY, BuildingFoundation.PLINTH_TALL_M)),
 			float(md.get(BuildingTerraces.SNAP_KEY, 0.0)))
 		var height_world := float(md["wall_m"]) * m2u

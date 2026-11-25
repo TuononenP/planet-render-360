@@ -291,8 +291,14 @@ func _run() -> void:
 	var near := BuildingMasses.plan(_bldg(_rect(160, 0, 193, 30), 16,
 		{"height": 80.0, "height_source": "tag_height", "parts": [low, near_box]}), ctx)
 	var near_lifts: Array = near.map(func(m: Dictionary) -> float: return float(m["min_m"]))
-	if near.size() != 2 or absf(float(near_lifts.max()) - 46.0) > 0.6:
-		failures.append("a part carried by the roof under it was moved %s" % [near_lifts])
+	if near.size() != 2 or absf(float(near_lifts.max()) - 45.0) > 0.6:
+		failures.append("a part hovering 1 m over a flat roof kept lift %s (want 45)" % [near_lifts])
+	var flush_box := box.merged({"min_height_m": 45.0}, true)
+	var flush := BuildingMasses.plan(_bldg(_rect(160, 0, 194, 30), 16,
+		{"height": 80.0, "height_source": "tag_height", "parts": [low, flush_box]}), ctx)
+	var flush_lifts: Array = flush.map(func(m: Dictionary) -> float: return float(m["min_m"]))
+	if flush.size() != 2 or absf(float(flush_lifts.max()) - 45.0) > 0.6:
+		failures.append("a part flush with the roof under it was moved %s" % [flush_lifts])
 	var wide_off := pent.merged({"footprint": _rect(220, 5, 240, 25), "x": 230.0, "z": 15.0,
 		"height": 80.0, "min_height_m": 60.0}, true)
 	var uncovered := BuildingMasses.plan(_bldg(_rect(160, 0, 250, 30), 16,

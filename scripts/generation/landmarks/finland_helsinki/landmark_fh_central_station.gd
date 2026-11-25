@@ -53,7 +53,8 @@ static func build(model: Node3D) -> void:
 	# cupola, the arch set low in it; the vault runs back behind.
 	lm.box("Granite", Vector3(hx, (hwall + slab) * 0.5, fz - 0.5), Vector3(hw + 0.8, slab - hwall, 1.4))
 	lm.box("Copper", Vector3(hx, slab + 0.3, fz - 0.2), Vector3(hw + 1.6, 0.6, 2.2))
-	lm.frustum("Copper", Vector3(hx, slab + 0.6, fz - 4.0), 2.2, 1.6, 0.8, 12)
+	var cup_y0 := hwall + hrise - 0.6
+	lm.frustum("Copper", Vector3(hx, cup_y0, fz - 4.0), 2.2, 1.6, (slab + 1.4) - cup_y0, 12)
 	lm.lathe("Copper", Vector3(hx, slab + 1.4, fz - 4.0), FhU.dome_prof(1.6, 1.1), 12)
 	for sx in [-1.0, 1.0]:
 		var x: float = hx + sx * hw * 0.5

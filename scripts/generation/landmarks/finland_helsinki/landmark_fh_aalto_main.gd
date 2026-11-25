@@ -367,7 +367,7 @@ static func _roof_details(lm: LandmarkMesh) -> void:
 		var c := s0.lerp(s1, (float(k) + 0.5) / float(count))
 		lm.box("Glass", Vector3(c.x, EAVE + 0.45, c.y), Vector3(width, 0.9, 1.8), Basis(Vector3.UP, yaw), 0.0)
 		lm.box("Metal", Vector3(c.x, EAVE + 0.95, c.y), Vector3(width, 0.1, 0.25), Basis(Vector3.UP, yaw), 0.0)
-	var outer := F.outline(TYPE)
+	var outer := F.offset(F.outline(TYPE), -1.5)
 	for rect in ROOF_LIGHTS:
 		var x: float = rect[0] + 2.0
 		while x < float(rect[2]):

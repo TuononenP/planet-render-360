@@ -98,6 +98,7 @@ static func build(model: Node3D) -> void:
 	FhP.ribs(lm, "Marble", Vector3(-13.0, 0, -25.75), Vector3(33.0, 0, -25.75), Vector3(0, 0, -1), 10.5, TOWER - 0.4, 1.6,
 		0.3, 0.14)
 	FhP.band(lm, "Roof", Vector3(-14.0, 0, -25.7), Vector3(34.0, 0, -25.7), Vector3(0, 0, -1), TOWER - 0.4, 0.6, 0.5)
+	FhU.blk(lm, "Marble", 10.0, 18.0, -10.0, 32.0, TOWER - 18.0, 16.0)
 	FhU.wedge(lm, "Marble", "Roof", -6.0, 26.0, -18.0, -2.0, TOWER, 1.4, 0.8)
 	# Chamber-hall fan: fins and its stepped roof edge.
 	FhP.band(lm, "Marble", Vector3(38.0, 0, -24.5), Vector3(97.0, 0, -25.5), Vector3(0, 0, -1), 14.6, 0.6, 0.3)

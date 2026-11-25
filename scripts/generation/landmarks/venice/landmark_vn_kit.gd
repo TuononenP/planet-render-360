@@ -229,8 +229,10 @@ static func campanile(lm: LandmarkMesh, shaft_mat: String, trim_mat: String, roo
 	lm.frustum(gold_mat, Vector3(bc.x, py + maxf(spire_h, 3.0), bc.z), 0.26, 0.08, 1.6, 6)
 
 ## Venetian funnel / bell-shaped chimney pot (*camino a campana*) on a roof at `p`.
-static func bell_chimney(lm: LandmarkMesh, mat: String, p: Vector3, h: float = 2.4) -> void:
-	lm.box(mat, p + Vector3(0, h * 0.38, 0), Vector3(0.55, h * 0.76, 0.55))
+static func bell_chimney(lm: LandmarkMesh, mat: String, p: Vector3, h: float = 2.4,
+		stem_down: float = 0.0) -> void:
+	var shaft_h := h * 0.76 + stem_down
+	lm.box(mat, p + Vector3(0, h * 0.76 - shaft_h * 0.5, 0), Vector3(0.55, shaft_h, 0.55))
 	lm.frustum(mat, p + Vector3(0, h * 0.76, 0), 0.30, 0.58, h * 0.24, 8)
 
 ## Venetian spiral-striped mooring pole (*palina*) standing out of the water at `p`.
@@ -295,7 +297,7 @@ static func palazzo_block(lm: LandmarkMesh, wall_mat: String, stone_mat: String,
 	var rot_r := Basis(Vector3.UP, PI * 0.5) if w > d else Basis()
 	lm.gable(roof_mat, c + Vector3(0, eave, 0), minf(w, d) + 0.6, maxf(w, d) + 0.6, roof_rise, rot_r, 0.35, wall_mat)
 	for sx in [-0.34, 0.34]:
-		bell_chimney(lm, wall_mat, c + Vector3(sx * w, eave + roof_rise * 0.52, -d * 0.15), 2.1)
+		bell_chimney(lm, wall_mat, c + Vector3(sx * w, eave + roof_rise * 0.52, -d * 0.15), 2.1, roof_rise * 0.52)
 
 ## Warm architectural night floodlights along +Z front (and optional crown).
 static func set_warm_floods(model: Node3D, width: float, depth: float, height: float,

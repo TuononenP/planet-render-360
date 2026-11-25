@@ -182,10 +182,11 @@ static func _roofs(lm: LandmarkMesh) -> void:
 	for p in [Vector3(-30.0, 0, 41.0), Vector3(-8.0, 0, 40.0), Vector3(18.0, 0, 41.0), Vector3(34.0, 0, 41.0),
 			Vector3(-31.0, 0, -20.0), Vector3(-31.0, 0, 10.0), Vector3(36.0, 0, -10.0), Vector3(10.0, 0, -53.0),
 			Vector3(-20.0, 0, -53.0)]:
-		U.blk(lm, "Wall", p.x, EAVE + 1.8, p.z, 1.6, 2.0, 1.6)
-		U.blk(lm, "Trim", p.x, EAVE + 3.7, p.z, 1.9, 0.25, 1.9)
+		var cy := EAVE if p.z > 30.0 else WING_EAVE
+		U.blk(lm, "Wall", p.x, cy, p.z, 1.6, 3.8, 1.6)
+		U.blk(lm, "Trim", p.x, cy + 3.7, p.z, 1.9, 0.25, 1.9)
 	var dc := Vector3(CX, EAVE + 1.4, 39.0)
-	lm.frustum("Wall", dc, 5.6, 5.6, 1.2, 28)
+	lm.frustum("Wall", Vector3(CX, EAVE, 39.0), 5.6, 5.6, 2.6, 28)
 	lm.frustum("Trim", dc + Vector3(0, 1.2, 0), 5.9, 5.9, 0.35, 28)
 	lm.lathe("Roof", dc + Vector3(0, 1.5, 0), U.dome_prof(5.5, 3.3), 28)
 	lm.frustum("Trim", dc + Vector3(0, 4.7, 0), 0.9, 0.9, 0.8, 10)

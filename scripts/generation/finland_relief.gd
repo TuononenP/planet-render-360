@@ -62,9 +62,15 @@ static func turret(kit: ReliefKit, sp: Dictionary, d: Dictionary, stone: Materia
 	if not bool(sp["first"]) or float(sp["len_m"]) < 8.0:
 		return
 	var m := WorldScale.metres_to_units()
-	var p: Vector2 = sp["a"]
-	var c := Vector3(p.x, float(d["top"]) - 1.5 * m, p.y)
 	var r := 1.35 * m
+	var dir: Vector2 = sp.get("dir", Vector2.ZERO)
+	var out_n: Vector2 = sp.get("n", Vector2.ZERO)
+	var p: Vector2 = (sp["a"] as Vector2) + (dir - out_n) * (r * 0.45)
+	var top := float(d["top"])
+	var base_y := float(d.get("ground_y", top - 3.5 * m))
+	var shaft_top := top + 2.0 * m
+	var c := Vector3(p.x, base_y, p.y)
+	var shaft_h := maxf(shaft_top - base_y, 3.5 * m)
 	var roof := ReliefKit.flat("#39413e", 0.6, 0.3)
 	for k in 12:
 		var a := TAU * float(k) / 12.0
@@ -72,20 +78,24 @@ static func turret(kit: ReliefKit, sp: Dictionary, d: Dictionary, stone: Materia
 		var n := Vector3(cos((a + b) * 0.5), 0, sin((a + b) * 0.5))
 		var p0 := c + Vector3(cos(a), 0, sin(a)) * r
 		var p1 := c + Vector3(cos(b), 0, sin(b)) * r
-		kit.quad(stone, p0, p1, p1 + Vector3.UP * 3.5 * m, p0 + Vector3.UP * 3.5 * m, n)
-		var base0 := p0 + Vector3.UP * 3.5 * m
-		var base1 := p1 + Vector3.UP * 3.5 * m
-		var tip := c + Vector3.UP * 8.0 * m
+		kit.quad(stone, p0, p1, p1 + Vector3.UP * shaft_h, p0 + Vector3.UP * shaft_h, n)
+		var base0 := p0 + Vector3.UP * shaft_h
+		var base1 := p1 + Vector3.UP * shaft_h
+		var tip := Vector3(p.x, top + 6.5 * m, p.y)
 		kit.tri(roof, base0, base1, tip, (n + Vector3.UP * 0.3).normalized())
 
-## A short masonry corner drum capped with a patinated copper dome.
+## A masonry corner drum rising from the ground and capped with a patinated copper dome.
 static func corner_dome(kit: ReliefKit, sp: Dictionary, d: Dictionary, stone: Material) -> void:
 	if not bool(sp["first"]) or float(sp["len_m"]) < 8.0:
 		return
 	var m := WorldScale.metres_to_units()
-	var centre: Vector2 = sp["a"]
-	var base := float(d["top"]) - 1.0 * m
 	var radius := 1.35 * m
+	var dir: Vector2 = sp.get("dir", Vector2.ZERO)
+	var out_n: Vector2 = sp.get("n", Vector2.ZERO)
+	var centre: Vector2 = (sp["a"] as Vector2) + (dir - out_n) * (radius * 0.45)
+	var top := float(d["top"])
+	var base := float(d.get("ground_y", top - 3.0 * m))
+	var drum_top := top + 2.0 * m
 	var ring := PackedVector2Array()
 	for i in 12:
 		var angle := TAU * float(i) / 12.0
@@ -95,12 +105,12 @@ static func corner_dome(kit: ReliefKit, sp: Dictionary, d: Dictionary, stone: Ma
 		var b := ring[(i + 1) % ring.size()]
 		var normal := ((a + b) * 0.5 - centre).normalized()
 		kit.quad(stone, Vector3(a.x, base, a.y), Vector3(b.x, base, b.y),
-			Vector3(b.x, base + 3.0 * m, b.y), Vector3(a.x, base + 3.0 * m, a.y),
+			Vector3(b.x, drum_top, b.y), Vector3(a.x, drum_top, a.y),
 			Vector3(normal.x, 0, normal.y))
 	var vertices := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
-	if RoofDomes.faces(ring, centre, base + 3.0 * m, 1.8 * m, "dome", vertices, normals, uvs):
+	if RoofDomes.faces(ring, centre, drum_top, 1.8 * m, "dome", vertices, normals, uvs):
 		var copper := ReliefKit.flat("#719384", 0.65, 0.3)
 		for i in range(0, vertices.size(), 3):
 			kit.tri(copper, vertices[i], vertices[i + 1], vertices[i + 2],

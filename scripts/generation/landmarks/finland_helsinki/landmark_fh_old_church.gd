@@ -50,11 +50,11 @@ static func build(model: Node3D) -> void:
 	_mass(lm, X1 - 0.01, ARM, -7.5, 4.2)
 	_mass(lm, -8.0, 8.3, Z1 - 0.01, PORCH_Z)
 	# Low hipped roof over the body, pedimented gables on the arms and porch.
-	U.hip(lm, "Roof", Vector3(cx, EAVE + 0.4, cz), X1 - X0 + 1.0, Z1 - Z0 + 1.0, 4.4, 0.30)
+	U.hip(lm, "Roof", Vector3(cx, EAVE, cz), X1 - X0 + 1.0, Z1 - Z0 + 1.0, 4.4, 0.30)
 	for s in [-1.0, 1.0]:
 		var ax: float = s * 0.5 * (X1 + ARM)
-		U.ridge_x(lm, "Roof", "Wall", Vector3(ax, EAVE + 0.4, -1.65), 5.4 + 0.6, 11.7 + 0.6, 2.3, 0.3)
-	U.ridge_z(lm, "Roof", "Wall", Vector3(0.15, EAVE + 0.4, 0.5 * (Z1 + PORCH_Z)), 16.3 + 0.6, 3.7 + 0.6, 2.8, 0.3)
+		U.ridge_x(lm, "Roof", "Wall", Vector3(ax, EAVE, -1.65), 5.4 + 0.6, 11.7 + 0.6, 2.3, 0.3)
+	U.ridge_z(lm, "Roof", "Wall", Vector3(0.15, EAVE, 0.5 * (Z1 + PORCH_Z)), 16.3 + 0.6, 3.7 + 0.6, 2.8, 0.3)
 	# Pilasters and tall many-paned windows between them on every face.
 	var south := Vector3(0, 0, 1)
 	var north := Vector3(0, 0, -1)
@@ -80,7 +80,7 @@ static func build(model: Node3D) -> void:
 	# open drum, green dome, gilt ball and cross.
 	var lc := Vector3(cx, 0, cz)
 	var h0 := EAVE + 4.4
-	U.blk(lm, "Trim", lc.x, h0 - 0.4, lc.z, 7.6, 2.8, 7.6)
+	U.blk(lm, "Trim", lc.x, EAVE + 1.0, lc.z, 7.6, h0 + 2.4 - (EAVE + 1.0), 7.6)
 	for k in 4:
 		var d := Basis(Vector3.UP, PI * 0.5 * float(k)) * Vector3(0, 0, 1)
 		lm.gable("Trim", lc + d * 3.9 + Vector3(0, h0 + 2.4, 0), 5.2, 0.5, 1.3, Basis(Vector3.UP, PI * 0.5 * float(k)), 0.1, "Trim")

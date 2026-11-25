@@ -391,5 +391,13 @@ static func flatiron(model: Node3D) -> void:
 	lm.commit(model)
 
 static func _grow(poly: PackedVector2Array, by: float) -> PackedVector2Array:
-	var out: Array = Geometry2D.offset_polygon(poly, by, Geometry2D.JOIN_MITER)
-	return out[0]
+	var cw := Geometry2D.is_polygon_clockwise(poly)
+	var ccw := poly.duplicate()
+	if cw:
+		ccw.reverse()
+	for piece in Geometry2D.offset_polygon(ccw, by, Geometry2D.JOIN_MITER):
+		if not Geometry2D.is_polygon_clockwise(piece):
+			if cw:
+				piece.reverse()
+			return piece
+	return poly

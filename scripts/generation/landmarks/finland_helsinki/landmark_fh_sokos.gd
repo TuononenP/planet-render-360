@@ -79,8 +79,8 @@ static func build(model: Node3D) -> void:
 	var top2 := F.offset(upper, -4.5)
 	lm.poly_prism("Wall", top2, SETBACK_TOP, SETBACK_TOP + 2.6)
 	lm.poly_prism("Roof", F.offset(top2, 0.2), SETBACK_TOP + 2.6, SETBACK_TOP + 2.8)
-	for p in [Vector2(-18, -20), Vector2(14, -26), Vector2(20, 8), Vector2(-6, 6), Vector2(-20, 6)]:
-		lm.box("Copper", Vector3(p.x, SETBACK_TOP + 3.6, p.y), Vector3(2.6, 1.6, 2.6))
+	for p in [Vector2(-14, -20), Vector2(14, -26), Vector2(20, 8), Vector2(-6, 6), Vector2(-10, -8)]:
+		lm.box("Copper", Vector3(p.x, SETBACK_TOP + 3.5, p.y), Vector3(2.6, 1.6, 2.6))
 	# The long diagonal front: entrance canopy, banners, roof lettering.
 	var a := Vector2(3.5, 40.5)
 	var b := Vector2(-35.2, -27.1)
@@ -101,6 +101,8 @@ static func build(model: Node3D) -> void:
 		lm.box("Red" if s > 0.0 else "Yellow", p3 + Vector3(0, 11.2, 0), Vector3(5.2, 3.6, 0.3), fb)
 	# Roof lettering (lit) and the two corner flagpoles to the LoD2 top.
 	var rs := m - along * 2.0 + out * -3.8
+	for sx: float in [-3.8, 3.8]:
+		lm.box("Frame", Vector3(rs.x, SETBACK_TOP + 2.0, rs.y) + fb.x * sx, Vector3(0.24, 3.6, 0.24), fb)
 	lm.box("Lamp", Vector3(rs.x, SETBACK_TOP + 4.2, rs.y), Vector3(11.0, 2.0, 0.35), fb)
 	for p in [Vector2(-17.0, -33.0), Vector2(26.0, -33.0)]:
 		lm.frustum("Pole", Vector3(p.x, SETBACK_TOP, p.y), 0.14, 0.06, TOP - SETBACK_TOP, 6)

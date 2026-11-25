@@ -53,7 +53,7 @@ static func build(model: Node3D) -> void:
 	_vault(lm, 17.0, -29.0, 8.0, 17.0, 9.0)
 	# Four white pylons on the roof with the museum lettering.
 	for x in [-38.0, -22.0, -4.0, 14.0]:
-		U.blk(lm, "Trim", float(x), CREST - 6.0, 6.0, 2.4, 34.0 - CREST + 6.0, 1.7)
+		U.blk(lm, "Trim", float(x), EAVE, 6.0, 2.4, 34.0 - EAVE, 1.7)
 		lm.box("Lamp", Vector3(float(x), 28.0, 6.9), Vector3(1.5, 12.0, 0.12), Basis(), 0.0)
 	lm.commit(model)
 

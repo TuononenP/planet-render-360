@@ -73,16 +73,19 @@ static func _seat_lifts(out: Array) -> void:
 ## How far (m) a support's top may fall short of a lifted part's floor and
 ## still count as carrying it, and the widest gap (m) a lift is brought down
 ## across.
-const FLOAT_SLACK_M := 1.5
+const FLOAT_SLACK_M := 0.05
 const FLOAT_MAX_GAP_M := 15.0
 
 ## A lifted part over a mass whose top is lower (or over footprint no mass
 ## covers) hung in the air with open sky under it (Seoul: a box over a
 ## tower's roof). Within FLOAT_MAX_GAP_M it comes down to the highest top
-## under its centre; with nothing under it, a part of at least
-## OsmParser.GROUND_ORPHAN_M2 stands on the ground (as _ground_orphans does
-## for a part outside every outline: keep the two in step). Smaller ones
-## (skybridges, canopies) and bridge/roof buildings keep their lift.
+## under its centre; over a pitched or domed roof, a drum/turret or narrow
+## spire inside the lower footprint extends its skirt down to the eave so its
+## perimeter never hovers above the roof slopes. With nothing under it, a part
+## of at least OsmParser.GROUND_ORPHAN_M2 stands on the ground (as
+## _ground_orphans does for a part outside every outline: keep the two in
+## step). Smaller ones (skybridges, canopies) and bridge/roof buildings keep
+## their lift.
 static func _seat_floaters(b: Dictionary, out: Array) -> void:
 	if str(b.get("kind", "")) in ["bridge", "roof"] or float(b.get("min_height_m", 0.0)) > 0.0 \
 			or int(b.get("min_level", 0)) > 0:
@@ -97,7 +100,10 @@ static func _seat_floaters(b: Dictionary, out: Array) -> void:
 		if lift <= 0.0:
 			continue
 		var centre: Vector2 = xm["centre"]
+		var x_area := absf(RingGeometry.signed_area(xm["ring"]))
+		var wall := float(xm["wall_m"])
 		var below := -1.0
+		var has_under := false
 		var carried := false
 		for yi in out.size():
 			var ym := out[yi] as Dictionary
@@ -105,19 +111,30 @@ static func _seat_floaters(b: Dictionary, out: Array) -> void:
 					or not Geometry2D.is_point_in_polygon(centre, ym["ring"]) \
 					or _in_hole(centre, ym["holes"]):
 				continue
+			has_under = true
 			var top := float(ym["wall_m"])
-			# A pitched roof under the part carries it up to its ridge.
-			if top + float(ym["rh_m"]) >= lift - FLOAT_SLACK_M:
-				carried = true
-				break
-			below = maxf(below, top)
+			var rh := float(ym["rh_m"])
+			if rh <= 0.01:
+				if top >= lift - FLOAT_SLACK_M:
+					carried = true
+					break
+				if lift - top <= FLOAT_MAX_GAP_M:
+					below = maxf(below, top)
+			else:
+				var wide_cap := wall - lift <= 0.1 \
+					and x_area >= absf(RingGeometry.signed_area(ym["ring"])) * 0.5
+				if (wide_cap or not _within(xm["ring"], ym["ring"])) \
+						and top + rh >= lift - FLOAT_SLACK_M:
+					carried = true
+					break
+				if lift - (top + rh) <= FLOAT_MAX_GAP_M:
+					below = maxf(below, top)
 		if carried:
 			continue
-		var wall := float(xm["wall_m"])
 		var seat := -1.0
-		if below >= 0.0 and lift - below <= FLOAT_MAX_GAP_M:
+		if below >= 0.0:
 			seat = below
-		elif below < 0.0 and absf(RingGeometry.signed_area(xm["ring"])) / m2 >= OsmParser.GROUND_ORPHAN_M2:
+		elif not has_under and x_area / m2 >= OsmParser.GROUND_ORPHAN_M2:
 			seat = 0.0
 		if seat < 0.0 or wall - seat < 0.5:
 			continue
@@ -127,7 +144,11 @@ static func _seat_floaters(b: Dictionary, out: Array) -> void:
 static func _lower_to(xm: Dictionary, seat: float) -> void:
 	var wall := float(xm["wall_m"])
 	var lift := float(xm["min_m"])
-	xm["storeys"] = maxi(1, roundi(float(int(xm["storeys"])) * (wall - seat) / (wall - lift)))
+	if wall - lift > 0.1:
+		xm["storeys"] = maxi(1, roundi(float(int(xm["storeys"])) * (wall - seat) / (wall - lift)))
+	else:
+		var fh := maxf(float((xm.get("look", {}) as Dictionary).get("floor_h", 3.3)), 2.0)
+		xm["storeys"] = maxi(1, roundi((wall - seat) / fh))
 	xm["min_m"] = seat
 
 static func _in_hole(p: Vector2, holes: Array) -> bool:

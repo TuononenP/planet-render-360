@@ -130,6 +130,8 @@ static func _entrance(lm: LandmarkMesh, poly: PackedVector2Array, h: float) -> v
 		lm.lathe("Mush", Vector3(m.x, 0.0, m.y), PackedVector2Array([Vector2(0.45, 0.0), Vector2(0.45, 3.6), Vector2(0.9, 4.6),
 			Vector2(2.6, 5.4), Vector2(3.4, 5.7), Vector2(3.4, 5.9), Vector2(0.0, 5.9)]), 16)
 	# Red rooftop sign above the entrance.
-	var s := mid
+	var s := mid - out * 0.6
+	for sx: float in [-7.5, 0.0, 7.5]:
+		lm.box("Trim", Vector3(s.x, h - 1.2, s.y) + basis.x * sx, Vector3(0.28, 3.0, 0.28), basis)
 	lm.box("Sign", Vector3(s.x, h + 0.9, s.y), Vector3(22.0, 1.8, 0.4), basis)
 

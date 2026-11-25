@@ -85,7 +85,7 @@ static func _main_block(lm: LandmarkMesh) -> void:
 	P.win_row(lm, "White", "Glass", Vector3(-24.0, 0, ZB), Vector3(24.0, 0, ZB), Vector3(0, 0, -1), 5.2, 14, 1.2, 2.3, false, 0.2)
 	# Chimney stacks on the ridge, and the rear annex.
 	for x: float in [-20.0, -9.0, 9.0, 20.0]:
-		U.blk(lm, "Roof", x, EAVE + 1.0, -1.0, 1.4, 2.4, 1.4)
+		U.blk(lm, "Roof", x, EAVE, -1.0, 1.4, 3.4, 1.4)
 	U.blk(lm, "Wall", 0.0, 0.0, -16.0, 22.6, 6.4, 6.6)
 	U.hip(lm, "Roof", Vector3(0.0, 6.4, -16.0), 23.4, 7.4, 1.3, 0.5)
 	U.blk(lm, "Wall", -0.3, 0.0, -18.6, 9.5, 7.0, 5.0)

@@ -334,8 +334,9 @@ static func _dormers(batch: Batch, c: Vector2, u: Vector2, v: Vector2,
 		var du := (float(i) - float(n - 1) / 2.0) * lu * 2.0 / float(n + 1) * 1.0
 		var dv := lv * 0.45
 		var surface := _roof_y(shape, du, dv, lu, lv, roof_h)
-		batch.add("box", _xf(basis, _at(c, u, v, du, dv, top + surface + 0.35 * m2u),
-			Vector3(1.1 * m2u, 1.5 * m2u, 1.0 * m2u)), roof_mat)
+		var body_h := surface + 1.1 * m2u
+		batch.add("box", _xf(basis, _at(c, u, v, du, dv, top + body_h * 0.5),
+			Vector3(1.1 * m2u, body_h, 1.0 * m2u)), roof_mat)
 
 ## Rooftop plant on flat roofs: AC units, stair/lift core, water tanks.
 static func _plant(batch: Batch, ring: PackedVector2Array, c: Vector2,

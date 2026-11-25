@@ -270,6 +270,8 @@ static func _effective_shape(raw: String, default_roof: String, legacy: bool) ->
 ## the total height so the wall keeps ≥0.5 m.
 static func _roof_height_m(shape: String, span_m: float, tag_m: float,
 		pitch: float = 1.0) -> float:
+	if shape == "flat":
+		return 0.0
 	if tag_m > 0.0:
 		return tag_m
 	# Clamps scale with the pitch so a steep alpine roof is not flattened

@@ -105,12 +105,12 @@ static func _parapet(lm: LandmarkMesh, c: Vector2) -> void:
 
 ## Roof plant: penthouse, lift overrun, duct block, radio masts.
 static func _plant(lm: LandmarkMesh, c: Vector2, p: Array, i: int) -> void:
-	var h := PLANT_TOP - PARAPET
+	var h := PLANT_TOP - ROOF
 	var px := c.x + float(p[0])
-	lm.box("Plant", Vector3(px, PARAPET + h * 0.5, c.y), Vector3(float(p[1]), h, float(p[2])), Basis(), 0.0)
+	lm.box("Plant", Vector3(px, ROOF + h * 0.5, c.y), Vector3(float(p[1]), h, float(p[2])), Basis(), 0.0)
 	lm.box("Roof", Vector3(px, PLANT_TOP + 0.1, c.y), Vector3(float(p[1]) + 0.4, 0.2, float(p[2]) + 0.4), Basis(), 0.0)
 	var side := -1.0 if i % 2 == 0 else 1.0
-	lm.box("Plant", Vector3(c.x - float(p[0]) * 1.8, PARAPET + 1.1, c.y + side * 2.6), Vector3(5.0, 2.2, 3.0), Basis(), 0.0)
+	lm.box("Plant", Vector3(c.x - float(p[0]) * 1.8, ROOF + 1.45, c.y + side * 2.6), Vector3(5.0, 2.9, 3.0), Basis(), 0.0)
 	lm.box("Steel", Vector3(px + float(p[1]) * 0.3, PLANT_TOP + 0.5, c.y - side * 1.5), Vector3(4.0, 0.8, 1.4), Basis(), 0.0)
 	for m in 3:
 		var mx := px - float(p[1]) * 0.4 + float(m) * float(p[1]) * 0.35

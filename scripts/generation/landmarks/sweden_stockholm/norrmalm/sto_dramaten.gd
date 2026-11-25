@@ -217,7 +217,7 @@ static func _attic(lm: LandmarkMesh) -> void:
 
 static func _tower(lm: LandmarkMesh) -> void:
 	var hw := 7.0
-	K.rb(lm, "Stone", -hw, hw, CORN, TOWER_Y, TOWER_Z - hw, TOWER_Z + hw, 0.0)
+	K.rb(lm, "Stone", -hw, hw, CORN, TOWER_Y + 0.9, TOWER_Z - hw, TOWER_Z + hw, 0.0)
 	for s in [-1.0, 1.0]:
 		for t in [-1.0, 1.0]:
 			K.rb(lm, "Relief", float(s) * hw - 0.9, float(s) * hw + 0.9, CORN + 1.0, TOWER_Y,
