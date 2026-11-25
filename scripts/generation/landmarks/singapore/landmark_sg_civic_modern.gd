@@ -44,9 +44,22 @@ static func arts_house_parliament(model: Node3D) -> void:
 	lm.use("WarmLamp", LandmarkMaterials.lit("#FFE0A2", 1.6))
 
 	# 1. The Arts House (Old Parliament House, 1827 white neoclassical, front +Z).
-	lm.box("White", Vector3(24.0, 6.5, 22.0), Vector3(44.0, 13.0, 28.0))
-	lm.box("Roof", Vector3(24.0, 14.8, 22.0), Vector3(46.0, 3.6, 30.0))
-	LandmarkSgKit.colonnade(lm, "White", Vector3(12.0, 0.0, 37.0), Vector3(36.0, 0.0, 37.0), 11.0, 0.45, 6)
+	lm.box("White", Vector3(24.0, 6.2, 22.0), Vector3(43.0, 12.4, 27.0))
+	lm.box("Stone", Vector3(24.0, 6.4, 22.0), Vector3(43.8, 0.55, 27.8))
+	lm.box("Stone", Vector3(24.0, 12.6, 22.0), Vector3(44.4, 0.8, 28.4))
+	LandmarkSgKit.hipped_roof(lm, "Roof", Vector3(24.0, 13.0, 22.0), 45.6, 29.6, 4.4, 9.0)
+	LandmarkSgKit.colonnade(lm, "White", Vector3(12.0, 0.0, 36.6), Vector3(36.0, 0.0, 36.6), 11.2, 0.45, 6)
+	LandmarkSgKit.pediment_prism(lm, "White", "Roof", Vector3(24.0, 12.2, 35.4), 25.0, 3.8, 4.4, true)
+	for fz: float in [-1.0, 1.0]:
+		for i in 7:
+			var wx := 6.0 + float(i) * 6.0
+			lm.box("Glass", Vector3(wx, 3.6, 22.0 + fz * 13.65), Vector3(2.1, 3.2, 0.4))
+			lm.box("Glass", Vector3(wx, 9.4, 22.0 + fz * 13.65), Vector3(2.1, 3.2, 0.4))
+	for fx: float in [-1.0, 1.0]:
+		for j in 4:
+			var wz := 13.0 + float(j) * 6.0
+			lm.box("Glass", Vector3(24.0 + fx * 21.65, 3.6, wz), Vector3(0.4, 3.2, 2.1))
+			lm.box("Glass", Vector3(24.0 + fx * 21.65, 9.4, wz), Vector3(0.4, 3.2, 2.1))
 	# Bronze elephant statue gifted by King Chulalongkorn on plinth in front.
 	lm.box("Stone", Vector3(24.0, 1.4, 43.0), Vector3(2.8, 2.8, 2.2))
 	lm.box("Bronze", Vector3(24.0, 3.4, 43.0), Vector3(1.8, 1.4, 1.1))
@@ -65,22 +78,54 @@ static func arts_house_parliament(model: Node3D) -> void:
 static func padang_ensemble(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()
 	lm.use("White", LandmarkMaterials.pbr("limestone", "#F4F1EA", 3.0))
-	lm.use("Stone", LandmarkMaterials.pbr("stone", "#C8C2B6", 3.0))
+	lm.use("Stone", LandmarkMaterials.pbr("stone", "#CFC9BC", 3.0))
 	lm.use("Roof", LandmarkMaterials.pbr("terracotta", "#A84A32", 2.0))
+	lm.use("Shutter", LandmarkMaterials.pbr("wood", "#2E5840", 2.0))
+	lm.use("Glass", LandmarkMaterials.glass("#3B5566"))
 	lm.use("Bronze", LandmarkMaterials.pbr("sheet_metal", "#5A4C3E", 2.0, 0.35, 0.72))
 	lm.use("WarmLamp", LandmarkMaterials.lit("#FFE0A4", 1.7))
 
-	# 1. Singapore Cricket Club (south end of Padang, x = -195 m).
+	# 1. Singapore Cricket Club (1884 Victorian colonial clubhouse, south end of Padang, x = -195 m).
 	var scc := Vector3(-195.0, 0.0, 0.0)
-	lm.box("White", scc + Vector3(0.0, 5.5, 0.0), Vector3(36.0, 11.0, 68.0))
-	lm.box("Roof", scc + Vector3(0.0, 13.0, 0.0), Vector3(38.0, 4.0, 70.0))
-	LandmarkSgKit.colonnade(lm, "White", scc + Vector3(19.0, 0.0, -28.0), scc + Vector3(19.0, 0.0, 28.0), 9.5, 0.42, 10)
+	lm.box("White", scc + Vector3(0.0, 5.2, 0.0), Vector3(33.0, 10.4, 65.0))
+	lm.box("Stone", scc + Vector3(0.0, 5.4, 0.0), Vector3(34.2, 0.55, 66.2))
+	lm.box("Stone", scc + Vector3(0.0, 10.6, 0.0), Vector3(35.0, 0.8, 67.0))
+	LandmarkSgKit.hipped_roof(lm, "Roof", scc + Vector3(0.0, 11.0, 0.0), 37.6, 69.6, 4.8, 12.0)
+	# Central gabled Victorian pavilion with verandah balustrade on both front (+X Padang) and rear (-X).
+	for fx: float in [-1.0, 1.0]:
+		LandmarkSgKit.colonnade(lm, "White", scc + Vector3(fx * 17.8, 0.0, -29.0), scc + Vector3(fx * 17.8, 0.0, 29.0), 9.8, 0.38, 11)
+		lm.box("White", scc + Vector3(fx * 17.8, 5.2, 0.0), Vector3(0.55, 1.1, 61.0))
+		LandmarkSgKit.pediment_prism(lm, "White", "Roof", scc + Vector3(fx * 16.5, 10.8, 0.0), 20.0, 4.4, 5.6, false)
+		for j in 10:
+			var wz := -27.0 + float(j) * 6.0
+			lm.box("Glass", scc + Vector3(fx * 16.65, 3.0, wz), Vector3(0.4, 3.0, 2.2))
+			lm.box("Shutter", scc + Vector3(fx * 16.65, 8.0, wz), Vector3(0.4, 3.0, 2.2))
+	# Short end facades (±Z) with windows & shutters so side views are fully articulated.
+	for fz: float in [-1.0, 1.0]:
+		for i in 5:
+			var wx := -12.0 + float(i) * 6.0
+			lm.box("Glass", scc + Vector3(wx, 3.0, fz * 32.65), Vector3(2.2, 3.0, 0.4))
+			lm.box("Shutter", scc + Vector3(wx, 8.0, fz * 32.65), Vector3(2.2, 3.0, 0.4))
+		LandmarkSgKit.pediment_prism(lm, "White", "Roof", scc + Vector3(0.0, 10.8, fz * 32.5), 14.0, 3.0, 3.6, true)
 
 	# 2. Singapore Recreation Club (north end of Padang, x = +195 m).
 	var src := Vector3(195.0, 0.0, 0.0)
-	lm.box("White", src + Vector3(0.0, 6.0, 0.0), Vector3(38.0, 12.0, 74.0))
-	lm.box("Roof", src + Vector3(0.0, 13.8, 0.0), Vector3(40.0, 3.6, 76.0))
-	LandmarkSgKit.colonnade(lm, "White", src + Vector3(-20.0, 0.0, -30.0), src + Vector3(-20.0, 0.0, 30.0), 10.5, 0.45, 10)
+	lm.box("White", src + Vector3(0.0, 5.6, 0.0), Vector3(36.0, 11.2, 71.0))
+	lm.box("Stone", src + Vector3(0.0, 5.8, 0.0), Vector3(37.2, 0.55, 72.2))
+	lm.box("Stone", src + Vector3(0.0, 11.4, 0.0), Vector3(38.0, 0.8, 73.0))
+	LandmarkSgKit.hipped_roof(lm, "Roof", src + Vector3(0.0, 11.8, 0.0), 40.4, 75.4, 4.6, 13.0)
+	for fx: float in [-1.0, 1.0]:
+		LandmarkSgKit.colonnade(lm, "White", src + Vector3(fx * 19.2, 0.0, -31.0), src + Vector3(fx * 19.2, 0.0, 31.0), 10.6, 0.4, 11)
+		LandmarkSgKit.pediment_prism(lm, "White", "Roof", src + Vector3(fx * 18.0, 11.6, 0.0), 22.0, 4.4, 5.6, false)
+		for j in 11:
+			var wz := -30.0 + float(j) * 6.0
+			lm.box("Glass", src + Vector3(fx * 18.15, 3.2, wz), Vector3(0.4, 3.2, 2.2))
+			lm.box("Shutter", src + Vector3(fx * 18.15, 8.6, wz), Vector3(0.4, 3.2, 2.2))
+	for fz: float in [-1.0, 1.0]:
+		for i in 5:
+			var wx := -12.0 + float(i) * 6.0
+			lm.box("Glass", src + Vector3(wx, 3.2, fz * 35.65), Vector3(2.2, 3.2, 0.4))
+			lm.box("Shutter", src + Vector3(wx, 8.6, fz * 35.65), Vector3(2.2, 3.2, 0.4))
 
 	# 3. The Cenotaph (Esplanade Park east of Padang, z = +122 m, 18.0 m stepped stone obelisk).
 	var cen := Vector3(-24.0, 0.0, 122.0)

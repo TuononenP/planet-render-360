@@ -17,12 +17,12 @@ static func raffles_hotel(model: Node3D) -> void:
 	lm.use("Palm", LandmarkMaterials.pbr("forest", "#2F6630", 3.0))
 	lm.use("WarmLamp", LandmarkMaterials.lit("#FFE0A0", 1.8))
 
-	# Main 3-storey neo-Renaissance central block + two flanking courtyard wings.
+	# Main 3-storey neo-Renaissance central block + two flanking courtyard wings with pitched hipped roofs.
 	lm.box("White", Vector3(0.0, 8.0, -8.0), Vector3(114.0, 16.0, 30.0))
-	lm.box("Roof", Vector3(0.0, 18.2, -8.0), Vector3(116.0, 4.4, 32.0))
+	LandmarkSgKit.hipped_roof(lm, "Roof", Vector3(0.0, 16.2, -8.0), 116.8, 32.8, 4.6, 11.0)
 	for sx: float in [-48.0, 48.0]:
 		lm.box("White", Vector3(sx, 8.0, 18.0), Vector3(24.0, 16.0, 34.0))
-		lm.box("Roof", Vector3(sx, 18.2, 18.0), Vector3(26.0, 4.4, 36.0))
+		LandmarkSgKit.hipped_roof(lm, "Roof", Vector3(sx, 16.2, 18.0), 26.8, 36.8, 4.6, 9.0)
 		# Corner cupola turret pavilions (reaches 24.0 m).
 		lm.box("White", Vector3(sx, 19.5, 32.0), Vector3(11.0, 3.6, 11.0))
 		lm.spire("Roof", Vector3(sx, 21.3, 32.0), 5.8, 2.7, 0.6, 4)

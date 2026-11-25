@@ -141,3 +141,78 @@ static func outward_tri(lm: LandmarkMesh, key: String, a: Vector3, b: Vector3, c
 		n = -n
 	n = n.normalized()
 	lm.tri(key, a, b, c, n, n, n, Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(0.5, 1.0))
+
+## Adds a pitched hipped roof over a rectangular footprint `(sx, sz)` whose eaves sit at `base_center.y`
+## and whose ridge rises by `ridge_h`. Includes a thin fascia band so eaves look crisp from below.
+static func hipped_roof(lm: LandmarkMesh, key: String, base_center: Vector3,
+		sx: float, sz: float, ridge_h: float, hip_inset: float = -1.0) -> void:
+	var hx := sx * 0.5
+	var hz := sz * 0.5
+	var y0 := base_center.y
+	var y1 := y0 + ridge_h
+	var cx := base_center.x
+	var cz := base_center.z
+	# Thin eave fascia so underside is sealed.
+	lm.box(key, Vector3(cx, y0 - 0.18, cz), Vector3(sx, 0.36, sz))
+	var inset := hip_inset if hip_inset >= 0.0 else minf(hx, hz) * 0.65
+	var rx := maxf(0.0, hx - inset) if sx >= sz else 0.0
+	var rz := maxf(0.0, hz - inset) if sz > sx else 0.0
+	var c0 := Vector3(cx - hx, y0, cz - hz)
+	var c1 := Vector3(cx + hx, y0, cz - hz)
+	var c2 := Vector3(cx + hx, y0, cz + hz)
+	var c3 := Vector3(cx - hx, y0, cz + hz)
+	var r0 := Vector3(cx - rx, y1, cz - rz)
+	var r1 := Vector3(cx + rx, y1, cz + rz)
+	if sx >= sz:
+		# Ridge runs along X: r0 = west ridge end, r1 = east ridge end.
+		outward_tri(lm, key, c0, c1, r1, Vector3(0.0, 1.0, -1.0))
+		outward_tri(lm, key, c0, r1, r0, Vector3(0.0, 1.0, -1.0))
+		outward_tri(lm, key, c2, c3, r0, Vector3(0.0, 1.0, 1.0))
+		outward_tri(lm, key, c2, r0, r1, Vector3(0.0, 1.0, 1.0))
+		outward_tri(lm, key, c1, c2, r1, Vector3(1.0, 1.0, 0.0))
+		outward_tri(lm, key, c3, c0, r0, Vector3(-1.0, 1.0, 0.0))
+	else:
+		# Ridge runs along Z: r0 = north ridge end, r1 = south ridge end.
+		outward_tri(lm, key, c1, c2, r1, Vector3(1.0, 1.0, 0.0))
+		outward_tri(lm, key, c1, r1, r0, Vector3(1.0, 1.0, 0.0))
+		outward_tri(lm, key, c3, c0, r0, Vector3(-1.0, 1.0, 0.0))
+		outward_tri(lm, key, c3, r0, r1, Vector3(-1.0, 1.0, 0.0))
+		outward_tri(lm, key, c0, c1, r0, Vector3(0.0, 1.0, -1.0))
+		outward_tri(lm, key, c2, c3, r1, Vector3(0.0, 1.0, 1.0))
+
+## Adds a solid 3D classical triangular pediment (front & back tympanums + sloped roof cheeks).
+## When `face_z` is true, the triangle faces ±Z with `width` along X and `depth` along Z.
+static func pediment_prism(lm: LandmarkMesh, tymp_key: String, roof_key: String,
+		base_center: Vector3, width: float, height: float, depth: float, face_z: bool = true) -> void:
+	var hw := width * 0.5
+	var hd := depth * 0.5
+	var y0 := base_center.y
+	var y1 := y0 + height
+	var cx := base_center.x
+	var cz := base_center.z
+	if face_z:
+		var fl := Vector3(cx - hw, y0, cz + hd)
+		var fr := Vector3(cx + hw, y0, cz + hd)
+		var ft := Vector3(cx, y1, cz + hd)
+		var bl := Vector3(cx - hw, y0, cz - hd)
+		var br := Vector3(cx + hw, y0, cz - hd)
+		var bt := Vector3(cx, y1, cz - hd)
+		outward_tri(lm, tymp_key, fl, fr, ft, Vector3(0.0, 0.0, 1.0))
+		outward_tri(lm, tymp_key, br, bl, bt, Vector3(0.0, 0.0, -1.0))
+		outward_tri(lm, roof_key, fl, ft, bt, Vector3(-1.0, 1.0, 0.0))
+		outward_tri(lm, roof_key, fl, bt, bl, Vector3(-1.0, 1.0, 0.0))
+		outward_tri(lm, roof_key, fr, br, bt, Vector3(1.0, 1.0, 0.0))
+		outward_tri(lm, roof_key, fr, bt, ft, Vector3(1.0, 1.0, 0.0))
+	else:
+		var fl := Vector3(cx + hd, y0, cz - hw)
+		var fr := Vector3(cx + hd, y0, cz + hw)
+		var ft := Vector3(cx + hd, y1, cz)
+		var bl := Vector3(cx - hd, y0, cz - hw)
+		var br := Vector3(cx - hd, y0, cz + hw)
+		var bt := Vector3(cx - hd, y1, cz)
+		outward_tri(lm, tymp_key, fl, fr, ft, Vector3(1.0, 0.0, 0.0))
+		outward_tri(lm, tymp_key, br, bl, bt, Vector3(-1.0, 0.0, 0.0))
+		outward_tri(lm, roof_key, fl, ft, bt, Vector3(0.0, 1.0, -1.0))
+		outward_tri(lm, roof_key, fl, bt, bl, Vector3(0.0, 1.0, -1.0))
+		outward_tri(lm, roof_key, fr, br, bt, Vector3(0.0, 1.0, 1.0))
+		outward_tri(lm, roof_key, fr, bt, ft, Vector3(0.0, 1.0, 1.0))
