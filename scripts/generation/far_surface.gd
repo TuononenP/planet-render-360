@@ -228,12 +228,17 @@ uniform float imagery_gain = 1.6;  // FarSurface.IMAGERY_GAIN
 // 0 Fast .. 3 Ultra: relief octaves, photographic detail (High+).
 uniform int far_quality = 2;
 // @SNOW
+// @AUTUMN
 // @TERRAIN
 // @WATER_FILTER
 // @GLOW
 global uniform float valley_haze_y;
 global uniform vec3 valley_haze_col;
 global uniform float far_fog_density;
+global uniform float valley_haze_amount;
+global uniform float valley_haze_scale;
+// Share of deciduous trees in this place's forest canopy (0 tropical/arid .. 0.68 temperate).
+uniform float deciduous_share = 0.0;
 // +1 where the sun stands in the south, -1 in the southern hemisphere.
 uniform float sun_side = 1.0;
 // Height of the treeline in world units (aspect_params); far above by default.
@@ -410,6 +415,7 @@ void fragment() {
 		float fine_crowns = canopy_noise(wpos + vec3(5.3, 1.7, 3.9), wnrm, crown_m * 0.47);
 		float stands = canopy_noise(wpos + vec3(2.1, 8.4, 6.2), wnrm, 160.0);
 		c *= mix(1.0, (0.58 + 0.56 * crowns + 0.3 * fine_crowns) * (0.82 + 0.36 * stands), forest * 0.85);
+		c = autumn_far_forest(c, wpos.y, stands, crowns, deciduous_share * forest);
 	}
 	float sc = snow_cover(wpos, nw.y) * (1.0 - water * (1.0 - climate_water_ice));
 	c = mix(c, snow_albedo(wpos.xz, max(fwidth(wpos.x), fwidth(wpos.z)), 0.0), sc);
@@ -420,7 +426,7 @@ void fragment() {
 	// apart in layers. Far terrain only: the detailed ground and the city
 	// stay clear whatever their height.
 	float valley_air = smoothstep(1500.0, 14000.0, dist) * (1.0 - smoothstep(0.0, 900.0, wpos.y - valley_haze_y));
-	c = mix(c, valley_haze_col * 0.85, valley_air * 0.42 * (1.0 - water));
+	c = mix(c, valley_haze_col * 0.85, valley_air * valley_haze_amount * (1.0 - water));
 	ALBEDO = min(c, vec3(albedo_cap));
 	// Night: the far city's carpet of street lights (StreetGlow), mottled
 	// block by block, never on water.
@@ -440,7 +446,8 @@ void fragment() {
 	float h0 = max(CAMERA_POSITION_WORLD.y - valley_haze_y, 0.0);
 	float h1 = max(wpos.y - valley_haze_y, 0.0);
 	float rise = h1 - h0;
-	float air = abs(rise) < 1.0 ? exp(-h0 / 2500.0) : 2500.0 / rise * (exp(-h0 / 2500.0) - exp(-h1 / 2500.0));
+	float h_scale = max(valley_haze_scale, 200.0);
+	float air = abs(rise) < 1.0 ? exp(-h0 / h_scale) : h_scale / rise * (exp(-h0 / h_scale) - exp(-h1 / h_scale));
 	FOG = vec4(valley_haze_col, 1.0 - exp(-far_fog_density * dist * air));
 }
 """
@@ -452,6 +459,7 @@ static var _shader: Shader
 static func drape_material(fine: Texture2D, coarse: Texture2D,
 		double_sided: bool = false, data: LocationData = null) -> ShaderMaterial:
 	var code := _SHADER_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+		.replace("// @AUTUMN", WeatherGlsl.AUTUMN_GLSL) \
 		.replace("// @TERRAIN", TerrainGlsl.CODE) \
 		.replace("// @WATER_FILTER", WaterShader.FILTER_GLSL).replace("// @GLOW", StreetGlow.GLSL)
 	if _shader == null:
@@ -468,6 +476,8 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 		var aspect := aspect_params(data)
 		mat.set_shader_parameter("sun_side", aspect["sun_side"])
 		mat.set_shader_parameter("treeline_y", aspect["treeline_y"])
+		mat.set_shader_parameter("deciduous_share",
+			TreeSpecies.deciduous_share_for_biome(TreeSpecies.biome_for_data(data)))
 		var sea := WaterSurface.sea_palette(data)
 		mat.set_shader_parameter("water_shallow", sea["shallow"])
 		mat.set_shader_parameter("water_deep", sea["deep"])

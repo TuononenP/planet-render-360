@@ -164,7 +164,9 @@ static func apply_camera_attributes(ca: CameraAttributesPractical, preset: int,
 	ca.auto_exposure_max_sensitivity = AUTO_EXP_MAX_ISO
 
 ## Volumetric medium in the haze colour, per light state: denser in fog
-## and drizzle; the albedo follows the haze so it adds shafts, not tint.
-static func update_volume(env: Environment, haze: Color, foggy: bool, units_per_metre: float) -> void:
+## and humid mist; the albedo follows the haze so it adds shafts, not tint.
+static func update_volume(env: Environment, haze: Color, foggy: bool,
+		units_per_metre: float, vol_per_m: float = -1.0) -> void:
 	env.volumetric_fog_albedo = haze
-	env.volumetric_fog_density = (VOLUME_FOG_PER_M if foggy else VOLUME_PER_M) / maxf(units_per_metre, 1e-4)
+	var d := vol_per_m if vol_per_m >= 0.0 else (VOLUME_FOG_PER_M if foggy else VOLUME_PER_M)
+	env.volumetric_fog_density = d / maxf(units_per_metre, 1e-4)

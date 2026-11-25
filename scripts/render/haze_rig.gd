@@ -249,7 +249,8 @@ static func project_sun(cam: Camera3D, aspect: float, sun_dir: Vector3) -> Dicti
 func update_from_atmosphere(atmos: AtmosphereRig = _atmos) -> void:
 	if atmos == null:
 		return
-	var raw_vis := float(atmos.weather_look.get("visibility_m", 0.0))
+	var raw_vis := atmos.effective_visibility_m if atmos.effective_visibility_m > 0.0 \
+		else float(atmos.weather_look.get("visibility_m", 0.0))
 	var vis_m := raw_vis if raw_vis > 0.0 else 20000.0
 	set_conditions(atmos.solar_elevation, atmos.solar_azimuth, atmos.cloud_cover,
 		vis_m, atmos.sun.light_color if atmos.sun != null else Color(1.0, 0.85, 0.64))

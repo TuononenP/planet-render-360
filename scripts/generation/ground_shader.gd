@@ -71,6 +71,7 @@ uniform float stripe_angle = 0.6;
 uniform vec2 glare = vec2(1.0, 0.0);
 
 // @SNOW
+global uniform float climate_autumn;
 // @TERRAIN
 // @GLOW
 varying vec3 wpos;
@@ -351,6 +352,11 @@ void fragment() {
 		// Sunlit turf is a deep, slightly grey green, never poster green.
 		float turf = lum(base);
 		base = mix(base, vec3(turf), 0.18 * meadow) * mix(1.0, 0.93, meadow);
+		if (climate_autumn > 0.01) {
+			base *= mix(vec3(1.0), vec3(1.12, 1.00, 0.72), climate_autumn * 0.42 * meadow);
+			float litter = smoothstep(0.35, 0.80, t_noise(g / 2.8 + 7.1)) * W1.y * smoothstep(0.30, 0.85, climate_autumn);
+			base = mix(base, vec3(0.30, 0.19, 0.09), litter * 0.55);
+		}
 		// A lawn is never a plane: slow swells catch the light.
 		if (ground_quality >= 1 && dist_m < 260.0) {
 			vec2 swell = t_relief(g, 7.0, 2);

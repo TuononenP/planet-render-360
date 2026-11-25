@@ -269,6 +269,35 @@ static func tint(name: String, season: int) -> Color:
 	var row: Array = TINTS.get(str(spec(name).get("tint", "broad")), TINTS["broad"])
 	return row[LocationData.clamp_season(season)]
 
+## Per-species autumn phenology profile: (deciduous 0/1, onset offset, crimson weight).
+static func autumn_meta(name: String) -> Vector3:
+	if is_evergreen(name):
+		return Vector3.ZERO
+	var base := name.trim_suffix(GREY_SUFFIX)
+	match base:
+		"birch", "horse_chestnut", "ginkgo":
+			return Vector3(1.0, -0.14, 0.05)
+		"maple", "rowan":
+			return Vector3(1.0, -0.05, 0.80)
+		"oak":
+			return Vector3(1.0, 0.14, 0.25)
+		"silk_cotton":
+			return Vector3(0.5, 0.0, 0.0)
+	return Vector3(1.0, 0.0, 0.15)
+
+## Approximate share of deciduous trees in a biome's forest canopy (for FarSurface).
+static func deciduous_share_for_biome(biome: String) -> float:
+	match biome:
+		"tropical", "miami", "khmer", "arid":
+			return 0.0
+		"mediterranean", "dry_coast":
+			return 0.20
+		"alpine":
+			return 0.28
+		"boreal":
+			return 0.38
+	return 0.68
+
 ## Biome for a place: coarse climate from the architecture region,
 ## latitude, and the viewpoint altitude (metres ASL).
 ## Biome for a place: the CHELSA climate class (ClimateModel) where the

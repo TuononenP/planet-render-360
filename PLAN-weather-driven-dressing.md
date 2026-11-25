@@ -1,6 +1,6 @@
 # Plan: Weather-Driven Dressing Beyond Rain
 
-> Status: proposed (2026-11-24). Covers four weather/climate dressing extensions built on top of the existing seasonal sky, `ClimateModel` shader globals, `WeatherLook`, `RoofSnow`, and `ViewConditions.dress` layer:
+> Status: implemented 2026-11-24 (`WeatherDressing`, `FogModel`, `WeatherGlsl`, extended `WeatherFetcher`/`ClimateModel`/`RoofSnow`/`Icicles`/`LandmarkShader`/`FacadeShader`/`FacadeLiteShader`/`TreeMeshLibrary`/`FarSurface`/`GroundShader`/`GrassCarpet`/`GroundCover`/`AtmosphereRig`/`RenderQuality`/`MarineLayer`/`HazeRig`/`ViewConditions`, verified by `tests/weather_dressing_test.gd` plus the full headless + windowed regression suites). Covers four weather/climate dressing extensions built on top of the existing seasonal sky, `ClimateModel` shader globals, `WeatherLook`, `RoofSnow`, and `ViewConditions.dress` layer:
 > 1. **Snow accumulation on roofs** (continuous depth, drift/aspect physics, thaw/slush, and landmark roofs)
 > 2. **Frost on windows** (crystalline rime/hoarfrost with heated-room diffusion across facade tiers)
 > 3. **Autumn foliage color shift** (continuous CHELSA + date + elevation phenology across near trees, impostors, far canopy, and distant forested hills — with zero world rebuild)

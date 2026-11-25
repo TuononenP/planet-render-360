@@ -23,10 +23,13 @@ static var _mesh: Mesh
 static var _mat: StandardMaterial3D
 
 ## Shows icicles on `world` while `on` (climate snow lies), building them
-## the first time; hides them otherwise.
-static func apply(world: Node, on: bool, data: LocationData) -> int:
+## the first time; hides them otherwise. Honors live weather temperature and
+## snowpack depth when supplied.
+static func apply(world: Node, on: bool, data: LocationData,
+		weather: Dictionary = {}, snow_depth: float = -1.0) -> int:
 	var node := world.get_node_or_null("Icicles") as MultiMeshInstance3D
-	if not on or data == null or not cold(data):
+	var deep_enough := snow_depth < 0.0 or snow_depth >= 0.12
+	if not on or not deep_enough or data == null or not cold(data, weather):
 		if node != null:
 			node.visible = false
 		return 0
@@ -53,8 +56,11 @@ static func apply(world: Node, on: bool, data: LocationData) -> int:
 	world.add_child(mmi)
 	return xf.size()
 
-## Whether the season is cold enough at the viewpoint for eaves to freeze.
-static func cold(data: LocationData) -> bool:
+## Whether the viewpoint is cold enough for eaves to freeze (live temp when
+## known, else CHELSA seasonal temperature or snowy winter fallback).
+static func cold(data: LocationData, weather: Dictionary = {}) -> bool:
+	if bool(weather.get("has_temp", false)):
+		return float(weather["temp"]) <= 0.5
 	if not ClimateModel.has(data):
 		return data.season == LocationData.Season.WINTER and ClimateModel.snowy_at_viewpoint(data, data.season)
 	return ClimateModel.season_temp_c(data, data.season) < COLD_C

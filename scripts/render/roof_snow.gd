@@ -21,39 +21,60 @@ render_mode blend_mix, depth_draw_never, cull_back, diffuse_lambert_wrap;
 // Where this world's origin lies on the streamer's continuous map (m,
 // WorldStreamer): the snow's grain and drifts hold through a swap.
 global uniform vec2 world_origin_m;
+global uniform vec3 cloud_sun_dir;
 varying vec3 wpos;
 varying float wny;
 varying vec3 wnrm;
 void vertex() {
 	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	wny = wnrm.y;
-	// A few centimetres proud of the roof so the pass never z-fights,
-	// and lying snow a hand deep on the flatter planes it settles on.
-	VERTEX += NORMAL * (0.03 + 0.08 * smoothstep(0.45, 0.85, wny));
+	// Depth-scaled pillowing: flatter roofs hold thicker cushions (up to ~22 cm),
+	// steep mansards/gables stay tight so snow never detaches from ridges.
+	float d = clamp(climate_snow_depth, 0.0, 1.0);
+	float flat_k = smoothstep(0.45, 0.90, wny);
+	VERTEX += NORMAL * (0.02 + (0.04 + 0.16 * d) * flat_k);
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 void fragment() {
 	float px = max(fwidth(wpos.x), fwidth(wpos.z));
+	float d = clamp(climate_snow_depth, 0.0, 1.0);
 	vec2 hp = wpos.xz + world_origin_m;
-	float n = mix(snow_noise(hp / 2.3) * 0.7 + snow_noise(hp / 0.7) * 0.3, 0.5, smoothstep(0.4, 2.5, px));
-	// Roofs are never one clean sheet: it thins where the roof's own
-	// warmth and the wind get at it, without opening holes.
-	float a = snow_line(wpos) * smoothstep(0.30, 0.60, wny) * mix(0.86, 1.0, smoothstep(0.15, 0.4, n));
+	// Wind-sculpted cover aligned with WaterShader.WIND (0.86, 0.51).
+	vec2 wind_p = vec2(dot(hp, vec2(0.86, 0.51)), dot(hp, vec2(-0.51, 0.86)));
+	float drift_n = mix(snow_noise(wind_p / vec2(4.5, 2.1)) * 0.65 + snow_noise(hp / 0.85) * 0.35, 0.5, smoothstep(0.4, 2.5, px));
+	// Steeper roofs shed light dustings; deep snowpack grips steeper pitches.
+	float pitch_lo = mix(0.52, 0.28, d);
+	float pitch_hi = mix(0.82, 0.56, d);
+	float slope_hold = smoothstep(pitch_lo, pitch_hi, wny);
+	// Sun-facing slopes and warm-roof spots thin first during light cover or thaw.
+	vec3 n_w = normalize(wnrm);
+	float sun_melt = smoothstep(0.25, 0.75, dot(n_w, cloud_sun_dir)) * smoothstep(0.10, 0.35, cloud_sun_dir.y);
+	float warm_spot = snow_noise(hp / 3.4 + 4.7);
+	float melt_cut = (0.18 * sun_melt + 0.22 * climate_snow_thaw) * (1.0 - 0.5 * d);
+	float cover_k = smoothstep(0.03 + melt_cut, 0.35 + melt_cut * 0.5, d * (0.65 + 0.70 * drift_n) - warm_spot * 0.14 * (1.0 - d * 0.6));
+	float a = snow_line(wpos) * slope_hold * cover_k * mix(0.86, 1.0, smoothstep(0.15, 0.4, drift_n));
 	// Where it thins, the edge is a rounded lip (derivatives first).
-	vec3 lip = snow_edge(a, wpos, 0.08);
+	vec3 lip = snow_edge(a, wpos, mix(0.04, 0.14, d));
 	if (a < 0.01) {
 		discard;
 	}
-	ALBEDO = snow_albedo(hp, px, 0.0) * (0.95 + 0.08 * n);
-	ALPHA = a * 0.97;
+	float age = climate_snow_thaw * 0.55;
+	ALBEDO = snow_albedo(hp, px, age) * (0.95 + 0.08 * drift_n);
+	ALPHA = a * mix(0.92, 0.98, d);
 	float near_px = 1.0 - smoothstep(0.4, 2.5, px);
-	vec2 dr = near_px > 0.0 ? snow_drift(hp) * near_px : vec2(0.0);
+	vec2 dr = near_px > 0.0 ? snow_drift(hp) * near_px * mix(0.6, 1.2, d) : vec2(0.0);
 	// Drift bends the roof's own normal, so a gable keeps its lit side.
-	vec3 nw = normalize(normalize(wnrm) - vec3(dr.x + lip.x * near_px, 0.0, dr.y + lip.y * near_px) * 0.2);
+	vec3 nw = normalize(n_w - vec3(dr.x + lip.x * near_px, 0.0, dr.y + lip.y * near_px) * 0.22);
+	float glint = 0.0;
+	if (climate_snow_thaw < 0.4 && near_px > 0.1) {
+		vec4 facet = snow_facet(hp, px);
+		glint = facet.w * (1.0 - climate_snow_thaw * 2.5) * a;
+		nw = normalize(mix(nw, facet.xyz, glint));
+	}
 	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
-	ROUGHNESS = SNOW_ROUGH;
-	SPECULAR = SNOW_SPEC;
-	RIM = SNOW_RIM;
+	ROUGHNESS = mix(mix(SNOW_ROUGH, 0.42, climate_snow_thaw), 0.04, glint);
+	SPECULAR = mix(mix(SNOW_SPEC, 0.55, climate_snow_thaw), 1.0, glint);
+	RIM = SNOW_RIM * (1.0 - 0.5 * climate_snow_thaw);
 	RIM_TINT = SNOW_RIM_TINT;
 }
 """
@@ -111,22 +132,41 @@ static func wet_overlay() -> ShaderMaterial:
 	return _wet_overlay
 
 ## Attaches (on) or detaches (off) the snow or wet overlay on every
-## building mesh of `world` that carries a roof material. Snow wins when
-## both are active; `wet` attaches the wet-sheen overlay when snow is off.
+## building and roof-tagged landmark mesh of `world`. Snow wins when both
+## are active; `wet` attaches the wet-sheen overlay when snow is off.
 static func apply(world: Node, on: bool, wet: bool = false) -> int:
 	var touched := 0
 	var mat: Material = overlay() if on else (wet_overlay() if wet else null)
 	for c in world.get_children():
-		if not (c is MeshInstance3D):
-			continue
-		var layer := str(c.get_meta("lod_layer", ""))
-		if layer != "Buildings" and layer != "FarCity":
-			continue
-		var mi := c as MeshInstance3D
-		var mats: Array = [mi.material_override]
-		for s in (mi.mesh.get_surface_count() if mi.mesh != null else 0):
-			mats.append(mi.mesh.surface_get_material(s))
-		if mats.any(func(m: Variant) -> bool: return m is Material and (m as Material).has_meta("roof")):
-			mi.material_overlay = mat
+		if c is MeshInstance3D:
+			var layer := str(c.get_meta("lod_layer", ""))
+			if layer != "Buildings" and layer != "FarCity":
+				continue
+			if _apply_mi(c as MeshInstance3D, mat):
+				touched += 1
+		elif c.name == "Landmarks" or str(c.get_meta("lod_layer", "")) == "Landmarks":
+			touched += _apply_landmarks(c, mat)
+	return touched
+
+static func _apply_landmarks(root: Node, mat: Material) -> int:
+	var touched := 0
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if n is MeshInstance3D and _apply_mi(n as MeshInstance3D, mat, true):
 			touched += 1
 	return touched
+
+static func _apply_mi(mi: MeshInstance3D, mat: Material, skip_shader := false) -> bool:
+	var mats: Array = [mi.material_override]
+	var sc := mi.mesh.get_surface_count() if mi.mesh != null else 0
+	for s in sc:
+		var over := mi.get_surface_override_material(s)
+		if skip_shader and over is ShaderMaterial:
+			return false
+		mats.append(over if over != null else mi.mesh.surface_get_material(s))
+	if mats.any(func(m: Variant) -> bool: return m is Material and (m as Material).has_meta("roof")):
+		mi.material_overlay = mat
+		return true
+	return false

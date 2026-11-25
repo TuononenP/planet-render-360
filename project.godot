@@ -94,6 +94,34 @@ climate_water_ice={
 "type": "float",
 "value": 0.0
 }
+climate_snow_depth={
+"type": "float",
+"value": 0.0
+}
+climate_snow_thaw={
+"type": "float",
+"value": 0.0
+}
+climate_frost={
+"type": "float",
+"value": 0.0
+}
+climate_autumn={
+"type": "float",
+"value": 0.0
+}
+climate_autumn_lapse={
+"type": "float",
+"value": 0.0
+}
+valley_haze_amount={
+"type": "float",
+"value": 0.42
+}
+valley_haze_scale={
+"type": "float",
+"value": 2500.0
+}
 street_lamp_glow={
 "type": "float",
 "value": 0.0

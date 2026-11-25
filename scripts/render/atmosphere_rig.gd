@@ -138,6 +138,13 @@ var _coastal := false
 var _valley_floor_y := 0.0
 var _valley_has_floor := false
 var _valley_arid := false
+## CHELSA climate moisture (0..1) and continentality (0..1), plus extended
+## live Open-Meteo telemetry (rh, dew_point_c, temp, visibility_m) for FogModel.
+var _climate_moisture := 0.55
+var _climate_continentality := 0.5
+var _weather_details: Dictionary = {}
+var _fog_state: Dictionary = {}
+var effective_visibility_m := 0.0
 ## Unified volumetric-haze driver (0..1, fed by HazeRig on Ultra): scales
 ## fog light energy, directional sun scatter, glow highlight threshold/
 ## intensity and froxel density together without re-capturing probes.
@@ -307,10 +314,18 @@ func golden_hour() -> float:
 
 ## Open-Meteo weather code + cloud cover %. Coverage drives the cloud
 ## deck itself; the code sets visibility, light and lightning.
-func set_weather(code: int, cover: float) -> void:
+func set_weather(code: int, cover: float, details: Dictionary = {}) -> void:
 	weather_code = code
 	cloud_cover = clampf(cover, 0.0, 100.0)
+	_weather_details = details
 	weather_look = WeatherLook.for_code(code, cloud_cover)
+	_apply()
+
+## CHELSA climatological moisture & continentality for FogModel.
+func set_climate(moisture: float, arid: bool, continentality: float) -> void:
+	_climate_moisture = clampf(moisture, 0.0, 1.0)
+	_valley_arid = arid
+	_climate_continentality = clampf(continentality, 0.0, 1.0)
 	_apply()
 
 ## Snow lying at the viewpoint brightens the ground bounce light.
@@ -347,7 +362,7 @@ func _ready() -> void:
 	RenderQuality.apply_viewport(get_viewport(), _preset)
 
 func is_foggy() -> bool:
-	return WeatherLook.is_foggy(weather_look)
+	return bool(_fog_state.get("foggy", WeatherLook.is_foggy(weather_look)))
 
 ## The place's sea level (render Y) and whether it has a coastline: fog
 ## there lies on the sea as a marine layer (MarineLayer) instead of
@@ -653,28 +668,35 @@ func _apply() -> void:
 	var lamps := CityLights.amount_for(night_amount, twilight_amount) * city_glow
 	RenderingServer.global_shader_parameter_set("climate_snow_glint",
 		0.8 * lamps if night else (1.0 - overcast) * direct)
-	environment.fog_light_color = haze_color.darkened(0.3 * darken)
+	var fog := FogModel.compute(_climate_moisture, _valley_arid, _climate_continentality,
+		_weather_details, look, season, float(s["haze"]), overcast, solar_elevation,
+		night_amount, _coastal, MarineLayer.supported(), _valley_has_floor)
+	_fog_state = fog
+	effective_visibility_m = float(fog["effective_visibility_m"])
+	var fog_col := haze_color.darkened(0.3 * darken)
+	var ice_fog := float(fog["ice_fog"])
+	if ice_fog > 0.01:
+		fog_col = fog_col.lerp(Color(0.84, 0.89, 0.96), ice_fog * 0.30 * (1.0 - night_amount))
+	elif float(fog["dust_haze"]) > 0.01:
+		fog_col = fog_col.lerp(Color(0.86, 0.79, 0.68), float(fog["dust_haze"]) * 0.16 * (1.0 - night_amount))
+	environment.fog_light_color = fog_col
 	# Far valleys fill with the same air (FarSurface).
 	var valley_air := environment.fog_light_color.srgb_to_linear()
 	RenderingServer.global_shader_parameter_set("valley_haze_col", Vector3(valley_air.r, valley_air.g, valley_air.b))
-	var haze := HAZE_PER_M * lerpf(1.0, 1.6, overcast) * float(s["haze"])
-	# A marine layer carries the fog itself; the air above it stays hazy.
-	var fog_m := haze * 2.0 if _marine_on() else WeatherLook.fog_per_m(look, haze)
-	environment.fog_density = fog_m / maxf(units_per_metre, 1e-4)
-	# Subtle height-based valley mist: gathers over inland valleys and basins
-	# near dawn, golden hour and damp weather while leaving peaks crisp.
-	# Kept off coastal harbours (MarineLayer handles sea fog) and arid sites.
-	if _valley_has_floor and not _valley_arid and not _coastal and not _marine_on() and not is_foggy():
-		var damp := 0.35 if str(look["precip"]) != "none" else 0.0
-		var season_mist := 0.35 if season == LocationData.Season.AUTUMN else (0.2 if season == LocationData.Season.SPRING else 0.0)
-		var mist := (0.00003 + 0.00012 * low_sun + 0.00009 * maxf(damp, season_mist)) * (1.0 - 0.65 * night_amount)
+	RenderingServer.global_shader_parameter_set("valley_haze_amount", float(fog["valley_haze_amount"]))
+	RenderingServer.global_shader_parameter_set("valley_haze_scale", float(fog["valley_haze_scale"]))
+	environment.fog_density = float(fog["fog_per_m"]) / maxf(units_per_metre, 1e-4)
+	var h_dens := float(fog["height_density_per_m"])
+	if h_dens > 0.0:
 		environment.fog_height = _valley_floor_y + 12.0 * units_per_metre
-		environment.fog_height_density = mist / maxf(units_per_metre, 1e-4)
+		environment.fog_height_density = h_dens / maxf(units_per_metre, 1e-4)
 	else:
 		environment.fog_height_density = 0.0
 	RenderingServer.global_shader_parameter_set("far_fog_density", environment.fog_density)
-	marine.set_amount(1.0 if _marine_on() else 0.0, environment.fog_light_color)
-	_base_sun_scatter = 0.0 if night else 0.14 * low_sun * (1.0 - overcast)
+	marine.set_profile(float(fog["marine_top_m"]), float(fog["marine_soft_m"]),
+		float(fog["marine_vis_m"]), units_per_metre)
+	marine.set_amount(float(fog["marine_amount"]), environment.fog_light_color)
+	_base_sun_scatter = 0.0 if night else (0.14 + 0.06 * ice_fog) * low_sun * (1.0 - overcast)
 	# Diffuse sky light takes over under cloud; the eye adapts to storms
 	# and to the night.
 	environment.ambient_light_energy = PostGrade.AMBIENT_ENERGY * float(look["ambient_gain"])
@@ -683,7 +705,8 @@ func _apply() -> void:
 		* (1.0 + float(look["exposure_lift"]) + NIGHT_EXPOSURE_LIFT * night_amount
 			+ SNOW_EXPOSURE_LIFT * snowbound * (1.0 - night_amount))
 	environment.adjustment_saturation = PostGrade.SATURATION * lerpf(1.0, SNOW_SATURATION, snowbound)
-	RenderQuality.update_volume(environment, haze_color, is_foggy(), units_per_metre)
+	RenderQuality.update_volume(environment, haze_color, bool(fog["foggy"]),
+		units_per_metre, float(fog["vol_density_per_m"]))
 	_base_vol_density = environment.volumetric_fog_density
 	_apply_haziness()
 	_update_lightning()

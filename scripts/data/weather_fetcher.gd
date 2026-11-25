@@ -7,10 +7,14 @@ extends Node
 signal succeeded(temp_c: float, label: String, cloud_cover: float, code: int)
 signal failed(reason: String)
 
-const URL_TEMPLATE := "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,cloud_cover&timezone=auto"
+const URL_TEMPLATE := "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,relative_humidity_2m,dew_point_2m,weather_code,cloud_cover,snowfall,snow_depth,wind_speed_10m,wind_direction_10m,visibility&timezone=auto"
 const USER_AGENT := Brand.USER_AGENT
 
 var _http: HTTPRequest
+## Full parsed current weather dictionary from the last response (temp, code,
+## cloud, optional rh, dew_point_c, snowfall_cm, snow_depth_m, wind_kmh,
+## wind_dir_deg, visibility_m).
+var current_data: Dictionary = {}
 ## The place's UTC offset from the last response (`timezone=auto`), for
 ## the true sun's local clock (T6.2); has_utc_offset is false until then.
 var utc_offset_s := 0
@@ -49,10 +53,23 @@ static func parse_current(text: String) -> Dictionary:
 		var code := int(cur.get("weather_code", -1))
 		var out := {
 			"temp": float(cur.get("temperature_2m", 0.0)),
+			"has_temp": cur.has("temperature_2m") and cur["temperature_2m"] != null,
 			"code": code,
 			"label": label_for_code(code),
 			"cloud": float(cur.get("cloud_cover", 0.0)),
 		}
+		var extras := {
+			"relative_humidity_2m": "rh",
+			"dew_point_2m": "dew_point_c",
+			"snowfall": "snowfall_cm",
+			"snow_depth": "snow_depth_m",
+			"wind_speed_10m": "wind_kmh",
+			"wind_direction_10m": "wind_dir_deg",
+			"visibility": "visibility_m",
+		}
+		for src_key in extras:
+			if cur.has(src_key) and cur[src_key] != null:
+				out[extras[src_key]] = float(cur[src_key])
 		if parsed.has("utc_offset_seconds"):
 			out["utc_offset_s"] = int(parsed["utc_offset_seconds"])
 		if parsed.has("elevation") and parsed["elevation"] != null:
@@ -80,6 +97,7 @@ func _on_done(result: int, code: int, _h: PackedStringArray, body: PackedByteArr
 	if parsed.is_empty():
 		failed.emit("Weather response unreadable")
 		return
+	current_data = parsed
 	if parsed.has("utc_offset_s"):
 		utc_offset_s = int(parsed["utc_offset_s"])
 		has_utc_offset = true

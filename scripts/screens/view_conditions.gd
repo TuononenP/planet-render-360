@@ -70,7 +70,8 @@ static func _precip_tint(v: View360) -> void:
 ## The place's live weather arrived: kept, and shown unless a preset is
 ## picked in the Conditions sheet (then only its clock is taken).
 static func _on_weather(v: View360, temp_c: float, label: String, cloud_cover: float, code: int) -> void:
-	v._live_weather = [temp_c, label, cloud_cover, code]
+	var details: Dictionary = v._weather.current_data.duplicate() if v._weather != null else {}
+	v._live_weather = [temp_c, label, cloud_cover, code, details]
 	if v._weather_pick == 0:
 		_show_weather(v)
 	if v._weather != null and v._weather.has_utc_offset:
@@ -90,27 +91,38 @@ static func reset_weather(v: View360) -> void:
 	v._live_weather = []
 	pick_weather(v, 0)
 
+static func _weather_dict(v: View360) -> Dictionary:
+	if v._weather_pick == 0:
+		var lw: Array = v._live_weather
+		if lw.size() >= 5 and lw[4] is Dictionary and not (lw[4] as Dictionary).is_empty():
+			return lw[4] as Dictionary
+		if lw.size() >= 4:
+			return {"temp": float(lw[0]), "has_temp": true, "cloud": float(lw[2]), "code": int(lw[3])}
+		return {}
+	return WeatherDressing.weather_for_pick(v._weather_pick, v._data, v._date)
+
 static func _show_weather(v: View360) -> void:
 	var lw: Array = v._live_weather
 	if v._weather_pick == 0:
 		if lw.is_empty():
-			_apply_weather(v, -1, AtmosphereRig.DEFAULT_COVER)
+			_apply_weather(v, -1, AtmosphereRig.DEFAULT_COVER, {})
 			ViewChrome.weather_failed(v)
 			return
 		if v._weather_chip != null:
 			ViewChrome.set_weather(v, float(lw[0]), str(lw[1]), int(lw[3]))
-		_apply_weather(v, int(lw[3]), float(lw[2]))
+		_apply_weather(v, int(lw[3]), float(lw[2]), _weather_dict(v))
 		return
 	var w: Array = DatePicker.WEATHER[v._weather_pick]
 	if v._weather_chip != null:
 		ViewChrome.set_weather_picked(v, str(w[0]), str(w[1]),
 			"" if lw.is_empty() else "%d °C %s" % [roundi(float(lw[0])), str(lw[1])])
-	_apply_weather(v, int(w[2]), float(w[3]))
+	var wd := _weather_dict(v)
+	_apply_weather(v, int(wd.get("code", int(w[2]))), float(wd.get("cloud", float(w[3]))), wd)
 
-static func _apply_weather(v: View360, code: int, cover: float) -> void:
+static func _apply_weather(v: View360, code: int, cover: float, details: Dictionary = {}) -> void:
 	if v._atmos == null:
 		return
-	v._atmos.set_weather(code, cover)
+	v._atmos.set_weather(code, cover, details)
 	_apply_precip(v, code)
 	apply_surface_state(v)
 
@@ -138,16 +150,20 @@ static func _apply_utc_offset(v: View360, hours: float) -> void:
 static func apply_surface_state(v: View360, dress_world := true) -> void:
 	if v._data == null:
 		return
-	var code := v._atmos.weather_code if v._atmos != null else -1
-	ClimateModel.apply_globals(v._data, code)
+	var wd := _weather_dict(v)
+	var solar_elev := v._atmos.solar_elevation if v._atmos != null else 15.0
+	var state := WeatherDressing.solve(v._data, wd, v._date, solar_elev)
+	WeatherDressing.apply_globals(state)
 	# Night skyglow follows how built-up the place is (~1500 mapped
 	# buildings in the detailed extent reads as a full city).
 	if v._atmos != null:
 		v._atmos.set_city_glow(float(v._data.buildings.size()) / 1500.0)
-	if v._atmos != null:
+		v._atmos.set_climate(ClimateModel.moisture_index(v._data),
+			ClimateModel.arid(v._data), ClimateModel.continentality(v._data))
 		# Snow underfoot brightens the bounce light; bolts land on terrain.
-		v._atmos.set_snow_ground(ClimateModel.has(v._data)
-			and ClimateModel.snowy_at_viewpoint(v._data, v._data.season))
+		var snow_underfoot := (float(state["climate_snow_on"]) > 0.0 and float(state["climate_snow_depth"]) > 0.05 and float(state["climate_snow_y"]) < 0.0) \
+			or (ClimateModel.has(v._data) and ClimateModel.snowy_at_viewpoint(v._data, v._data.season))
+		v._atmos.set_snow_ground(snow_underfoot)
 		if v._ground != null:
 			v._atmos.lightning.ground_height = v._ground.height_at_world
 			v._atmos.set_valley_floor(v._ground.render_y(v._ground.water_level_m), ClimateModel.arid(v._data))
@@ -162,14 +178,18 @@ static func apply_surface_state(v: View360, dress_world := true) -> void:
 ## stages big subtrees child by child): roads and roofs are only ever the
 ## world's direct children, so those passes skip it.
 static func dress(world: Node, top: bool, v: View360, data: LocationData) -> void:
-	var code := v._atmos.weather_code if v._atmos != null else -1
+	var wd := _weather_dict(v)
+	var code := v._atmos.weather_code if v._atmos != null else int(wd.get("code", -1))
 	StreetGlow.apply_world(world, data, top)
 	if top:
 		var raining := code in ClimateModel.RAINING
 		_wet_roads(world, 1.0 if raining else 0.0)
-		var snow_on := float(ClimateModel.globals_for(data, code)["climate_snow_on"]) > 0.0
+		var solar_elev := v._atmos.solar_elevation if v._atmos != null else 15.0
+		var st := WeatherDressing.solve(data, wd, v._date, solar_elev)
+		var snow_depth := float(st["climate_snow_depth"])
+		var snow_on := float(st["climate_snow_on"]) > 0.0 and snow_depth > 0.01
 		RoofSnow.apply(world, snow_on, raining)
-		Icicles.apply(world, snow_on, data)
+		Icicles.apply(world, snow_on, data, wd, snow_depth)
 	if v._atmos != null:
 		var night_amt := CityLights.amount_for(v._atmos.night_amount, v._atmos.twilight_amount)
 		CityLights.apply(world, night_amt)
@@ -282,6 +302,9 @@ static func set_date(v: View360, date: Dictionary) -> void:
 	var season := ViewLink.season_for_date(date, v._data.latitude, v._data)
 	if season != v._data.season:
 		await _select_season(v, season)
+	else:
+		# Intra-season date change updates autumn phenology, frost and snow depth live.
+		apply_surface_state(v, false)
 
 ## The picked date's label ("21 Jun 2026"); without the year ("21 Jun") when
 ## `with_year` is false.

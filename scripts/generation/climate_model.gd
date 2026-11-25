@@ -160,6 +160,8 @@ global uniform float climate_wetness;
 global uniform float climate_rain;
 global uniform float climate_snow_glint;
 global uniform float climate_water_ice;
+global uniform float climate_snow_depth;
+global uniform float climate_snow_thaw;
 uniform vec3 snow_col : source_color = vec3(0.90, 0.92, 0.95);
 float snow_line(vec3 p) {
 	if (climate_snow_on <= 0.0) { return 0.0; }
@@ -358,7 +360,9 @@ vec2 rain_ripples(vec2 m, float t, float pixel_m) {
 """
 
 const GLOBALS := ["climate_snow_on", "climate_snow_y", "climate_snow_band",
-	"climate_wetness", "climate_rain", "climate_snow_glint", "climate_water_ice", "valley_haze_y"]
+	"climate_wetness", "climate_rain", "climate_snow_glint", "climate_water_ice",
+	"climate_snow_depth", "climate_snow_thaw", "climate_frost", "climate_autumn",
+	"climate_autumn_lapse", "valley_haze_y", "valley_haze_amount", "valley_haze_scale"]
 ## Open-Meteo WMO codes: falling snow / rain (incl. showers, storms).
 const SNOWING := [71, 73, 75, 77, 85, 86]
 const RAINING := [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]
@@ -412,8 +416,61 @@ static func globals_for(data: LocationData, weather_code: int = -1) -> Dictionar
 	g["climate_wetness"] = 1.0 if weather_code in RAINING else 0.0
 	g["climate_rain"] = float(WeatherLook.for_code(weather_code, 100.0)["intensity"]) if weather_code in RAINING else 0.0
 	g["climate_water_ice"] = ice_amount(data)
+	g["climate_snow_depth"] = snowpack_index(data, data.season) if float(g["climate_snow_on"]) > 0.0 else 0.0
+	g["climate_snow_thaw"] = 0.0
+	g["climate_frost"] = 0.0
+	g["climate_autumn"] = 0.68 if LocationData.clamp_season(data.season) == LocationData.Season.AUTUMN and not arid(data) and (not has(data) or float(data.climate["t_cold_c"]) < 13.0) else 0.0
+	g["climate_autumn_lapse"] = 0.0
 	g["valley_haze_y"] = valley_y(data)
 	return g
+
+## Climatological moisture index (0 arid .. 1 humid oceanic/monsoon/alpine)
+## from CHELSA annual precipitation and mean temperature (de Martonne proxy).
+## Returns 0.55 when climate data is unavailable.
+static func moisture_index(data: LocationData) -> float:
+	if not has(data):
+		return 0.55
+	var t_mean := (float(data.climate["t_warm_c"]) + float(data.climate["t_cold_c"])) * 0.5
+	var precip := float(data.climate.get("precip_mm", 700.0))
+	var raw := clampf((precip / maxf(t_mean + 10.0, 5.0)) / 55.0, 0.0, 1.0)
+	if arid(data):
+		return raw * 0.25
+	return raw
+
+## Continentality (0 maritime .. 1 continental) from annual temperature range.
+static func continentality(data: LocationData) -> float:
+	if not has(data):
+		return 0.5
+	var span := float(data.climate["t_warm_c"]) - float(data.climate["t_cold_c"])
+	return clampf((span - 6.0) / 24.0, 0.0, 1.0)
+
+## Climatological snowpack depth index (0..1, 1 ≈ ≥0.50 m pack) from CHELSA
+## snow cover days (`scd`), cold-quarter temperature, and cold-half rainfall.
+static func snowpack_index(data: LocationData, season: int, date: Dictionary = {}) -> float:
+	var s := LocationData.clamp_season(season)
+	if s == LocationData.Season.SUMMER:
+		return 0.0
+	var sl_diff := snowline_m(data, s) - data.centre_elevation_m
+	if not has(data):
+		if sl_diff > 150.0:
+			return 0.0
+		return clampf(smoothstep(150.0, -350.0, sl_diff) * (0.72 if s == LocationData.Season.WINTER else 0.35), 0.0, 1.0)
+	var scd := float(data.climate.get("snow_days", 0.0))
+	var scd_k := clampf(scd / 180.0, 0.0, 1.0)
+	var t_ref := month_temp_c(data, int(date["month"])) if date.has("month") else season_temp_c(data, s)
+	var cold_k := smoothstep(2.0, -9.0, t_ref)
+	var p_tot := float(data.climate.get("precip_mm", 600.0))
+	var p_warm := float(data.climate.get("precip_warm_mm", p_tot * 0.3))
+	var winter_p := maxf(p_tot - p_warm, 0.0)
+	var p_k := clampf(winter_p / 450.0, 0.35, 1.0)
+	var line_k := smoothstep(200.0, -200.0, sl_diff)
+	# High slopes above the viewpoint still carry pack even when the valley is bare.
+	var base := maxf(scd_k * 0.65 + cold_k * 0.35, line_k * 0.55) * p_k
+	if s == LocationData.Season.SPRING:
+		base *= 0.65
+	elif s == LocationData.Season.AUTUMN:
+		base *= 0.45
+	return clampf(base * maxf(line_k, 0.25 if scd > 40.0 and s == LocationData.Season.WINTER else 0.0), 0.0, 1.0)
 
 ## Valley floor around the viewpoint in render Y (the viewpoint is Y = 0).
 static func valley_y(data: LocationData) -> float:

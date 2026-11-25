@@ -68,6 +68,7 @@ uniform float buried_by_snow = 1.0;
 // Distance from the eye at which this kind has shrunk away.
 uniform float fade_m = 260.0;
 // @SNOW
+global uniform float climate_autumn;
 varying vec3 wpos;
 void vertex() {
 	vec3 root = MODEL_MATRIX[3].xyz;
@@ -100,6 +101,9 @@ void fragment() {
 	vec3 up = normalize((VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
 	NORMAL = normalize(mix(NORMAL, up, 0.7));
 	vec3 c = t.rgb * COLOR.rgb;
+	if (climate_autumn > 0.01) {
+		c = mix(c, vec3(c.g * 1.14, c.g * 0.94, c.g * 0.52), climate_autumn * 0.35);
+	}
 	float sc = snow_cover(wpos, 1.0);
 	ALBEDO = mix(c, snow_col, sc * 0.8);
 	// Thin leaves glow yellow-green when lit from behind.

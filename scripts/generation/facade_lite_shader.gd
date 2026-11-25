@@ -45,6 +45,7 @@ global uniform vec3 cloud_sun_dir;
 // Where this world's origin lies on the streamer's continuous map (m,
 // WorldStreamer): the lit-window cells hold through a swap.
 global uniform vec2 world_origin_m;
+global uniform float climate_frost;
 
 float h13(vec3 p) {
 	p = fract(p * 0.1031);
@@ -68,8 +69,26 @@ void fragment() {
 		NORMAL_MAP = texture(normal_tex, UV).rgb;
 		NORMAL_MAP_DEPTH = normal_depth;
 	}
+	float met = metallic_value;
+	if (climate_frost > 0.005 && has_normal) {
+		float pane = smoothstep(0.32, 0.22, rough);
+		if (pane > 0.05) {
+			vec2 cg_f = UV * cells;
+			float bay_f = max(length(dFdx(cg_f)), length(dFdy(cg_f)));
+			vec2 cuv_f = fract(cg_f);
+			vec2 ed_f = min(cuv_f, 1.0 - cuv_f);
+			float rim_f = min(ed_f.x, ed_f.y);
+			float f_k = climate_frost * (curtain_wall ? 0.45 : 1.0);
+			float reach_f = mix(0.06, 0.36, f_k);
+			float fc = mix(1.0 - smoothstep(reach_f - 0.08, reach_f + 0.04, rim_f), f_k * 0.45, smoothstep(0.18, 0.55, bay_f));
+			fc *= pane * smoothstep(0.0, 0.25, f_k);
+			ALBEDO = mix(ALBEDO, vec3(0.82, 0.88, 0.94), fc * 0.78);
+			rough = mix(rough, 0.62, fc);
+			met = mix(met, 0.04, fc);
+		}
+	}
 	ROUGHNESS = rough;
-	METALLIC = metallic_value;
+	METALLIC = met;
 	SPECULAR = specular_value;
 	if (warm_bounce > 0.0) {
 		vec3 n = normalize(wnrm);

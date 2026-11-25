@@ -85,6 +85,7 @@ varying vec3 wnrm;
 varying flat float bld;
 // @SNOW
 // @CLOUD_SHADOW
+// @FROST
 
 // Near panes. Double-glazing Fresnel over a dim shaded interior: crisp sky
 // and sun reflections at oblique angles, subtle interior depth head-on
@@ -425,19 +426,34 @@ void fragment() {
 	vec3 glass_refl = env_ref * (fresnel * env_gain)
 		+ sun_col * (sun_spec * (0.30 + 0.70 * fresnel) * 0.36 * glare_k);
 
-	// A curtain wall's floors differ a little: no two batches of glass match.
+	// Window frost / rime crystals (WeatherGlsl): creeps in from cold pane
+	// edges, thaws at the centre of lit rooms, suppresses mirror reflection,
+	// and diffuses warm lamp light.
+	vec4 fr = pane > 0.05 ? window_frost(cuv, pane_px, seed, lit, curtain_wall, wnrm) : vec4(0.0);
+	float frost = fr.x;
 	vec3 glass_tint_base = vec3(GLASS_ALBEDO) * GLASS_TINT;
 	vec3 glass_alb = curtain_wall ? base * 0.45 * (0.97 + 0.06 * h12(vec2(cell.y, bld)))
 		: mix(mix(vec3(0.018, 0.026, 0.032), fabric * 0.10, drape), glass_tint_base, mix(0.45, 1.0, near_glass));
 	glass_alb *= 1.0 - 0.18 * edge_rim;
+	if (frost > 0.005) {
+		glass_alb = mix(glass_alb, vec3(0.82, 0.89, 0.96), frost * 0.82);
+		glass_refl *= 1.0 - frost * 0.85;
+		vec3 frost_glow = lamp * lit * night_energy * 0.68 * vec3(1.0, 0.92, 0.82);
+		glass_e = mix(glass_e, frost_glow, frost * 0.78 * step(0.001, lit));
+		glass_e *= mix(1.0, 0.35, frost * (1.0 - step(0.001, lit)));
+		tilt += fr.yz * 0.14 * near_glass;
+		tilt *= min(1.0, 0.45 / max(length(tilt), 1e-4));
+	}
 	ALBEDO = mix(wall, glass_alb, pane);
 	// Below ~0.11 the indirect reflections render as salt-and-pepper noise.
 	// Sub-pixel panes share one value: picked per pane they alias to speckle.
 	float pane_rough = mix(0.11, 0.16, mix(h12(vec2(seed, 29.0)), 0.5, pane_mean));
 	pane_rough = mix(pane_rough, 0.09, wet * 0.5);
-	ROUGHNESS = mix(rough, mix(0.24, pane_rough, near_glass), pane);
-	METALLIC = mix(metallic_wall, curtain_wall ? 0.32 : GLASS_METALLIC * mix(0.4, 1.0, near_glass), pane);
-	SPECULAR = mix(mix(0.5, 0.6, wet), 0.88, pane);
+	pane_rough = mix(pane_rough, 0.62, frost);
+	ROUGHNESS = mix(rough, mix(mix(0.24, 0.62, frost), pane_rough, near_glass), pane);
+	float pane_met = mix(curtain_wall ? 0.32 : GLASS_METALLIC * mix(0.4, 1.0, near_glass), 0.04, frost);
+	METALLIC = mix(metallic_wall, pane_met, pane);
+	SPECULAR = mix(mix(0.5, 0.6, wet), mix(0.88, 0.55 + 0.40 * fr.w * climate_snow_glint, frost), pane);
 	ROUGHNESS = max(ROUGHNESS, glass_cap.z * pane);
 	METALLIC = min(METALLIC, mix(1.0, glass_cap.x, pane));
 	SPECULAR = min(SPECULAR, mix(1.0, glass_cap.y, pane));
@@ -474,7 +490,8 @@ static func shader() -> Shader:
 	if _shader == null:
 		var sh := Shader.new()
 		sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
-			.replace("// @CLOUD_SHADOW", TerrainGlsl.CLOUD_SHADOW_GLSL)
+			.replace("// @CLOUD_SHADOW", TerrainGlsl.CLOUD_SHADOW_GLSL) \
+			.replace("// @FROST", WeatherGlsl.FROST_GLSL)
 		_shader = sh
 	return _shader
 

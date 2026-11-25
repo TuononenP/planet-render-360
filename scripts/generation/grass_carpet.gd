@@ -52,6 +52,7 @@ uniform vec3 lawn = vec3(0.17, 0.27, 0.07);
 uniform float stripe_angle = 0.6;
 uniform float sway = 0.1;
 // @SNOW
+global uniform float climate_autumn;
 varying vec3 tint;
 varying float tipv;
 varying vec3 wpos;
@@ -187,6 +188,9 @@ void fragment() {
 	vec3 nn = dot(NORMAL, up) < 0.0 ? -NORMAL : NORMAL;
 	NORMAL = normalize(mix(nn, up, 0.5));
 	float sc = snow_cover(wpos, 1.0);
+	if (climate_autumn > 0.01) {
+		c = mix(c, vec3(c.g * 1.14, c.g * 0.95, c.g * 0.52), climate_autumn * 0.38);
+	}
 	float wet = climate_wetness * (1.0 - sc);
 	ALBEDO = mix(c * mix(1.0, 0.82, wet), snow_col, sc * 0.8);
 	BACKLIGHT = c * vec3(0.4, 0.36, 0.2);

@@ -54,8 +54,11 @@ uniform vec2 glare = vec2(1.0, 0.0);
 uniform vec3 runs = vec3(0.1);
 // A part's height above the model's ground when its node is lifted.
 instance uniform float lift = 0.0;
+// @SNOW
+global uniform vec2 world_origin_m;
 
 varying vec3 lpos;
+varying vec3 wpos;
 varying vec3 wnrm;
 
 float h12(vec2 p) {
@@ -91,6 +94,7 @@ float fbm3(vec3 p) {
 
 void vertex() {
 	lpos = VERTEX + vec3(0.0, lift, 0.0);
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
@@ -190,6 +194,27 @@ void fragment() {
 		// Deep in a big monument the walls see less sky than at its top.
 		ao *= mix(0.82, 1.0, smoothstep(0.0, 12.0, p.y));
 	}
+	// Live snow accumulation on upward-facing landmark roofs, domes & ledges,
+	// and rain wetness darkening/gloss on porous masonry & metal.
+	float lpx = max(fwidth(wpos.x), fwidth(wpos.z));
+	float lsc = 0.0;
+	if (!ground) {
+		float d = clamp(climate_snow_depth, 0.0, 1.0);
+		if (d > 0.01) {
+			float hold = smoothstep(mix(0.55, 0.35, d), mix(0.84, 0.62, d), up);
+			lsc = snow_cover(wpos, up) * hold * smoothstep(0.04, 0.50, d) * (grime < 0.5 ? 0.55 : 1.0);
+		}
+	} else {
+		lsc = snow_cover(wpos, up);
+	}
+	float lwet = climate_wetness * (1.0 - lsc);
+	if (lwet > 0.001) {
+		alb *= mix(1.0, metal ? 0.88 : 0.78, lwet);
+	}
+	if (lsc > 0.01) {
+		vec2 hp = wpos.xz + world_origin_m;
+		alb = mix(alb, snow_albedo(hp, lpx, climate_snow_thaw * 0.45), lsc);
+	}
 	ALBEDO = clamp(alb, vec3(0.0), vec3(1.0));
 	AO = ao;
 	AO_LIGHT_AFFECT = 0.0;
@@ -197,9 +222,13 @@ void fragment() {
 	float r = has_rough_tex ? texture(rough_tex, uv).r : roughness;
 	r *= mix(0.88, 1.12, m2);
 	r += 0.1 * clamp(dirt, 0.0, 1.0) * grime + 0.15 * joint + (block - 0.5) * 0.06;
-	ROUGHNESS = clamp(max(r, glare.y), 0.05, 1.0);
-	SPECULAR = min(0.5, glare.x);
-	METALLIC = metallic * (1.0 - 0.5 * clamp(dirt, 0.0, 1.0) * grime);
+	r = mix(r, max(r * 0.58, 0.24), lwet);
+	r = mix(r, mix(SNOW_ROUGH, 0.45, climate_snow_thaw), lsc);
+	ROUGHNESS = clamp(max(r, glare.y * (1.0 - lsc) * (1.0 - lwet)), 0.05, 1.0);
+	SPECULAR = mix(mix(min(0.5, glare.x), 0.62, lwet), SNOW_SPEC, lsc);
+	METALLIC = metallic * (1.0 - 0.5 * clamp(dirt, 0.0, 1.0) * grime) * (1.0 - lsc);
+	RIM = SNOW_RIM * lsc * (1.0 - 0.5 * climate_snow_thaw);
+	RIM_TINT = SNOW_RIM_TINT;
 
 	vec3 nm = texture(normal_tex, uv).rgb;
 	vec2 nxy = nm.xy * 2.0 - 1.0;
@@ -211,7 +240,7 @@ void fragment() {
 	nxy += fine * (metal ? 0.15 : 0.45) + joint_n;
 	// Godot rebuilds z from xy: keep the sum inside the unit disc.
 	nxy *= min(1.0, 0.92 / max(length(nxy), 1e-4));
-	NORMAL_MAP = vec3(nxy * 0.5 + 0.5, 1.0);
+	NORMAL_MAP = mix(vec3(nxy * 0.5 + 0.5, 1.0), vec3(0.5, 0.5, 1.0), lsc * 0.75);
 }
 """
 
@@ -223,7 +252,7 @@ static func shader() -> Shader:
 	_mutex.lock()
 	if _shader == null:
 		var sh := Shader.new()
-		sh.code = SHADER
+		sh.code = SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
 		_shader = sh
 	var ret := _shader
 	_mutex.unlock()

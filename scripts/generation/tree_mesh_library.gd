@@ -21,6 +21,8 @@ shader_type spatial;
 render_mode cull_disabled, depth_draw_opaque;
 uniform sampler2D leaf_tex : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform vec3 tint : source_color = vec3(0.36, 0.5, 0.24);
+uniform vec3 autumn_tint : source_color = vec3(0.86, 0.56, 0.22);
+uniform vec3 autumn_meta = vec3(0.0, 0.0, 0.0);
 uniform vec3 translucency : source_color = vec3(0.2, 0.26, 0.08);
 uniform float alpha_cut = 0.5;
 uniform float snow = 0.0;
@@ -29,10 +31,14 @@ uniform float sway = 0.0;
 // axis-aligned card props keep their full coverage).
 uniform bool edge_fade = false;
 // @SNOW
+// @AUTUMN
+global uniform vec2 world_origin_m;
 varying vec3 v_n;
 varying vec3 wpos;
+varying vec2 tree_xz;
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	tree_xz = MODEL_MATRIX[3].xz + world_origin_m;
 	if (sway > 0.0) {
 		vec3 wp = MODEL_MATRIX[3].xyz;
 		// Travelling wind gust front aligned with WaterShader.WIND + fine leaf flutter.
@@ -48,18 +54,19 @@ void vertex() {
 }
 void fragment() {
 	vec4 t = texture(leaf_tex, UV);
-	vec3 c = t.rgb * tint * COLOR.rgb;
+	vec3 n = normalize(v_n);
+	float up_w = (INV_VIEW_MATRIX * vec4(n, 0.0)).y;
+	vec3 live_tint = autumn_tree_tint(tint, autumn_tint, autumn_meta, tree_xz, wpos.y, up_w);
+	vec3 c = t.rgb * live_tint * COLOR.rgb;
 	// Shaded inner foliage (low AO in COLOR) turns slightly cooler.
 	float ao = clamp(COLOR.g, 0.0, 1.0);
 	c *= mix(vec3(0.86, 0.95, 1.1), vec3(1.0), smoothstep(0.3, 0.95, ao));
-	vec3 n = normalize(v_n);
 	float snow_load = 0.0;
 	if (snow > 0.0) {
 		// Snow sits in clumps on the upper sprays, not as an even frost,
 		// and is the ground's own snow.
-		float up = (INV_VIEW_MATRIX * vec4(n, 0.0)).y;
 		float clump = snow_noise(wpos.xz / 0.45 + wpos.y * 0.7) * 0.65 + snow_noise(wpos.xz / 0.17) * 0.35;
-		snow_load = smoothstep(0.0, 0.6, up) * snow * snow_line(wpos);
+		snow_load = smoothstep(0.0, 0.6, up_w) * snow * snow_line(wpos);
 		snow_load *= smoothstep(0.75 - 0.5 * snow_load, 0.95 - 0.5 * snow_load, clump + 0.25);
 		c = mix(c, snow_col * (0.94 + 0.08 * clump), snow_load);
 	}
@@ -90,8 +97,9 @@ void fragment() {
 	NORMAL = n;
 	ROUGHNESS = mix(0.82, 0.36, wet);
 	SPECULAR = mix(0.22, 0.44, wet) * mix(0.4, 1.0, edge);
-	// Snow on the sprays glows when the sun is behind it.
-	BACKLIGHT = mix(translucency * COLOR.rgb, vec3(0.35), snow_load);
+	// Snow on the sprays glows when the sun is behind it; autumn leaves warm translucency.
+	vec3 trans = mix(translucency, vec3(live_tint.r * 0.48, live_tint.g * 0.36, live_tint.b * 0.14), climate_autumn * autumn_meta.x);
+	BACKLIGHT = mix(trans * COLOR.rgb, vec3(0.35), snow_load);
 }
 """
 
@@ -100,6 +108,8 @@ shader_type spatial;
 render_mode cull_disabled, depth_draw_opaque;
 uniform sampler2D imp_tex : filter_linear_mipmap, repeat_disable;
 uniform vec3 tint : source_color = vec3(0.36, 0.5, 0.24);
+uniform vec3 autumn_tint : source_color = vec3(0.86, 0.56, 0.22);
+uniform vec3 autumn_meta = vec3(0.0, 0.0, 0.0);
 uniform vec3 bark_tint : source_color = vec3(0.4, 0.35, 0.3);
 // The baked image carries AO and crown-cavity shade but not the
 // cast shadows the mesh crowns receive from their own outer foliage;
@@ -108,10 +118,14 @@ uniform vec3 bark_tint : source_color = vec3(0.4, 0.35, 0.3);
 uniform float foliage_gain = 0.6;
 uniform float snow = 0.0;
 // @SNOW
+// @AUTUMN
+global uniform vec2 world_origin_m;
 varying vec3 v_n;
 varying vec3 wpos;
+varying vec2 tree_xz;
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	tree_xz = MODEL_MATRIX[3].xz + world_origin_m;
 	v_n = normalize((MODELVIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 void fragment() {
@@ -120,7 +134,8 @@ void fragment() {
 	// that, the cluster warmth the mesh carries in its vertex colour.
 	float fol = clamp(t.g / 0.55, 0.0, 1.0);
 	float warm = (clamp((t.g - 0.55) / 0.45, 0.0, 1.0) * 2.0 - 1.0) * fol;
-	vec3 leaf_c = tint * COLOR.rgb * foliage_gain * vec3(1.0 + 0.07 * warm, 1.0, 1.0 - 0.09 * warm);
+	vec3 live_tint = autumn_tree_tint(tint, autumn_tint, autumn_meta, tree_xz, wpos.y, t.b);
+	vec3 leaf_c = live_tint * COLOR.rgb * foliage_gain * vec3(1.0 + 0.07 * warm, 1.0, 1.0 - 0.09 * warm);
 	// Same cool shift on shaded foliage as the mesh leaf shader.
 	leaf_c *= mix(vec3(0.86, 0.95, 1.1), vec3(1.0), smoothstep(0.3, 0.95, t.r));
 	vec3 c = t.r * mix(bark_tint, leaf_c, fol);
@@ -232,7 +247,11 @@ static func mesh(sp: String, lod: int, season: int, snow: float, sway: float = 0
 			# Snow settles on conifer whorls; broad-crowned evergreens
 			# (pines, olives) hold only a dusting.
 			var sn := snow if str(s["gen"]) == "conifer" else snow * 0.35
-			lm = leaf_material(str(s["leaf"]), TreeSpecies.tint(sp, season), sn, sway, true, true)
+			var live_aut := season in [LocationData.Season.SUMMER, LocationData.Season.AUTUMN]
+			var base_tint := TreeSpecies.tint(sp, LocationData.Season.SUMMER if live_aut else season)
+			var aut_tint := TreeSpecies.tint(sp, LocationData.Season.AUTUMN)
+			var aut_meta := TreeSpecies.autumn_meta(sp) if live_aut else Vector3.ZERO
+			lm = leaf_material(str(s["leaf"]), base_tint, sn, sway, true, true, aut_tint, aut_meta)
 		m.surface_set_material(m.get_surface_count() - 1, lm)
 	_meshes[key] = m
 	return m
@@ -281,17 +300,22 @@ static func bark_material(kind: String) -> StandardMaterial3D:
 ## `edge_fade` thins cards seen edge-on: tree crowns only (crossed
 ## cards at random angles), not axis-aligned props such as hedges.
 static func leaf_material(kind: String, tint: Color, snow: float, sway: float,
-		translucent: bool, edge_fade: bool = false) -> ShaderMaterial:
-	var key := "leaf|%s|%s|%.2f|%.3f|%s|%s" % [kind, tint.to_html(), snow, sway, translucent, edge_fade]
+		translucent: bool, edge_fade: bool = false,
+		autumn_tint: Color = Color(0.86, 0.56, 0.22), autumn_meta: Vector3 = Vector3.ZERO) -> ShaderMaterial:
+	var key := "leaf|%s|%s|%s|%s|%.2f|%.3f|%s|%s" % [kind, tint.to_html(), autumn_tint.to_html(),
+		str(autumn_meta), snow, sway, translucent, edge_fade]
 	if _mats.has(key):
 		return _mats[key]
 	if _shader_leaf == null:
 		_shader_leaf = Shader.new()
-		_shader_leaf.code = LEAF_SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+		_shader_leaf.code = LEAF_SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+			.replace("// @AUTUMN", WeatherGlsl.AUTUMN_GLSL)
 	var m := ShaderMaterial.new()
 	m.shader = _shader_leaf
 	m.set_shader_parameter("leaf_tex", FoliageTextures.leaf(kind))
 	m.set_shader_parameter("tint", tint)
+	m.set_shader_parameter("autumn_tint", autumn_tint)
+	m.set_shader_parameter("autumn_meta", autumn_meta)
 	m.set_shader_parameter("snow", snow)
 	m.set_shader_parameter("sway", sway)
 	m.set_shader_parameter("edge_fade", edge_fade)
@@ -306,12 +330,16 @@ static func impostor_material(sp: String, bare: bool, season: int, snow: float) 
 		return _mats[key]
 	if _shader_imp == null:
 		_shader_imp = Shader.new()
-		_shader_imp.code = IMPOSTOR_SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL)
+		_shader_imp.code = IMPOSTOR_SHADER.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
+			.replace("// @AUTUMN", WeatherGlsl.AUTUMN_GLSL)
 	var s := TreeSpecies.spec(sp)
+	var live_aut := not bare and season in [LocationData.Season.SUMMER, LocationData.Season.AUTUMN]
 	var m := ShaderMaterial.new()
 	m.shader = _shader_imp
 	m.set_shader_parameter("imp_tex", TreeImpostor.texture(sp, bare))
-	m.set_shader_parameter("tint", TreeSpecies.tint(sp, season))
+	m.set_shader_parameter("tint", TreeSpecies.tint(sp, LocationData.Season.SUMMER if live_aut else season))
+	m.set_shader_parameter("autumn_tint", TreeSpecies.tint(sp, LocationData.Season.AUTUMN))
+	m.set_shader_parameter("autumn_meta", TreeSpecies.autumn_meta(sp) if live_aut else Vector3.ZERO)
 	m.set_shader_parameter("bark_tint", TreeSpecies.BARK_TINT.get(str(s["bark"]), Color(0.4, 0.35, 0.3)))
 	# Calibrated against LOD-0 renders (mean crown colour, sun + sky):
 	# conifer whorls self-shadow less than lobed broadleaf crowns.

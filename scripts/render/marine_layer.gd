@@ -78,6 +78,7 @@ void fragment() {
 """
 
 var _mat: ShaderMaterial
+var _sea_y := 0.0
 
 func _init() -> void:
 	name = "MarineLayer"
@@ -95,10 +96,15 @@ func _init() -> void:
 
 ## Sea level in render Y (GroundTruth.render_y(0)) and units per metre.
 func set_sea(sea_y: float, units_per_metre: float) -> void:
-	_mat.set_shader_parameter("sea_y", sea_y)
-	_mat.set_shader_parameter("top_y", sea_y + TOP_M * units_per_metre)
-	_mat.set_shader_parameter("soft", SOFT_M * units_per_metre)
-	_mat.set_shader_parameter("density", 3.0 / (VISIBILITY_M * units_per_metre))
+	_sea_y = sea_y
+	set_profile(TOP_M, SOFT_M, VISIBILITY_M, units_per_metre)
+
+## Continuous slab height, edge softness and internal visibility (metres).
+func set_profile(top_m: float, soft_m: float, visibility_m: float, units_per_metre: float) -> void:
+	_mat.set_shader_parameter("sea_y", _sea_y)
+	_mat.set_shader_parameter("top_y", _sea_y + top_m * units_per_metre)
+	_mat.set_shader_parameter("soft", soft_m * units_per_metre)
+	_mat.set_shader_parameter("density", 3.0 / maxf(visibility_m * units_per_metre, 1e-3))
 
 ## Shown (0..1) in the haze colour; hidden at 0.
 func set_amount(amount: float, colour: Color) -> void:
