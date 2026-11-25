@@ -50,9 +50,9 @@ static func anderson_bridge(model: Node3D) -> void:
 	lm.use("Lamp", LandmarkMaterials.lit("#FFE2A2", 2.2))
 
 	var deck_y := 4.4
-	# 70 m roadway deck (width 23 m) & monumental rusticated neoclassical stone portal piers at both ends.
-	lm.box("Deck", Vector3(0.0, deck_y, 0.0), Vector3(70.0, 1.1, 22.8))
-	for sx: float in [-34.0, 34.0]:
+	# 82 m roadway deck (width 23 m) & monumental rusticated neoclassical stone portal piers at both ends.
+	lm.box("Deck", Vector3(0.0, deck_y, 0.0), Vector3(82.0, 1.1, 22.8))
+	for sx: float in [-39.5, 39.5]:
 		lm.box("Stone", Vector3(sx, 2.4, 0.0), Vector3(6.5, 11.0, 24.4))
 		# Twin neoclassical archway portals flanking the roadway.
 		for sz: float in [-10.8, 0.0, 10.8]:
@@ -63,10 +63,10 @@ static func anderson_bridge(model: Node3D) -> void:
 	# Three parallel white steel bowstring arches (z = -10.8, 0.0, +10.8 m, rise 9.4 m -> 14.0 m top).
 	for sz: float in [-10.8, 0.0, 10.8]:
 		var segs := 18
-		var prev := Vector3(-31.0, deck_y + 0.5, sz)
+		var prev := Vector3(-36.5, deck_y + 0.5, sz)
 		for i in range(1, segs + 1):
 			var t := float(i) / float(segs)
-			var ax := lerpf(-31.0, 31.0, t)
+			var ax := lerpf(-36.5, 36.5, t)
 			var ay := deck_y + 0.5 + 8.8 * sin(t * PI)
 			var cur := Vector3(ax, ay, sz)
 			lm.beam("WhiteSteel", prev, cur, 0.85, 0.95)
@@ -74,8 +74,8 @@ static func anderson_bridge(model: Node3D) -> void:
 				lm.beam("WhiteSteel", Vector3(ax, deck_y + 0.4, sz), cur, 0.34, 0.34)
 			prev = cur
 		# Overhead lateral wind-bracing struts between the three arches.
-	for bx: float in [-14.0, 0.0, 14.0]:
-		var t := (bx + 31.0) / 62.0
+	for bx: float in [-16.0, 0.0, 16.0]:
+		var t := (bx + 36.5) / 73.0
 		var ay := deck_y + 0.5 + 8.8 * sin(t * PI)
 		lm.beam("WhiteSteel", Vector3(bx, ay, -10.8), Vector3(bx, ay, 10.8), 0.45, 0.45)
 	lm.commit(model)
