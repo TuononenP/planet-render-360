@@ -164,8 +164,8 @@ static func triton_figure(lm: LandmarkMesh, key: String, base: Vector3, h: float
 static func sea_lion(lm: LandmarkMesh, key: String, base: Vector3, length: float,
 		yaw: float = 0.0) -> Vector3:
 	var rot := Basis(Vector3.UP, yaw)
-	_stamp_glb(lm, key, "sea_lion", base - Vector3(0.0, 0.04 * length, 0.0), Vector3(length, length, length), yaw)
-	return base + rot * Vector3(0.0, 0.66 * length, 0.24 * length)
+	_stamp_glb(lm, key, "sea_lion", base - Vector3(0.0, 0.005 * length, 0.0), Vector3(length, length, length), yaw)
+	return base + rot * Vector3(0.18 * length, 0.79 * length, 0.24 * length)
 
 ## Sculpted rearing / surging Baroque horse (Poly Haven CC0 Horse Statue 01, height-normalized).
 static func rearing_horse(lm: LandmarkMesh, key: String, base: Vector3, scale_m: float = 1.0,
