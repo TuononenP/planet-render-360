@@ -13,7 +13,7 @@ static func entries() -> Array:
 			"lat": 1.28368, "lon": 103.86071, "radius_m": 5000.0,
 			"wiki_title": "Marina Bay Sands", "height_m": 207.0, "yaw_deg": -67.5,
 			"clear_m": 95.0,
-			"clear_offsets_m": [[-116.0, 0.0], [0.0, 0.0], [105.0, -6.0], [0.0, -140.0], [-95.0, -140.0], [95.0, -140.0]],
+			"clear_offsets_m": [[-116.0, 0.0], [0.0, 0.0], [105.0, -6.0], [0.0, -140.0], [-95.0, -140.0], [95.0, -140.0], [-225.0, -110.0], [14.0, -254.0], [-195.0, -214.0]],
 			"ultra_registry_limit": 42, "ultra_total_limit": 50,
 			"kind": "Resort", "aliases": ["marina bay sands", "mbs", "skypark", "sands skypark"]},
 
