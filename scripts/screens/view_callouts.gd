@@ -379,6 +379,46 @@ func nearest(limit: int = LandmarkList.MAX_ROWS) -> Array:
 		return []
 	return LandmarkList.rank(_sites, _view._rig.global_position, limit)
 
+## Search rows for `query` from `from`, nearest first: every site in
+## range plus every other curated landmark of this city (the registry
+## entries covering the viewpoint, even those the preset's candidate
+## cap left unbuilt), so a search finds any landmark in the city, not
+## only the nearest twelve. Empty query reads as the nearest list.
+func search_rows(query: String, from: Vector3, limit: int = LandmarkList.MAX_ROWS) -> Array:
+	var pool := _sites.duplicate()
+	if _data != null:
+		var seen := {}
+		for s in pool:
+			seen[str(s.get("id", ""))] = true
+		var entries: Array = []
+		var primary := LocationData.entry_for_type(_data.landmark_type)
+		if not primary.is_empty():
+			entries.append(primary)
+		entries.append_array(LocationData.registry_extras(
+			_data.latitude, _data.longitude, _data.landmark_type))
+		for entry in entries:
+			var s := LandmarkVisit.from_registry(entry as Dictionary)
+			if seen.has(str(s.get("id", ""))):
+				continue
+			seen[str(s.get("id", ""))] = true
+			var xz := WorldScale.xz_from_latlon(float((entry as Dictionary)["lat"]),
+				float((entry as Dictionary)["lon"]), _data.latitude, _data.longitude)
+			var y := 0.0
+			if _ground != null and _ground.is_inside(xz.x, xz.y):
+				y = _ground.height_at_world(xz.x, xz.y)
+			var lift := maxf(float((entry as Dictionary).get("height_m", 0.0)) * 0.5, 20.0)
+			s["pos"] = Vector3(xz.x, y + lift, xz.y)
+			s["base_y"] = y
+			pool.append(s)
+	var q := query.strip_edges()
+	if q == "":
+		return LandmarkList.rank(pool, from, limit)
+	var kept: Array = []
+	for s in pool:
+		if LandmarkList.matches_query(s as Dictionary, q):
+			kept.append(s)
+	return LandmarkList.rank(kept, from, limit)
+
 ## "450 m" below a kilometre, "6.2 km" above.
 static func distance_text(m: float) -> String:
 	if m < 1000.0:

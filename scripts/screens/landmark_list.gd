@@ -18,6 +18,8 @@ const EMPTY := "No landmarks found near here."
 ## While the nearby articles are still on their way (a calm "not yet",
 ## not the final "none").
 const PENDING := "Looking for landmarks…"
+## A search that matches nothing: calm, no error styling.
+const NO_MATCH := "No landmarks match \"%s\"."
 
 var _key: Array = []
 var _built := false
@@ -53,16 +55,42 @@ static func distance_text(row: Dictionary) -> String:
 func row_count() -> int:
 	return get_children().filter(func(c: Node) -> bool: return c is HBoxContainer).size()
 
+## Whether `site` answers `query` (case-insensitive): every word of
+## the query appears in its name, kind or description, so "turku
+## cathedral" finds Turku Cathedral and "church" finds every church.
+static func matches_query(site: Dictionary, query: String) -> bool:
+	var q := query.strip_edges().to_lower()
+	if q == "":
+		return true
+	var hay := ("%s %s %s" % [str(site.get("name", "")), str(site.get("kind", "")),
+		str(site.get("description", ""))]).to_lower()
+	for token in q.split(" ", false):
+		if not hay.contains(token):
+			return false
+	return true
+
+## The rows whose landmark answers `query`, nearest-first order kept.
+static func filter_rows(rows: Array, query: String) -> Array:
+	if query.strip_edges() == "":
+		return rows
+	return rows.filter(func(r: Dictionary) -> bool:
+		return matches_query(r["site"] as Dictionary, query))
+
 ## Replace the rows; none reads as one plain line, not an error
-## (`pending`: the articles that may fill it have not arrived). Rows that
-## come out the same (landmark, distance, direction, order) are left as
-## they are, so a late answer that adds nothing does not shift a row
-## under the pointer or drop keyboard focus.
-func set_rows(rows: Array, pending: bool = false) -> void:
+## (`pending`: the articles that may fill it have not arrived; `query`:
+## a search that matched nothing names what was searched). Rows that
+## come out the same (landmark, distance, direction, order, query) are
+## left as they are, so a late answer that adds nothing does not shift
+## a row under the pointer or drop keyboard focus.
+func set_rows(rows: Array, pending: bool = false, query: String = "") -> void:
 	var key: Array = rows.map(func(r: Dictionary) -> String:
 		return "%s|%s" % [(r["site"] as Dictionary).get("id", ""), distance_text(r)])
 	if rows.is_empty():
-		key.append("pending" if pending else "none")
+		var qn := query.strip_edges().to_lower()
+		if qn != "":
+			key.append(("pending:" if pending else "nomatch:") + qn)
+		else:
+			key.append("pending" if pending else "none")
 	if _built and key == _key:
 		return
 	_built = true
@@ -71,7 +99,10 @@ func set_rows(rows: Array, pending: bool = false) -> void:
 		remove_child(c)
 		c.queue_free()
 	if rows.is_empty():
-		var empty := UiTheme.text(PENDING if pending else EMPTY, "body-s", UiTheme.MUTED)
+		var line := PENDING if pending else EMPTY
+		if query.strip_edges() != "" and not pending:
+			line = NO_MATCH % query.strip_edges()
+		var empty := UiTheme.text(line, "body-s", UiTheme.MUTED)
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		empty.custom_minimum_size = Vector2(120, 0)
 		add_child(empty)

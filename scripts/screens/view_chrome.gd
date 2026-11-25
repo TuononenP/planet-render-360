@@ -55,6 +55,10 @@ static func build(v: View360) -> void:
 	# The landmark sheet stays up while the HUD idles (on _hud, not _fade).
 	v._landmark_panel = LandmarkPanel.new(v._wiki)
 	v._hud.add_child(v._landmark_panel)
+	# City-wide matches for the panel's search: every site plus the
+	# city's other curated landmarks, nearest first.
+	v._landmark_panel.set_search_provider(func(q: String) -> Array:
+		return v._callouts.search_rows(q, v._rig.global_position) if v._rig != null else [])
 	v._landmark_panel.go_requested.connect(v.visit)
 	v._landmark_panel.closer_requested.connect(v.visit.bind(true))
 	v._landmark_panel.closed.connect(func() -> void: layout(v))

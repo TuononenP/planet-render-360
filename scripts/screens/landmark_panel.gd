@@ -20,12 +20,14 @@ signal state_changed
 signal content_resized
 
 const LIST_TITLE := "Nearby landmarks"
+const SEARCH_PLACEHOLDER := "Search landmarks"
 
 var card: LandmarkCard
 var list: LandmarkList
 var _top: HBoxContainer
 var _back: Button
 var _title: Label
+var _search: LineEdit
 var _body: VBoxContainer
 var _scroll: ScrollContainer
 var _close: Button
@@ -34,6 +36,12 @@ var _list_scroll := 0
 ## The latest rows and whether more may still arrive: what Back shows.
 var _rows: Array = []
 var _pending := false
+## The current search text, and where city-wide matches come from: a
+## Callable taking the query String and returning ranked rows (see
+## ViewCallouts.search_rows). Empty until ViewChrome sets it; without
+## it a search filters only the nearby rows already shown.
+var _query := ""
+var _search_provider := Callable()
 
 func _init(fetcher: WikiFetcher) -> void:
 	visible = false
@@ -63,6 +71,12 @@ func _init(fetcher: WikiFetcher) -> void:
 	_close = UiIcon.button("x", "Close")
 	_close.pressed.connect(close)
 	_top.add_child(_close)
+	_search = UiTheme.search_field(SEARCH_PLACEHOLDER)
+	_search.clear_button_enabled = true
+	_search.tooltip_text = "Search landmarks in this city"
+	_search.visible = false
+	_search.text_changed.connect(_on_search_changed)
+	col.add_child(_search)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -98,29 +112,69 @@ func open(site: Dictionary, distance_m: float = -1.0) -> void:
 	card.show_site(site, distance_m)
 	_show(false, false, true)
 
+## Where city-wide matches come from (ViewChrome sets this to the
+## view's callouts): a Callable taking the query String and returning
+## ranked rows, nearest first.
+func set_search_provider(provider: Callable) -> void:
+	_search_provider = provider
+
+func _on_search_changed(text: String) -> void:
+	_query = text
+	_apply_search()
+
+## Show the nearby rows, or the city-wide matches for `_query`.
+func _apply_search() -> void:
+	if not is_listing():
+		return
+	var q := _query.strip_edges()
+	if q == "":
+		list.set_rows(_rows, _pending)
+		return
+	if _search_provider.is_valid():
+		list.set_rows(_search_provider.call(q) as Array, false, q)
+	else:
+		list.set_rows(LandmarkList.filter_rows(_rows, q), false, q)
+
 ## The nearest landmarks (LandmarkList.rank rows); `pending` while the
-## nearby articles that may add more are still on their way.
+## nearby articles that may add more are still on their way. Opening
+## clears any previous search, so the list starts at the nearest.
 func open_list(rows: Array, pending: bool = false) -> void:
 	_rows = rows
 	_pending = pending
+	_query = ""
+	if _search != null:
+		_search.set_block_signals(true)
+		_search.text = ""
+		_search.set_block_signals(false)
 	list.set_rows(rows, pending)
 	_show(true, false, not visible)
 
 ## Back from a card to the list it was opened from, with any rows that
-## arrived meanwhile, and focus on the landmark just read.
+## arrived meanwhile, and focus on the landmark just read. A search in
+## progress stays applied, so Back returns to the matches.
 func show_list() -> void:
-	list.set_rows(_rows, _pending)
+	_apply_or_show_all()
 	_show(true, false, false)
 	_scroll.set_deferred("scroll_vertical", _list_scroll)
 	list.focus_site(str(card.site.get("id", "")))
 
+func _apply_or_show_all() -> void:
+	if _query.strip_edges() != "":
+		_apply_search()
+	else:
+		list.set_rows(_rows, _pending)
+
 ## New rows (late nearby articles): shown now when the list is up, else
-## when Back returns to it.
+## when Back returns to it. An active search re-queries, so late rows
+## and city matches join the filtered list together.
 func update_list(rows: Array, pending: bool = false) -> void:
 	_rows = rows
 	_pending = pending
 	if is_listing():
-		list.set_rows(rows, pending)
+		if _query.strip_edges() != "":
+			_apply_search()
+		else:
+			list.set_rows(rows, pending)
 
 ## Keyboard focus into the list (opened with L): the nearest landmark.
 func focus_list() -> void:
@@ -132,6 +186,7 @@ func _show(listing: bool, from_list: bool, fade: bool) -> void:
 	list.visible = listing
 	card.visible = not listing
 	_back.visible = from_list
+	_search.visible = listing
 	_title.text = LIST_TITLE if listing else ""
 	_scroll.scroll_vertical = 0
 	visible = true
@@ -167,6 +222,8 @@ func is_listing() -> bool:
 func place(rect: Rect2, bottom_anchored: bool) -> void:
 	size = Vector2(rect.size.x, 0)
 	var chrome := get_theme_stylebox("panel").get_minimum_size().y + _top.get_combined_minimum_size().y
+	if _search.visible:
+		chrome += _search.get_combined_minimum_size().y + 8.0
 	var want := _body.get_combined_minimum_size().y + chrome
 	# shadow-3 falls away from the scene: up off a bottom sheet, down
 	# under a side panel.
