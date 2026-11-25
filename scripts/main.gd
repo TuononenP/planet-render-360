@@ -541,12 +541,12 @@ func _set_generating(busy: bool) -> void:
 	_picker.set_render_busy(busy)
 
 ## Where Explore goes for the picker's pin: a selected landmark is seen
-## from its standoff, not stood on. {"at": Vector2(lat, lon), "site": {}}.
+## from its 50 m arrival, not stood on. {"at": Vector2(lat, lon), "site": {}}.
 func _explore_target(lat: float, lon: float) -> Dictionary:
 	var site := _picker.selected_landmark
 	if site.is_empty():
 		return {"at": Vector2(lat, lon), "site": {}}
-	return {"at": LandmarkVisit.viewpoint(site, LandmarkVisit.default_bearing(lat)), "site": site}
+	return {"at": LandmarkVisit.arrival_viewpoint(site, LandmarkVisit.default_bearing(lat)), "site": site}
 
 ## `save_only`: Save for offline. Runs the same pipeline and world build
 ## but keeps the picker up and stops at the saved world.

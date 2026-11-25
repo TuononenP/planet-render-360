@@ -105,7 +105,7 @@ var _current_layout: int = Responsive.Layout.COMPACT
 var _focus_queued := false
 var selected_name := ""
 ## The landmark a marker tap selected (LandmarkVisit site), {} for none.
-## Explore renders from its standoff, facing it.
+## Explore renders from its 50 m arrival, facing it.
 var selected_landmark: Dictionary = {}
 # Landmark markers and details (MapLandmarkHome).
 var _wiki: WikiFetcher

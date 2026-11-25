@@ -6,7 +6,7 @@ extends RefCounted
 ## 10 km, and drawn as MapLandmarks markers. Tapping one selects it like
 ## any place, and its LandmarkCard (no header, no Go: the panel names the
 ## selection and Explore stays the one primary) joins the selected place.
-## Explore then renders from LandmarkVisit's standoff, facing it (main).
+## Explore then renders from LandmarkVisit's 50 m arrival, facing it (main).
 ## Operates on the picker via `p`.
 
 const PAUSE_S := 0.6

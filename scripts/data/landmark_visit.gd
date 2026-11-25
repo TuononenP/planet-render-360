@@ -17,6 +17,10 @@ const MAX_M := 700.0
 ## Get closer: this share of the standoff, never nearer than CLOSE_MIN_M.
 const CLOSE_FACTOR := 0.4
 const CLOSE_MIN_M := 80.0
+## Explore arrival from a map selection: the eye stands this close to a
+## regular landmark, so it fills the opening view. Peaks and water keep
+## their wide standoffs (a summit or bay is not seen from 50 m).
+const ARRIVAL_M := 50.0
 
 static func site(name: String, lat: float, lon: float, description: String = "",
 		source: String = "wiki", height_m: float = 0.0) -> Dictionary:
@@ -88,15 +92,29 @@ static func close_standoff_m(s: Dictionary) -> float:
 static func default_bearing(lat: float) -> float:
 	return 250.0 if lat >= 0.0 else 290.0
 
+## Metres between the Explore viewpoint and the landmark.
+static func arrival_m(s: Dictionary) -> float:
+	match str(s.get("kind", "")):
+		"Peak":
+			return PEAK_M
+		"Water":
+			return WATER_M
+	return ARRIVAL_M
+
 ## Viewpoint (lat, lon) standoff_m away from the landmark on `bearing_deg`.
-static func viewpoint(s: Dictionary, bearing_deg: float) -> Vector2:
+static func viewpoint(s: Dictionary, bearing_deg: float, override_m: float = -1.0) -> Vector2:
 	var lat := float(s["lat"])
 	var lon := float(s["lon"])
-	var d := standoff_m(s)
+	var d := override_m if override_m > 0.0 else standoff_m(s)
 	var b := deg_to_rad(bearing_deg)
 	# WorldScale: +X east, +Z south.
 	var xz := Vector2(sin(b) * d, -cos(b) * d)
 	return WorldScale.latlon_from_xz(xz.x, xz.y, lat, lon)
+
+## Viewpoint (lat, lon) arrival_m away from the landmark on `bearing_deg`:
+## the Explore start for a map selection, 50 m from a regular landmark.
+static func arrival_viewpoint(s: Dictionary, bearing_deg: float) -> Vector2:
+	return viewpoint(s, bearing_deg, arrival_m(s))
 
 ## Compass bearing (degrees) of world XZ offset `d` (+X east, +Z south).
 static func bearing_of(d: Vector2) -> float:
