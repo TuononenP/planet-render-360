@@ -40,6 +40,7 @@ func _run() -> void:
 	_visit_math()
 	_view_aim()
 	_registry_icons()
+	_marker_chips()
 	await _map_markers()
 	await _card_states()
 	_osm_tag()
@@ -154,6 +155,21 @@ func _registry_icons() -> void:
 			"statue", "school", "drama", "store", "hotel", "bridge",
 			"building-2", "landmark", "mountain", "leaf"]:
 		_check(FileAccess.file_exists("res://assets/icons/%s.svg" % icon), "icon ships: " + icon)
+
+## The hover chip names the name plus "kind · provenance", so a marker
+## says what it is and where its data comes from.
+func _marker_chips() -> void:
+	var turku := LandmarkVisit.from_registry(LocationData.entry_for_type("turku_cathedral"))
+	_check(MapLandmarks.chip_lines(turku) == ["Turku Cathedral", "Place of worship · Curated landmark"],
+		"curated chip: %s" % [MapLandmarks.chip_lines(turku)])
+	var peak := LandmarkVisit.site("Matterhorn", 45.9764, 7.6586, "Mountain in the Swiss and Italian Alps")
+	_check(MapLandmarks.chip_lines(peak) == ["Matterhorn", "Peak · Wikipedia"],
+		"article chip: %s" % [MapLandmarks.chip_lines(peak)])
+	var mill := LandmarkVisit.site("Old mill", 46.0, 7.7, "", "osm")
+	_check(MapLandmarks.chip_lines(mill) == ["Old mill", "Landmark · OpenStreetMap"],
+		"OSM chip: %s" % [MapLandmarks.chip_lines(mill)])
+	_check(MapLandmarks.chip_lines({"name": "X", "kind": "Bridge"}) == ["X", "Bridge"],
+		"a sourceless site still names its kind")
 
 func _view_aim() -> void:
 	var data := LocationData.new()
