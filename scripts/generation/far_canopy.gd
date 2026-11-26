@@ -285,18 +285,43 @@ static func _band(r: float) -> int:
 
 ## One MultiMesh of species `sp`'s impostor for the trees in `list`, each
 ## turned at random about its trunk, on the FarCity band from `r0`.
+## Writes a single PackedFloat32Array directly to MultiMesh.buffer (16 floats
+## per instance: 3x4 transform + RGBA) to avoid 2*N GDScript->C++ calls.
 static func _instances(list: Array, r0: float, sp: String, season: int) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
 	mm.mesh = TreeMeshLibrary.mesh(sp, IMPOSTOR_LOD, season, 0.0)
-	mm.instance_count = list.size()
-	for k in list.size():
+	var n := list.size()
+	mm.instance_count = n
+	var buf := PackedFloat32Array()
+	buf.resize(n * 16)
+	for k in n:
 		var t: Array = list[k]
 		var at: Vector3 = t[0]
-		var turn := Basis(Vector3.UP, _hash(at.x, at.z, 6.0) * TAU)
-		mm.set_instance_transform(k, Transform3D(turn.scaled(t[1]), at))
-		mm.set_instance_color(k, t[2])
+		var sc: Vector3 = t[1]
+		var col: Color = t[2]
+		var ang := _hash(at.x, at.z, 6.0) * TAU
+		var cs := cos(ang)
+		var sn := sin(ang)
+		var o := k * 16
+		buf[o] = cs * sc.x
+		buf[o + 1] = 0.0
+		buf[o + 2] = sn * sc.z
+		buf[o + 3] = at.x
+		buf[o + 4] = 0.0
+		buf[o + 5] = sc.y
+		buf[o + 6] = 0.0
+		buf[o + 7] = at.y
+		buf[o + 8] = -sn * sc.x
+		buf[o + 9] = 0.0
+		buf[o + 10] = cs * sc.z
+		buf[o + 11] = at.z
+		buf[o + 12] = col.r
+		buf[o + 13] = col.g
+		buf[o + 14] = col.b
+		buf[o + 15] = col.a
+	mm.buffer = buf
 	var mi := MultiMeshInstance3D.new()
 	mi.name = "FarCanopy_" + sp
 	mi.multimesh = mm

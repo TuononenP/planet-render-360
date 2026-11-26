@@ -95,7 +95,7 @@ const PAVED := {"urban": 1.0, "building": 1.0, "path": 0.3, "sett": 1.0}
 static func shader_code() -> String:
 	return GroundShader.CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
 		.replace("// @TERRAIN", TerrainGlsl.CODE).replace("// @PAVING", PavingGlsl.CODE) \
-		.replace("// @GLOW", StreetGlow.GLSL)
+		.replace("// @GLOW", StreetGlow.GLSL).replace("// @HEIGHT_FOG", WeatherGlsl.HEIGHT_FOG_GLSL)
 
 ## The shared ground material for one built place. `photo` is the
 ## satellite mosaic (vertex UV = TerrainBuilder.satellite_uv) or, with

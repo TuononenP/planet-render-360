@@ -79,6 +79,8 @@ uniform bool photo_turn = false;
 // Ground-bounce light on walls out of the sun (0 = none): the sunlit paving throws warm light onto shaded
 // fronts, which the blue sky ambient cannot give. Helsinki's fronts (FacadeTextures.HELSINKI_BOUNCE).
 uniform float warm_bounce = 0.0;
+// Heated street-level shopfront vitrines thaw the pane centre, keeping corner frost.
+uniform float shopfront_heat = 0.0;
 
 varying vec3 wpos;
 varying vec3 wnrm;
@@ -429,7 +431,7 @@ void fragment() {
 	// Window frost / rime crystals (WeatherGlsl): creeps in from cold pane
 	// edges, thaws at the centre of lit rooms, suppresses mirror reflection,
 	// and diffuses warm lamp light.
-	vec4 fr = pane > 0.05 ? window_frost(cuv, pane_px, seed, lit, curtain_wall, wnrm) : vec4(0.0);
+	vec4 fr = pane > 0.05 ? window_frost(cuv, pane_px, seed, lit, curtain_wall, wnrm, shopfront_heat) : vec4(0.0);
 	float frost = fr.x;
 	vec3 glass_tint_base = vec3(GLASS_ALBEDO) * GLASS_TINT;
 	vec3 glass_alb = curtain_wall ? base * 0.45 * (0.97 + 0.06 * h12(vec2(cell.y, bld)))
@@ -581,6 +583,8 @@ static func from_standard(m: StandardMaterial3D) -> ShaderMaterial:
 	s.set_shader_parameter("room_depth", ROOM_DEPTH_M * m2u)
 	s.set_shader_parameter("units_per_m", m2u)
 	s.set_shader_parameter("city_hour", CityLights.hour)
+	if m.has_meta("shopfront_heat"):
+		s.set_shader_parameter("shopfront_heat", float(m.get_meta("shopfront_heat")))
 	if PHOTO_DETAIL and uvp.z > 0.0 and MaterialLibrary.PBR_SETS.has(set_name):
 		var diff := photo_texture(set_name, "diff")
 		var reps := float(FacadeComposer.PHOTO_REPS.get(set_name, 1))

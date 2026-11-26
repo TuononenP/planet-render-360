@@ -82,15 +82,11 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 		var reps: int = PHOTO_REPS.get(set_name, 1)
 		# The bundled planks run vertically; siding runs horizontally.
 		var turn := set_name == "wood" and pattern == "clapboard"
-		alb = _wall_layer(loader, set_name, "diff", reps, turn)
 		var smooth := smooth_plaster(set_name, look)
-		if smooth:
-			_soften(alb, STOCKHOLM_KEEP)
+		alb = _wall_layer(loader, set_name, "diff", reps, turn, smooth)
 		if detail >= 1:
-			nor = _wall_layer(loader, set_name, "nor", reps, turn)
-			rgh = _wall_layer(loader, set_name, "rough", reps, turn)
-			if smooth:
-				_soften(nor, STOCKHOLM_KEEP)
+			nor = _wall_layer(loader, set_name, "nor", reps, turn, smooth)
+			rgh = _wall_layer(loader, set_name, "rough", reps, turn, false)
 	if detail >= 1 and nor == null:
 		nor = Image.create(W, CELL, false, Image.FORMAT_RGBA8)
 		nor.fill(Color(0.5, 0.5, 1.0))
@@ -170,16 +166,12 @@ static func compose_tile(set_name: String, pattern: String, detail: int,
 static func compose_blank(set_name: String, detail: int, smooth: bool,
 		turn: bool, loader: Callable) -> Dictionary:
 	var reps: int = PHOTO_REPS.get(set_name, 1)
-	var alb := _wall_layer(loader, set_name, "diff", reps, turn)
-	if smooth:
-		_soften(alb, STOCKHOLM_KEEP)
+	var alb := _wall_layer(loader, set_name, "diff", reps, turn, smooth)
 	var nor: Image = null
 	var rgh: Image = null
 	if detail >= 1:
-		nor = _wall_layer(loader, set_name, "nor", reps, turn)
-		rgh = _wall_layer(loader, set_name, "rough", reps, turn)
-		if smooth:
-			_soften(nor, STOCKHOLM_KEEP)
+		nor = _wall_layer(loader, set_name, "nor", reps, turn, smooth)
+		rgh = _wall_layer(loader, set_name, "rough", reps, turn, false)
 	return FacadePaint.finish(alb, null, null, nor, rgh)
 
 ## Dirt washed down from each sill (base layer, so it takes the tint).
@@ -191,18 +183,17 @@ static func _sill_streaks(base: Image, ox: int, win: String, hv: float) -> void:
 ## The photographic base tiled across the whole strip: one bay cell holds
 ## `reps` x `reps` copies, so the grain is real-sized and repeats cleanly.
 static func _wall_layer(loader: Callable, set_name: String, map_name: String,
-		reps: int, turn: bool = false) -> Image:
+		reps: int, turn: bool = false, smooth: bool = false) -> Image:
 	var n := CELL / reps
-	var key := "%s|%s|%d|%d" % [set_name, map_name, n, 1 if turn else 0]
+	var key := "%s|%s|%d|%d|%d" % [set_name, map_name, n, 1 if turn else 0, 1 if smooth else 0]
 	_wall_mutex.lock()
 	if _wall_cache.has(key):
 		var cached: Image = _wall_cache[key] as Image
 		_wall_mutex.unlock()
-		var src2 := cached.duplicate() as Image
 		var out2 := Image.create(CELL * BAYS, CELL, false, Image.FORMAT_RGBA8)
 		for ty in reps:
 			for tx in BAYS * reps:
-				out2.blit_rect(src2, Rect2i(0, 0, n, n), Vector2i(tx * n, ty * n))
+				out2.blit_rect(cached, Rect2i(0, 0, n, n), Vector2i(tx * n, ty * n))
 		return out2
 	_wall_mutex.unlock()
 	var src := (loader.call(set_name, map_name) as Image).duplicate() as Image
@@ -212,17 +203,21 @@ static func _wall_layer(loader: Callable, set_name: String, map_name: String,
 		_soften(src, SIDING_CONTRAST)
 	elif map_name == "diff" and KEEP_CONTRAST.has(set_name):
 		_soften(src, float(KEEP_CONTRAST[set_name]))
+	if smooth and (map_name == "diff" or map_name == "nor"):
+		_soften(src, STOCKHOLM_KEEP)
 	if turn:
 		src.rotate_90(CLOCKWISE)
 		if map_name == "nor":  # rotate the tangent frame with the image
-			for y in n:
-				for x in n:
-					var c := src.get_pixel(x, y)
-					src.set_pixel(x, y, Color(c.g, 1.0 - c.r, c.b, 1.0))
-	# Memoise the resized source (32 cap, per-build only).
+			var d := src.get_data()
+			for i in range(0, d.size(), 4):
+				var r := d[i]
+				d[i] = d[i + 1]
+				d[i + 1] = 255 - r
+				d[i + 3] = 255
+			src.set_data(n, n, false, Image.FORMAT_RGBA8, d)
+	# Memoise the resized (and softened) source (64 cap, per-build only).
 	_wall_mutex.lock()
-	if _wall_cache.size() >= 32:
-		# Evict oldest (insertion-order dict).
+	if _wall_cache.size() >= 64:
 		_wall_cache.erase(_wall_cache.keys()[0])
 	_wall_cache[key] = src.duplicate()
 	_wall_mutex.unlock()
@@ -252,16 +247,27 @@ static func _hash(x: float, z: float) -> float:
 static func _soften(img: Image, keep: float) -> void:
 	var w := img.get_width()
 	var h := img.get_height()
-	var mean := Color(0, 0, 0, 0)
-	for y in h:
-		for x in w:
-			mean += img.get_pixel(x, y)
-	mean = mean / float(w * h)
-	for y in h:
-		for x in w:
-			var c := img.get_pixel(x, y)
-			img.set_pixel(x, y, Color(mean.r + (c.r - mean.r) * keep,
-				mean.g + (c.g - mean.g) * keep, mean.b + (c.b - mean.b) * keep, 1.0))
+	var d := img.get_data()
+	var px_count := w * h
+	if px_count <= 0 or d.size() < px_count * 4:
+		return
+	var sr := 0.0
+	var sg := 0.0
+	var sb := 0.0
+	for i in range(0, px_count * 4, 4):
+		sr += d[i]
+		sg += d[i + 1]
+		sb += d[i + 2]
+	var inv := 1.0 / float(px_count)
+	var mr := sr * inv * (1.0 - keep)
+	var mg := sg * inv * (1.0 - keep)
+	var mb := sb * inv * (1.0 - keep)
+	for i in range(0, px_count * 4, 4):
+		d[i] = clampi(roundi(mr + d[i] * keep), 0, 255)
+		d[i + 1] = clampi(roundi(mg + d[i + 1] * keep), 0, 255)
+		d[i + 2] = clampi(roundi(mb + d[i + 2] * keep), 0, 255)
+		d[i + 3] = 255
+	img.set_data(w, h, false, Image.FORMAT_RGBA8, d)
 
 static func _lin(c: Color) -> Color:
 	return c.srgb_to_linear()

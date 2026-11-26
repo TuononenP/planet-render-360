@@ -81,6 +81,8 @@ func _apply_level(next: int, usage: float) -> void:
 		return
 	_below_s = 0.0
 	level = next
+	if next >= Level.TIGHT:
+		StaticCaches.trim_for_pressure(next)
 	if next >= Level.EMERGENCY:
 		_drop_preset = true
 	WorldStreamer._log("MEM guard %s at %d%% of the limit: %s" % [NAMES[next],

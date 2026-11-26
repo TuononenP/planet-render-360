@@ -394,6 +394,7 @@ var _edge_s := INF
 ## How long the camera has held a heading the pending world misses
 ## (heading_misses).
 var _miss_s := 0.0
+var _steer := StreamSteering.new()
 var _view: View360
 ## How far the generation in flight has come, for the HUD's StreamBadge:
 ## the pipeline's data stages, then the build (null before the first).
@@ -550,6 +551,7 @@ func reset_for_new_place() -> void:
 	_last_pos = Vector2.INF
 	_last_yaw = INF
 	_turning_s = 0.0
+	_steer.reset()
 
 ## The view is going away: stop fetchers and builds, drop the ready
 ## world, and forget the view so late callbacks touch nothing.
@@ -689,12 +691,14 @@ func tick(v: View360, delta: float) -> void:
 		_abort.urgent = urgent()  # a late build: no garnish, a bigger frame share
 		if _pipeline != null:
 			_pipeline.hurry = _abort.urgent
+	_steer.tick_cooldown(delta)
 	_miss_s = _miss_s + delta if heading_misses(pos, _vel) else 0.0
 	var look := Vector2(-sin(v._rig.yaw), -cos(v._rig.yaw))
 	# Heading somewhere the pending world does not cover, with the edge
 	# within a build's lead: rebuild for the new heading now, not once
-	# the camera is past the edge.
-	var veered := _miss_s >= MISS_HOLD_S \
+	# the camera is past the edge. Build-phase work is never aborted on veer.
+	var veered := StreamSteering.allow_veer_drop(_miss_s, state == State.FETCHING,
+		_fetched_msec > 0, _vel, pending_target_xz - pos) \
 		and needs_recentre(pos, _vel, look, expected_build_s(v._quality_preset))
 	if v._data.season != centre_season or v._quality_preset != centre_preset:
 		_cancel_pending()
@@ -722,17 +726,20 @@ func tick(v: View360, delta: float) -> void:
 			_worst["swap call"] = (Time.get_ticks_usec() - t0) / 1000.0
 			_after_swap = 4
 			return
-		if swap_stale(pos, _vel):
+		if _steer.check_stale(swap_stale(pos, _vel), pending_misses(pos), delta):
 			_park_ready()
 			_cancel_pending()
 			invalidate("camera turned back")
+			_steer.note_drop()
 			return
 		if veered:
 			_park_ready()
 			_cancel_pending()
 			invalidate("camera heading off the ready stretch")
 			_miss_s = 0.0
-			_start_generation(v, pos, look)
+			_steer.note_drop()
+			if not _steer.cooling_down(near_edge):
+				_start_generation(v, pos, look)
 			return
 	var hold_turn := _turning_s > 0.0 and not near_edge and inside_detailed(pos)
 	if should_redirect(pos) or (veered and state == State.FETCHING and not redirected and not hold_turn):
@@ -741,14 +748,16 @@ func tick(v: View360, delta: float) -> void:
 		_cancel_pending()
 		invalidate("camera turned away mid-build")
 		_miss_s = 0.0
-		_start_generation(v, pos, look)
+		_steer.note_drop()
+		if not _steer.cooling_down(near_edge):
+			_start_generation(v, pos, look)
 		redirected = true
 		return
 	if state == State.FETCHING or state == State.READY:
 		return
 	if state == State.DEGRADED and Time.get_ticks_msec() < retry_at_msec:
 		return
-	if hold_turn:
+	if hold_turn or _steer.cooling_down(near_edge):
 		return
 	if needs_recentre(pos, _planned_vel(), look, expected_build_s(v._quality_preset)):
 		_start_generation(v, pos, look)
@@ -871,6 +880,7 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -
 	# cancel flag and stage counters are shared), so a stale finish
 	# could claim the next generation. The token guards it regardless.
 	if _pipeline != null:
+		PostpassGate.leave_subtree(_pipeline)
 		_pipeline.cancel()
 		_pipeline.queue_free()
 	_pipeline = GenerationPipeline.new()

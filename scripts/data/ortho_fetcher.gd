@@ -13,6 +13,8 @@ signal failed(reason: String)
 
 const TIMEOUT_S := 30.0
 const CACHE_VERSION := 1
+const MAX_RETRIES := 1
+const RETRY_DELAY_S := 0.5
 
 ## False for a fetch-only run (the streamer warming caches).
 var textures := true
@@ -87,22 +89,41 @@ func fetch(src: String, lat: float, lon: float, zoom: int, span: int) -> void:
 	for i in _parts * _parts:
 		var path := cache_path(src, zoom, span, lat, lon, i)
 		if FileAccess.file_exists(path):
-			CacheStore.note_read(path)
-			_part_done(gen, i, PackedByteArray([1]) if not textures else FileAccess.get_file_as_bytes(path), false)
-			continue
+			var cached := PackedByteArray([1]) if not textures else FileAccess.get_file_as_bytes(path)
+			if not cached.is_empty():
+				CacheStore.note_read(path)
+				_part_done(gen, i, cached, false)
+				continue
+			DirAccess.remove_absolute(path)
 		if offline:
 			_part_done(gen, i, PackedByteArray(), false)
 			continue
-		var http := _pool[i]
-		var part_origin := _origin + Vector2(i % _parts, i / _parts) * float(_part_px)
-		var url := OrthoSource.part_url(src, part_origin, _part_px, zoom)
-		var done := func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
-			var ok := result == HTTPRequest.RESULT_SUCCESS and code == 200 and _is_image(headers)
-			_part_done(gen, i, body if ok else PackedByteArray(), ok)
-		http.request_completed.connect(done, CONNECT_ONE_SHOT)
-		if http.request(url, ["User-Agent: " + Brand.USER_AGENT]) != OK:
-			http.request_completed.disconnect(done)
-			_part_done(gen, i, PackedByteArray(), false)
+		_request_part(gen, i, 0)
+
+func _request_part(gen: int, i: int, attempt: int) -> void:
+	if gen != _gen:
+		return
+	var http := _pool[i]
+	var part_origin := _origin + Vector2(i % _parts, i / _parts) * float(_part_px)
+	var url := OrthoSource.part_url(_src, part_origin, _part_px, _zoom)
+	var done := func(result: int, code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+		if gen != _gen:
+			return
+		var ok := result == HTTPRequest.RESULT_SUCCESS and code == 200 and _is_image(headers) and not body.is_empty()
+		if ok:
+			_part_done(gen, i, body, true)
+			return
+		var transient := result != HTTPRequest.RESULT_SUCCESS or code >= 500 or code == 429 or (code == 200 and not _is_image(headers))
+		if transient and attempt < MAX_RETRIES and is_inside_tree():
+			get_tree().create_timer(RETRY_DELAY_S).timeout.connect(func() -> void:
+				_request_part(gen, i, attempt + 1), CONNECT_ONE_SHOT)
+			return
+		print("OrthoFetcher: %s part %d failed (result=%d code=%d bytes=%d)" % [_src, i, result, code, body.size()])
+		_part_done(gen, i, PackedByteArray(), false)
+	http.request_completed.connect(done, CONNECT_ONE_SHOT)
+	if http.request(url, ["User-Agent: " + Brand.USER_AGENT]) != OK:
+		http.request_completed.disconnect(done)
+		_part_done(gen, i, PackedByteArray(), false)
 
 ## Decodes a WMS image part (PNG when the server sends a PNG header, else JPEG).
 static func _decode_part(img: Image, body: PackedByteArray) -> Error:

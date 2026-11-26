@@ -232,11 +232,7 @@ uniform int far_quality = 2;
 // @TERRAIN
 // @WATER_FILTER
 // @GLOW
-global uniform float valley_haze_y;
-global uniform vec3 valley_haze_col;
-global uniform float far_fog_density;
-global uniform float valley_haze_amount;
-global uniform float valley_haze_scale;
+// @HEIGHT_FOG
 // Share of deciduous trees in this place's forest canopy (0 tropical/arid .. 0.68 temperate).
 uniform float deciduous_share = 0.0;
 // +1 where the sun stands in the south, -1 in the southern hemisphere.
@@ -443,12 +439,7 @@ void fragment() {
 	// Haze thins with height: integrated along the view ray, not the scene
 	// fog's uniform air, so high peaks keep their rock and snow contrast.
 	// Level with the valley floor it equals the scene fog.
-	float h0 = max(CAMERA_POSITION_WORLD.y - valley_haze_y, 0.0);
-	float h1 = max(wpos.y - valley_haze_y, 0.0);
-	float rise = h1 - h0;
-	float h_scale = max(valley_haze_scale, 200.0);
-	float air = abs(rise) < 1.0 ? exp(-h0 / h_scale) : h_scale / rise * (exp(-h0 / h_scale) - exp(-h1 / h_scale));
-	FOG = vec4(valley_haze_col, 1.0 - exp(-far_fog_density * dist * air));
+	FOG = height_integrated_fog(CAMERA_POSITION_WORLD.y, wpos.y, dist);
 }
 """
 static var _shader: Shader
@@ -461,7 +452,8 @@ static func drape_material(fine: Texture2D, coarse: Texture2D,
 	var code := _SHADER_CODE.replace("// @SNOW", ClimateModel.SNOW_GLSL) \
 		.replace("// @AUTUMN", WeatherGlsl.AUTUMN_GLSL) \
 		.replace("// @TERRAIN", TerrainGlsl.CODE) \
-		.replace("// @WATER_FILTER", WaterShader.FILTER_GLSL).replace("// @GLOW", StreetGlow.GLSL)
+		.replace("// @WATER_FILTER", WaterShader.FILTER_GLSL).replace("// @GLOW", StreetGlow.GLSL) \
+		.replace("// @HEIGHT_FOG", WeatherGlsl.HEIGHT_FOG_GLSL)
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = code

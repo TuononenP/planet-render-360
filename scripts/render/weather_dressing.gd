@@ -268,3 +268,10 @@ static func solve(data: LocationData, weather: Dictionary = {},
 static func apply_globals(state: Dictionary) -> void:
 	for k in state:
 		RenderingServer.global_shader_parameter_set(k, state[k])
+
+## Blowing-snow ground spindrift intensity (0..1) when snow lies on the ground
+## and wind exceeds 25 km/h. Pure.
+static func blowing_snow_strength(snow_depth: float, wind_kmh: float) -> float:
+	if wind_kmh <= 25.0 or snow_depth <= 0.25:
+		return 0.0
+	return clampf((wind_kmh - 25.0) / 35.0, 0.0, 1.0) * smoothstep(0.25, 0.65, snow_depth)

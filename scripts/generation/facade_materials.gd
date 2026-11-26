@@ -433,6 +433,8 @@ static func ground_for_building(b: Dictionary, fidelity: int, distant: bool,
 				style, fascia, Callable(MaterialLibrary, "_set_image")))
 		_facade_texs[tkey] = texs
 	var m := _material_from(texs, set_name, detail, tint)
+	if kind in ["shop", "signage"]:
+		m.set_meta("shopfront_heat", 1.0)
 	if _helsinki(style):
 		m.set_meta("warm_bounce", FacadeTextures.HELSINKI_BOUNCE)
 	m.set_meta("fc_uv", Vector3(maxf(float(style.get("bay_m", 3.2)), 1.0),

@@ -20,7 +20,7 @@ float frost_ridge(vec2 p) {
 	return 1.0 - abs(n * 2.0 - 1.0);
 }
 
-vec4 window_frost(vec2 cuv, float pane_px, float seed, float lit, bool curtain, vec3 wall_n) {
+vec4 window_frost(vec2 cuv, float pane_px, float seed, float lit, bool curtain, vec3 wall_n, float shop_heat) {
 	if (climate_frost <= 0.005) { return vec4(0.0); }
 	float f = climate_frost;
 	// Modern triple-glazed curtain walls frost less; warmly lit rooms thaw a
@@ -43,8 +43,13 @@ vec4 window_frost(vec2 cuv, float pane_px, float seed, float lit, bool curtain, 
 	float dend = frost_ridge(q + warp * 1.4) * 0.65 + frost_ridge(q * 2.4 - warp * 0.9) * 0.35;
 	float pat = mix(0.55, dend, near_c);
 	// Reach inward grows smoothly from 6% of pane at light frost to ~46% at heavy frost.
-	float reach = mix(0.05, 0.44, f) * (0.65 + 0.70 * pat);
+	float reach = mix(0.05, 0.44, f) * (0.65 + 0.70 * pat) * mix(1.0, 0.52, clamp(shop_heat, 0.0, 1.0));
 	float cover = (1.0 - smoothstep(reach - 0.09, reach + 0.04, rim)) * smoothstep(0.0, 0.25, f);
+	// Heated street-level shopfronts stay clear in the centre, keeping crisp corner/rim frost.
+	if (shop_heat > 0.5) {
+		float radial = max(abs(cuv.x - 0.5), abs(cuv.y - 0.5)) * 2.0;
+		cover *= smoothstep(0.50, 0.92, radial) * mix(1.0, 0.75, clamp(lit, 0.0, 1.0));
+	}
 	// Micro-crystal facet normal & ice sparkle up close only.
 	float fine_c = 1.0 - smoothstep(0.006, 0.025, pane_px);
 	vec2 fq = cuv * 28.0 + vec2(seed * 31.7, seed * 13.3);
@@ -101,5 +106,26 @@ vec3 autumn_far_forest(vec3 c, float wy, float stands, float crowns, float decid
 	float lum_t = max(dot(target, vec3(0.2126, 0.7152, 0.0722)), 0.005);
 	vec3 matched = target * (lum_c / lum_t) * mix(1.0, 1.18, smoothstep(0.2, 0.7, prog));
 	return mix(c, matched, w * 0.85);
+}
+"""
+
+## Shared analytical height-integrated ray fog (GroundShader + FarSurface) so
+## elevated lookouts show zero discontinuity across the 2.4 km detailed edge.
+const HEIGHT_FOG_GLSL := """
+global uniform float valley_haze_y;
+global uniform vec3 valley_haze_col;
+global uniform float far_fog_density;
+global uniform float valley_haze_amount;
+global uniform float valley_haze_scale;
+
+vec4 height_integrated_fog(float cam_y, float frag_y, float dist_u) {
+	float h0 = max(cam_y - valley_haze_y, 0.0);
+	float h1 = max(frag_y - valley_haze_y, 0.0);
+	float rise = h1 - h0;
+	float h_scale = max(valley_haze_scale, 200.0);
+	float air = abs(rise) < 1.0
+		? exp(-h0 / h_scale)
+		: h_scale / rise * (exp(-h0 / h_scale) - exp(-h1 / h_scale));
+	return vec4(valley_haze_col, 1.0 - exp(-far_fog_density * dist_u * air));
 }
 """

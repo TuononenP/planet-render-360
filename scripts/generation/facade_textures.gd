@@ -179,8 +179,9 @@ static func facade_texs(set_name: String, rows: int, detail: int,
 	var loader := Callable(MaterialLibrary, "_set_image")
 	var d: Dictionary
 	if tiled:
-		d = composed(["tile", set_name, pattern, detail, look], func() -> Dictionary:
-			return FacadeComposer.compose_tile(set_name, pattern, detail, look, loader))
+		var canon := _canonical_tile_look(set_name, look)
+		d = composed(["tile", set_name, pattern, detail, canon], func() -> Dictionary:
+			return FacadeComposer.compose_tile(set_name, pattern, detail, canon, loader))
 	elif set_name == "glass":
 		d = composed(["glass", detail], func() -> Dictionary:
 			return StoreyComposer.compose_glass(detail))
@@ -202,6 +203,23 @@ static var _store_order: Array[String] = []
 static var _store_used := {}
 ## Milliseconds the last build spent composing (BUILDINGS timings).
 static var compose_ms := 0
+
+## Strips keys unused by FacadeComposer.compose_tile so buildings with
+## identical tile pixels share one composed() cache entry.
+static func _canonical_tile_look(set_name: String, look: Dictionary) -> Dictionary:
+	var out := {
+		"frame": look.get("frame", Color(0.85, 0.83, 0.78)),
+		"shutter": look.get("shutter", Color(0.3, 0.4, 0.3)),
+		"shutter_p": float(look.get("shutter_p", 0.0)),
+		"window": str(look.get("window", "casement")),
+		"rails": float(look.get("rails", 0.0)),
+		"variant": int(look.get("variant", 0)),
+	}
+	if look.has("curtain"):
+		out["curtain"] = str(look["curtain"])
+	if FacadeComposer.smooth_plaster(set_name, look):
+		out["city"] = str(look.get("city", ""))
+	return out
 
 static func composed(inputs: Array, make: Callable) -> Dictionary:
 	var k := var_to_str(inputs)

@@ -74,6 +74,7 @@ uniform vec2 glare = vec2(1.0, 0.0);
 global uniform float climate_autumn;
 // @TERRAIN
 // @GLOW
+// @HEIGHT_FOG
 varying vec3 wpos;
 varying vec3 wnrm;
 varying float water_level;
@@ -547,5 +548,8 @@ void fragment() {
 	// nearer (StreetGlow.GROUND_NEAR_M), yards and lawns stay dark.
 	EMISSION = far_lamp_tint() * lamp_settle(wpos.xz) * smoothstep(700.0, 1200.0, dist_m)
 		* (0.45 + 0.55 * t_noise(wpos.xz / 70.0)) * (0.7 + 0.3 * t_noise(wpos.xz / 23.0 + 4.1));
+	if (far_fog_density > 0.0) {
+		FOG = height_integrated_fog(CAMERA_POSITION_WORLD.y, wpos.y, length(VERTEX));
+	}
 }
 """

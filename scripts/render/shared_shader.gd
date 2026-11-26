@@ -19,3 +19,8 @@ static func of(code: String) -> Shader:
 		_by_code[code] = sh
 	_mutex.unlock()
 	return sh
+
+static func clear() -> void:
+	_mutex.lock()
+	_by_code.clear()
+	_mutex.unlock()

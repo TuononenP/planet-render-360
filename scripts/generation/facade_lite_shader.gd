@@ -39,6 +39,7 @@ uniform vec2 cells = vec2(4.0, 1.0);
 uniform float night_energy = 0.0;
 // Warm ground-bounce on walls out of the sun, as in FacadeShader (0 = none).
 uniform float warm_bounce = 0.0;
+uniform float shopfront_heat = 0.0;
 varying vec3 wpos;
 varying vec3 wnrm;
 global uniform vec3 cloud_sun_dir;
@@ -79,8 +80,12 @@ void fragment() {
 			vec2 ed_f = min(cuv_f, 1.0 - cuv_f);
 			float rim_f = min(ed_f.x, ed_f.y);
 			float f_k = climate_frost * (curtain_wall ? 0.45 : 1.0);
-			float reach_f = mix(0.06, 0.36, f_k);
+			float reach_f = mix(0.06, 0.36, f_k) * mix(1.0, 0.52, clamp(shopfront_heat, 0.0, 1.0));
 			float fc = mix(1.0 - smoothstep(reach_f - 0.08, reach_f + 0.04, rim_f), f_k * 0.45, smoothstep(0.18, 0.55, bay_f));
+			if (shopfront_heat > 0.5) {
+				float rad_f = max(abs(cuv_f.x - 0.5), abs(cuv_f.y - 0.5)) * 2.0;
+				fc *= smoothstep(0.50, 0.92, rad_f);
+			}
 			fc *= pane * smoothstep(0.0, 0.25, f_k);
 			ALBEDO = mix(ALBEDO, vec3(0.82, 0.88, 0.94), fc * 0.78);
 			rough = mix(rough, 0.62, fc);
@@ -201,6 +206,8 @@ static func from_standard(m: StandardMaterial3D) -> ShaderMaterial:
 	s.set_shader_parameter("night_energy", 0.0)
 	if m.has_meta("warm_bounce"):
 		s.set_shader_parameter("warm_bounce", float(m.get_meta("warm_bounce")))
+	if m.has_meta("shopfront_heat"):
+		s.set_shader_parameter("shopfront_heat", float(m.get_meta("shopfront_heat")))
 	for k in m.get_meta_list():
 		if k != "facade_set":
 			s.set_meta(k, m.get_meta(k))

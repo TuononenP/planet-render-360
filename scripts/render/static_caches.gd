@@ -18,6 +18,7 @@ static func release_all() -> void:
 		RenderingServer.global_shader_parameter_set("street_lamp_settle", null)
 		RenderingServer.global_shader_parameter_set("street_heights", null)
 	SharedTexture.clear()
+	SharedShader.clear()
 	LandmarkImpostor.clear_view_cache()
 	FacadeComposer.clear_cache()
 	StoreyComposer.clear_cache()
@@ -107,6 +108,7 @@ static func release_all() -> void:
 	Precipitation._shader = null
 	Precipitation._contrast_shader = null
 	Precipitation._veil_shader = null
+	Precipitation._drift_shader = null
 	StreetLights._halo_mesh = null
 	Icicles._mesh = null
 	Icicles._mat = null
@@ -138,3 +140,59 @@ static func release_all() -> void:
 	CogFetcher._metadata.clear()
 	CogFetcher._meta_loading.clear()
 	MapPack._shared.clear()
+	FarSurface._shader = null
+	FacadeLiteShader._shader = null
+	LandmarkShader._shader = null
+	LandmarkShader._swapped.clear()
+	TreeMeshLibrary._bufs.clear()
+	TreeMeshLibrary._meshes.clear()
+	TreeMeshLibrary._mats.clear()
+	TreeMeshLibrary._shader_leaf = null
+	TreeMeshLibrary._shader_imp = null
+	FountainWater._flow_mat = null
+	FountainWater._foam_mat = null
+	FountainWater._mist_mat = null
+	FountainWater._flow_fallback = null
+	FountainWater._foam_fallback = null
+	BuildingBasement._mats.clear()
+	ShoreRailings._white_mat = null
+	SkyKit._mats.clear()
+	WaterWakes._wake_mat = null
+	WaterWakes._collar_mat = null
+	RoadDecals._cover = null
+	RoadDecals._grate = null
+	RoadDecals._litter = null
+	MeshArrays._held.clear()
+	RealityMeshKit._cache.clear()
+	StreetProps._fence_tex = null
+	StreetProps._chainlink_tex = null
+	StreetProps._mats.clear()
+	CarPaint._paint = null
+	CarPaint._shadow = null
+	BuildingDetail._mats.clear()
+	TramModel._meshes.clear()
+	TukTukModel._meshes.clear()
+	CarModel._meshes.clear()
+	RoadBuilder._mats.clear()
+	LandmarkSfAlcatrazSurface._material = null
+	FtSuomenJoutsen._nameplate_mat = null
+
+## Sheds rebuildable CPU/GPU caches when MemoryGuard enters TIGHT or CRITICAL.
+static func trim_for_pressure(level: int) -> void:
+	if level < MemoryGuard.Level.TIGHT:
+		return
+	PbrTextures._raw_images.clear()
+	FacadeComposer.clear_cache()
+	StoreyComposer.clear_cache()
+	OsmParseCache.clear()
+	LandmarkImpostor.clear_view_cache()
+	if level >= MemoryGuard.Level.CRITICAL:
+		MaterialLibrary._set_images.clear()
+		HelsinkiLod2._decoded.clear()
+		HelsinkiLod2._decoded_order.clear()
+		TurkuLod2Meshes._decoded.clear()
+		TurkuLod2Meshes._decoded_order.clear()
+		CityOpenData._decoded.clear()
+		CogFetcher._tiles.clear()
+		CogFetcher._tile_order.clear()
+		LandmarkShader._swapped.clear()

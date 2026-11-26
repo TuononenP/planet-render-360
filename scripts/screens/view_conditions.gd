@@ -109,7 +109,7 @@ static func _show_weather(v: View360) -> void:
 			ViewChrome.weather_failed(v)
 			return
 		if v._weather_chip != null:
-			ViewChrome.set_weather(v, float(lw[0]), str(lw[1]), int(lw[3]))
+			ViewChrome.set_weather(v, float(lw[0]), str(lw[1]), int(lw[3]), _weather_dict(v))
 		_apply_weather(v, int(lw[3]), float(lw[2]), _weather_dict(v))
 		return
 	var w: Array = DatePicker.WEATHER[v._weather_pick]
@@ -154,6 +154,11 @@ static func apply_surface_state(v: View360, dress_world := true) -> void:
 	var solar_elev := v._atmos.solar_elevation if v._atmos != null else 15.0
 	var state := WeatherDressing.solve(v._data, wd, v._date, solar_elev)
 	WeatherDressing.apply_globals(state)
+	if v._precip != null:
+		var wind_kmh := float(wd.get("wind_kmh", 0.0))
+		var drift := WeatherDressing.blowing_snow_strength(float(state.get("climate_snow_depth", 0.0)), wind_kmh)
+		var sky_col := v._atmos.sky_horizon_color if v._atmos != null else Color(0.88, 0.91, 0.96)
+		Precipitation.set_blowing_snow(v._precip, drift, wind_kmh, sky_col)
 	# Night skyglow follows how built-up the place is (~1500 mapped
 	# buildings in the detailed extent reads as a full city).
 	if v._atmos != null:

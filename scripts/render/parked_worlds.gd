@@ -52,8 +52,12 @@ func free_all() -> void:
 		_retire.call(p["world"])
 	_parked.clear()
 
-## Forgets them without freeing (the world root they live in is going).
+## Forgets them (the world root frees in-tree ones; detached ones are freed here).
 func forget() -> void:
+	for p in _parked:
+		var w: Variant = p.get("world")
+		if is_instance_valid(w) and not (w as Node).is_inside_tree():
+			(w as Node).free()
 	_parked.clear()
 
 ## Removes and returns the newest entry `fits(entry)` accepts ({} none).

@@ -20,7 +20,7 @@ const BUDGET_US := 1500
 
 ## A subtree with more children than this comes back child by child (a
 ## whole building layer entering the tree at once outlasted any budget).
-const SPLIT_CHILDREN := 16
+const SPLIT_CHILDREN := 8
 
 ## The world being staged (hidden, in the tree) and the pieces still to
 ## add back, in their original order (names stay unique): [parent, node,
@@ -217,9 +217,17 @@ func adopt(world: Node3D) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		# No method of its own here: the script is already going.
-		for piece: Variant in _late:
-			if is_instance_valid(piece[1]):
+		for piece: Variant in _pending:
+			if is_instance_valid(piece[1]) and not (piece[1] as Node).is_inside_tree():
 				(piece[1] as Node).free()
+		for piece: Variant in _late:
+			if is_instance_valid(piece[1]) and not (piece[1] as Node).is_inside_tree():
+				(piece[1] as Node).free()
+		if staged != null and is_instance_valid(staged) and not staged.is_inside_tree():
+			staged.free()
+		for old: Variant in _retiring:
+			if is_instance_valid(old) and not (old as Node).is_inside_tree():
+				(old as Node).free()
 		if is_instance_valid(_holder):
 			_holder.free()
 
@@ -227,19 +235,24 @@ func _notification(what: int) -> void:
 ## is no longer freed with it).
 func _free_pending() -> void:
 	for piece in _pending:
-		if is_instance_valid(piece[1]):
+		if is_instance_valid(piece[1]) and not (piece[1] as Node).is_inside_tree():
 			(piece[1] as Node).free()
 	_pending.clear()
 
 ## Late pieces still off are freed themselves, like pending ones.
 func _free_late() -> void:
 	for piece in _late:
-		if is_instance_valid(piece[1]):
+		if is_instance_valid(piece[1]) and not (piece[1] as Node).is_inside_tree():
 			(piece[1] as Node).free()
 	_late.clear()
 
 func clear() -> void:
 	_free_pending()
 	_free_late()
+	if staged != null and is_instance_valid(staged) and not staged.is_inside_tree():
+		staged.free()
 	staged = null
+	for old: Variant in _retiring:
+		if is_instance_valid(old) and not (old as Node).is_inside_tree():
+			(old as Node).free()
 	_retiring.clear()

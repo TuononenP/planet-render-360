@@ -288,12 +288,38 @@ static func show_place(v: View360, data: LocationData) -> void:
 	wake(v)
 	v._on_resized.call_deferred()
 
-static func set_weather(v: View360, temp_c: float, label: String, code: int) -> void:
+## Formats live Open-Meteo / CHELSA telemetry for the weather chip tooltip
+## using SI units and calm meteorological wording (Planet Render 360 voice).
+static func format_weather_tooltip(temp_c: float, label: String, details: Dictionary = {}) -> String:
+	var lines: Array[String] = []
+	var head := "%s · %d °C" % [label, roundi(temp_c)] if label != "" else "%d °C" % roundi(temp_c)
+	lines.append(head)
+	var row: Array[String] = []
+	if details.has("rh"):
+		row.append("Humidity %d%%" % roundi(float(details["rh"])))
+	if details.has("dew_point_c"):
+		row.append("Dew point %d °C" % roundi(float(details["dew_point_c"])))
+	if details.has("wind_kmh") and float(details["wind_kmh"]) >= 1.0:
+		row.append("Wind %d km/h" % roundi(float(details["wind_kmh"])))
+	if not row.is_empty():
+		lines.append(" · ".join(row))
+	var extra: Array[String] = []
+	if details.has("snow_depth_m") and float(details["snow_depth_m"]) > 0.005:
+		extra.append("Snow depth %d cm" % roundi(float(details["snow_depth_m"]) * 100.0))
+	if details.has("visibility_m") and float(details["visibility_m"]) > 0.0 and float(details["visibility_m"]) < 20000.0:
+		var km := float(details["visibility_m"]) / 1000.0
+		extra.append("Visibility %.1f km" % km if km < 10.0 else "Visibility %d km" % roundi(km))
+	if not extra.is_empty():
+		lines.append(" · ".join(extra))
+	lines.append("Pick the weather")
+	return "\n".join(lines)
+
+static func set_weather(v: View360, temp_c: float, label: String, code: int, details: Dictionary = {}) -> void:
 	v._weather_icon.texture = UiIcon.texture(HudParts.weather_icon(code), 18)
 	v._weather_value.text = "%d °C" % roundi(temp_c)
 	v._weather_value.visible = true
 	v._weather_label.text = label
-	v._weather_chip.tooltip_text = "Pick the weather"
+	v._weather_chip.tooltip_text = format_weather_tooltip(temp_c, label, details)
 	sync_weather_label(v)
 	v._weather_chip.visible = true
 	v._on_resized.call_deferred()

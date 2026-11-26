@@ -227,9 +227,41 @@ void fragment() {
 }
 """
 
+const DRIFT_SHADER := """
+shader_type spatial;
+render_mode blend_mix, depth_draw_never, cull_disabled, shadows_disabled, unshaded;
+
+uniform vec3 tint : source_color = vec3(0.88, 0.91, 0.96);
+uniform float opacity = 0.0;
+uniform float speed = 4.0;
+
+float dhash(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float dnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(dhash(i), dhash(i + vec2(1.0, 0.0)), f.x),
+		mix(dhash(i + vec2(0.0, 1.0)), dhash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+void fragment() {
+	vec2 p = vec2(UV.x * 18.0 - TIME * speed, UV.y * 4.0);
+	float w1 = dnoise(p);
+	float w2 = dnoise(p * 2.3 + vec2(-TIME * speed * 0.4, 1.7));
+	float streak = smoothstep(0.38, 0.85, w1 * 0.65 + w2 * 0.35);
+	float vert = smoothstep(0.0, 0.18, UV.y) * (1.0 - smoothstep(0.45, 1.0, UV.y));
+	ALBEDO = tint;
+	ALPHA = clamp(streak * vert * opacity, 0.0, 0.35);
+}
+"""
+
 static var _shader: Shader
 static var _contrast_shader: Shader
 static var _veil_shader: Shader
+static var _drift_shader: Shader
 
 static func _compiled(cached: Shader, code: String) -> Shader:
 	if cached != null:
@@ -243,6 +275,7 @@ static func build(parent: Node3D, preset: int) -> GPUParticles3D:
 	_shader = _compiled(_shader, SHADER)
 	_contrast_shader = _compiled(_contrast_shader, SHADER.replace("shader_type spatial;", "shader_type spatial;\n#define SCREEN_CONTRAST"))
 	_veil_shader = _compiled(_veil_shader, VEIL_SHADER)
+	_drift_shader = _compiled(_drift_shader, DRIFT_SHADER)
 	var p := Precipitation.new()
 	p.name = "Precipitation"
 	p.top_level = true
@@ -267,6 +300,7 @@ static func build(parent: Node3D, preset: int) -> GPUParticles3D:
 	p.set_process(false)
 	for i in VEILS.size():
 		p.add_child(_veil(i))
+	p.add_child(_drift_veil())
 	_set_veils(p, RenderSettings.clamp_preset(preset) >= VEIL_MIN_PRESET)
 	return p
 
@@ -313,12 +347,54 @@ static func _veil(i: int) -> MeshInstance3D:
 	mi.material_override = m
 	return mi
 
+static func _drift_veil() -> MeshInstance3D:
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 11.0
+	cyl.bottom_radius = 11.0
+	cyl.height = 3.2
+	cyl.radial_segments = 36
+	cyl.rings = 1
+	cyl.cap_top = false
+	cyl.cap_bottom = false
+	var mi := MeshInstance3D.new()
+	mi.name = "DriftVeil"
+	mi.mesh = cyl
+	mi.position = Vector3(0.0, -BOX_UP_M - 0.3, 0.0)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.visible = false
+	var m := ShaderMaterial.new()
+	m.shader = _drift_shader
+	mi.material_override = m
+	return mi
+
 static func _veil_nodes(p: GPUParticles3D) -> Array[MeshInstance3D]:
 	var out: Array[MeshInstance3D] = []
 	for c in p.get_children():
-		if c is MeshInstance3D:
+		if c is MeshInstance3D and c.name.begins_with("Veil"):
 			out.append(c)
 	return out
+
+## Drives low-altitude wind-swept snow spindrift when snow lies on the ground
+## and wind exceeds 25 km/h. Zero GPU cost when hidden.
+static func set_blowing_snow(p: GPUParticles3D, strength: float, wind_kmh: float,
+		sky: Color = Color(0.88, 0.91, 0.96)) -> void:
+	if p == null:
+		return
+	var mi := p.get_node_or_null("DriftVeil") as MeshInstance3D
+	if mi == null:
+		return
+	var active := strength > 0.01
+	mi.visible = active
+	if active:
+		var m := mi.material_override as ShaderMaterial
+		m.set_shader_parameter("opacity", clampf(0.08 + 0.22 * strength, 0.0, 0.30))
+		m.set_shader_parameter("speed", clampf(wind_kmh / 12.0, 1.5, 6.5))
+		m.set_shader_parameter("tint", Color(sky.r * 1.15, sky.g * 1.18, sky.b * 1.22).clamp())
+		p.visible = true
+		p.set_process(true)
+	elif not p.emitting:
+		p.visible = false
+		p.set_process(false)
 
 static func _set_veils(p: GPUParticles3D, on: bool) -> void:
 	for mi in _veil_nodes(p):
@@ -344,9 +420,11 @@ static func apply(p: GPUParticles3D, look: Dictionary) -> void:
 		return
 	var kind := str(look.get("precip", "none"))
 	var on := kind != "none"
-	p.visible = on
+	var drift := p.get_node_or_null("DriftVeil") as MeshInstance3D
+	var drift_on := drift != null and drift.visible
+	p.visible = on or drift_on
 	p.emitting = on
-	p.set_process(on)
+	p.set_process(on or drift_on)
 	p.set_meta("look", look)
 	if on:
 		p._process(0.0)
