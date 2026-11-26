@@ -203,6 +203,8 @@ func _ready() -> void:
 	_governor.environment = _atmos.environment
 	_governor.haze = _haze
 	_governor.set_preset(_quality_preset)
+	_governor.pause_down = func() -> bool:
+		return (_streamer != null and _streamer.is_busy()) or WorldCache.saving_any()
 	_governor.suggest_high.connect(func() -> void: ViewTools.suggest_high_quality(self))
 	sync_haze()
 	_weather = WeatherFetcher.new()

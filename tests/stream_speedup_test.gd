@@ -20,6 +20,8 @@ func _run() -> void:
 	_test_far_kernels()
 	_test_coastal_terrain_mesh()
 	_test_suggest_high_prompt()
+	_test_governor_pause_down()
+	_test_impostor_rasterize_parity()
 	if _failures.is_empty():
 		print("STREAM SPEEDUP PASS")
 		quit(0)
@@ -172,3 +174,62 @@ func _test_suggest_high_prompt() -> void:
 		gov.adapt(20.0)
 	_check(hits[0] == 1, "High preset never emits suggest_high")
 	gov.free()
+
+func _test_governor_pause_down() -> void:
+	var gov := QualityGovernor.new()
+	var vp := SubViewport.new()
+	gov.viewport = vp
+	gov.set_preset(RenderSettings.Preset.ULTRA)
+	var busy := [true]
+	gov.pause_down = func() -> bool: return busy[0]
+	for _i in 20:
+		gov._process(0.25)  # 4 FPS while streaming/saving busy
+	_check(gov.step == RenderSettings.Preset.ULTRA and gov.effects_step == QualityGovernor.EFFECTS_MAX,
+		"QualityGovernor must not step down while pause_down is true")
+	busy[0] = false
+	for _i in 6:
+		gov._process(0.25)  # 1.5 s inside BUSY_SETTLE_S (2.0 s)
+	_check(gov.step == RenderSettings.Preset.ULTRA and gov.effects_step == QualityGovernor.EFFECTS_MAX,
+		"QualityGovernor must hold Ultra through BUSY_SETTLE_S cooldown")
+	gov.free()
+	vp.free()
+
+func _test_impostor_rasterize_parity() -> void:
+	if not ClassDB.class_exists(&"FarKernels"):
+		return
+	var verts := PackedVector3Array([
+		Vector3(-4, 0, -2), Vector3(4, 0, -2), Vector3(0, 12, 0),
+		Vector3(4, 0, -2), Vector3(4, 0, 2), Vector3(0, 12, 0),
+		Vector3(-4, 0, 2), Vector3(4, 0, 2), Vector3(0, 12, 0),
+	])
+	var batches := [{
+		"v": verts, "n": PackedVector3Array(), "idx": PackedInt32Array(),
+		"color": Color(0.75, 0.55, 0.40), "cols": PackedColorArray(),
+	}]
+	var center := Vector3(0, 6, 0)
+	var key_dir := LandmarkImpostor.RELIEF_KEY.normalized()
+	var native_views: Array = FarKernels.rasterize_impostor_views(
+		batches, center, 12.4, 12.8, 8.4, 4.4, key_dir, 64)
+	_check(native_views.size() == 4, "FarKernels.rasterize_impostor_views returns 4 views")
+	var normals: Array[Vector3] = [
+		Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0)]
+	var rights: Array[Vector3] = [
+		Vector3(-1, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1)]
+	var widths: Array[float] = [8.4, 4.4, 8.4, 4.4]
+	for vi in 4:
+		var nv: PackedByteArray = native_views[vi]
+		var non_zero := 0
+		for p in range(3, nv.size(), 4):
+			if nv[p] == 255:
+				non_zero += 1
+		_check(non_zero > 200, "impostor view %d has solid silhouette (%d px)" % [vi, non_zero])
+		# Also verify full-size bake matches GDScript _rasterize_view closely.
+	var full_nv: PackedByteArray = FarKernels.rasterize_impostor_views(
+		batches, center, 12.4, 12.8, 8.4, 4.4, key_dir, LandmarkImpostor.SIZE)[0]
+	var full_gd := LandmarkImpostor._rasterize_view(
+		batches, center, 12.4, 12.8, normals[0], rights[0], widths[0] * 0.5, key_dir)
+	var diff_px := 0
+	for i in range(0, full_gd.size(), 4):
+		if absi(int(full_nv[i]) - int(full_gd[i])) > 1 or absi(int(full_nv[i + 3]) - int(full_gd[i + 3])) > 0:
+			diff_px += 1
+	_check(diff_px <= 16, "native impostor rasterizer matches GDScript (diff_px=%d)" % diff_px)

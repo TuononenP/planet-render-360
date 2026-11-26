@@ -433,6 +433,11 @@ func urgent() -> bool:
 func build_step() -> int:
 	return _abort.step if _abort != null else 0
 
+## True while streaming fetch, build, handoff, reveal, or detail work is active.
+func is_busy() -> bool:
+	return state == State.FETCHING or state == State.READY \
+		or _handoff.busy() or _reveal.active() or _detail.busy() or _after_swap > 0
+
 ## The measured velocity at the recent peak pace (see _pace).
 func _planned_vel() -> Vector2:
 	return _vel.normalized() * _pace if _vel.length() > 0.5 else _vel
@@ -666,9 +671,10 @@ func tick(v: View360, delta: float) -> void:
 		else:
 			_turning_s = maxf(_turning_s - delta, 0.0)
 	_last_yaw = v._rig.yaw
-	# The pace to plan for: a camera just eased past an edge (or turning)
-	# is still on its way back to full speed.
-	_pace = maxf(_vel.length(), _pace - PACE_DECAY_MPS2 * delta)
+	# The pace to plan for: hold peak cruise pace across temporary edge-cap
+	# slowdowns so the next stretch keeps its full high-speed lookahead.
+	slowed = (state == State.FETCHING or state == State.READY) and not inside_detailed(pos)
+	_pace = maxf(_pace, _vel.length()) if slowed else maxf(_vel.length(), _pace - PACE_DECAY_MPS2 * delta)
 	_still_s = _still_s + delta if _vel.length() < 1.0 else 0.0
 	# Memory short (MemoryGuard): parked stretches go, then the stretch
 	# being fetched; nothing new starts.
@@ -679,7 +685,6 @@ func tick(v: View360, delta: float) -> void:
 	_reveal.tick(pos, delta, v._quality_preset)
 	# Planned fetches overlap non-Postpass downloads; ring waits for live fetch.
 	_scout.pump(v, state == State.FETCHING and _fetched_msec == 0, state == State.FETCHING and urgent())
-	slowed = (state == State.FETCHING or state == State.READY) and not inside_detailed(pos)
 	_edge_s = detailed_ahead(pos, _vel) / _vel.length() if _vel.length() > 0.5 else INF
 	if state == State.FETCHING and _abort != null:
 		_abort.urgent = urgent()  # a late build: no garnish, a bigger frame share
@@ -755,7 +760,8 @@ func tick(v: View360, delta: float) -> void:
 		_start_generation(v, pos, look)
 	elif DetailDrift.wanted(pos, View360.spawn_xz(v._data), _still_s, v._quality_preset):
 		_start_generation(v, pos, look, true)
-	elif not _warmed and v.start_flying and v._drone.on and not WorldCache.saving_any() \
+	elif not _warmed and v.start_flying and v._drone.on \
+			and not (WorldCache.saving_any() and MemoryBudget.usage() >= 0.50) \
 			and (_vel.length() >= ViewDrone.CRUISE_MPS or Time.get_ticks_msec() - _opened_msec >= int(WARM_S * 1000.0)):
 		_start_generation(v, pos, look)
 

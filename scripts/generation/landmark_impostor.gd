@@ -364,10 +364,15 @@ static func bake(root: Node3D, _yaw_deg: float = 0.0) -> Dictionary:
 	var key := _content_key(batches) if view_cache_enabled else ""
 	var views: Array = _views_for(key) if view_cache_enabled else []
 	var rastered := views.is_empty()
+	if rastered and ClassDB.class_exists(&"FarKernels"):
+		var native_views: Array = FarKernels.rasterize_impostor_views(
+			batches, center, y1, span_y, wx, wz, key_dir, SIZE)
+		if native_views.size() == 4:
+			views = native_views
 	for v_idx in 4:
-		var bytes: PackedByteArray = views[v_idx] if not rastered else _rasterize_view(batches,
+		var bytes: PackedByteArray = views[v_idx] if views.size() == 4 else _rasterize_view(batches,
 			center, y1, span_y, normals[v_idx], rights[v_idx], widths[v_idx] * 0.5, key_dir)
-		if rastered:
+		if rastered and views.size() < 4:
 			views.append(bytes)
 		var base_img := Image.create_from_data(SIZE, SIZE, false, Image.FORMAT_RGBA8, bytes)
 		images.append(base_img)

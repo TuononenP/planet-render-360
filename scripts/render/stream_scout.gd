@@ -151,7 +151,8 @@ func pump(v: View360, net_busy: bool, urgent_busy: bool = false) -> void:
 		# to be fetched once there is room again.
 		for w in _warms.duplicate():
 			_end_warm(w, true)
-	if _ring.is_empty() or cap == 0 or net_busy or urgent_busy or WorldCache.saving_any():
+	if _ring.is_empty() or cap == 0 or net_busy or urgent_busy \
+			or (WorldCache.saving_any() and MemoryBudget.usage() >= 0.50):
 		return
 	var ll: Vector2 = _ring[0]
 	var is_plan := ll == plan_ll or ll == plan2_ll

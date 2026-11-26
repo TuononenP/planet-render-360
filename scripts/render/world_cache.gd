@@ -385,6 +385,14 @@ static func pack_wanted(background: bool) -> bool:
 ## Seconds a save waits for MemoryGuard to allow it before it is dropped.
 const SAVE_WAIT_S := 120.0
 
+## True while the view is actively streaming or flying fast in drone mode.
+static func _flight_busy(view: Node) -> bool:
+	if not is_instance_valid(view) or not (view is View360):
+		return false
+	var v := view as View360
+	return (v._streamer != null and v._streamer.is_busy()) \
+		or (v._drone != null and v._drone.on and v._drone._vel.length() > 15.0)
+
 ## `asked`: the person asked for this save (Save for offline): it does not
 ## wait for memory, only an EMERGENCY drops it.
 static func save_async(view: Node, threads: Array, data: LocationData, built: Array,
@@ -403,12 +411,7 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	var waited := 0.0
 	while true:
 		var mem_ok := MemoryGuard.save_allowed() or (asked and not MemoryGuard.save_dropped())
-		var flight_busy := not background and not asked and not hurry \
-			and is_instance_valid(view) and view is View360 \
-			and (((view as View360)._streamer != null \
-					and (view as View360)._streamer.state != WorldStreamer.State.IDLE) \
-				or ((view as View360)._drone != null and (view as View360)._drone.on \
-					and (view as View360)._drone._vel.length() > 15.0))
+		var flight_busy := not background and not asked and not hurry and _flight_busy(view)
 		if mem_ok and not flight_busy:
 			break
 		if (not mem_ok and (MemoryGuard.save_dropped() or waited >= SAVE_WAIT_S)) \
@@ -464,10 +467,10 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	var last_us := [Time.get_ticks_usec()]
 	var pump := func() -> void:
 		var t := Time.get_ticks_usec()
-		var streaming := is_instance_valid(view) and view is View360 \
-			and (view as View360)._streamer != null \
-			and (view as View360)._streamer.state != WorldStreamer.State.IDLE
-		var budget := pump_budget_us(t - last_us[0], background or streaming)
+		if not background and not asked and not hurry and _flight_busy(view):
+			last_us[0] = t
+			return
+		var budget := pump_budget_us(t - last_us[0], background)
 		while th.is_alive() and Time.get_ticks_usec() - t < budget:
 			RenderingServer.force_sync()
 		last_us[0] = t

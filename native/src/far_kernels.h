@@ -39,6 +39,9 @@ public:
 	// [verts, normals, colors, tangents, uvs, water_levels, indices].
 	static Array terrain_grid_sat(int size, double step, const PackedFloat32Array &post_heights,
 			const Dictionary &params, const Array &drapes, Object *shore_domains);
+	// LandmarkImpostor.bake's 4 orthographic cardinal RGBA8 views (N, E, S, W).
+	static Array rasterize_impostor_views(const Array &batches, const Vector3 &center,
+			double y_top, double span_y, double wx, double wz, const Vector3 &key_dir, int size);
 };
 
 } // namespace godot

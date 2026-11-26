@@ -15,7 +15,10 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <limits>
 #include <vector>
 
 namespace godot {
@@ -501,6 +504,213 @@ Array FarKernels::terrain_grid_sat(int size, double step, const PackedFloat32Arr
 	return out;
 }
 
+namespace {
+
+struct ImpostorBatch {
+	PackedVector3Array verts;
+	PackedVector3Array norms;
+	PackedInt32Array idx;
+	PackedColorArray vcols;
+	Color base_col;
+	bool has_n = false;
+	bool has_vc = false;
+};
+
+static inline void splat_segment(uint8_t *px, float *zbuf, int size,
+		float ax, float ay, float za, float bx, float by, float zb,
+		uint8_t cr, uint8_t cg, uint8_t cb) {
+	float dx = bx - ax;
+	float dy = by - ay;
+	float dist = std::sqrt(dx * dx + dy * dy);
+	int steps = std::min(std::max((int)std::ceil(dist), 1), size * 2);
+	float inv_steps = 1.0f / (float)steps;
+	for (int s = 0; s <= steps; s++) {
+		float t = (float)s * inv_steps;
+		int x = (int)std::llround(ax + dx * t);
+		int y = (int)std::llround(ay + dy * t);
+		if (x < 0 || x >= size || y < 0 || y >= size) {
+			continue;
+		}
+		float z = za + (zb - za) * t;
+		int di = y * size + x;
+		if (z > zbuf[di]) {
+			zbuf[di] = z;
+			int o = di * 4;
+			px[o + 0] = cr;
+			px[o + 1] = cg;
+			px[o + 2] = cb;
+			px[o + 3] = 255;
+		}
+	}
+}
+
+static PackedByteArray rasterize_one_view(const std::vector<ImpostorBatch> &batches,
+		const Vector3 &center, float y_top, float span_y,
+		const Vector3 &out_normal, const Vector3 &right_axis, float half_w,
+		const Vector3 &key_dir, int size) {
+	PackedByteArray px_arr;
+	px_arr.resize(size * size * 4);
+	uint8_t *px = px_arr.ptrw();
+	std::memset(px, 0, (size_t)size * (size_t)size * 4);
+	std::vector<float> zbuf((size_t)size * (size_t)size, -std::numeric_limits<float>::infinity());
+	float *zp = zbuf.data();
+
+	const float inv_w = (float)(size - 1) / std::max(2.0f * half_w, 1e-3f);
+	const float inv_h = (float)(size - 1) / std::max(span_y, 1e-3f);
+
+	for (const ImpostorBatch &b : batches) {
+		const Vector3 *vp = b.verts.ptr();
+		const Vector3 *np = b.has_n ? b.norms.ptr() : nullptr;
+		const int32_t *ip = b.idx.is_empty() ? nullptr : b.idx.ptr();
+		const Color *cp = b.has_vc ? b.vcols.ptr() : nullptr;
+		const int64_t count = ip != nullptr ? b.idx.size() : b.verts.size();
+		const int64_t vcount = b.verts.size();
+
+		for (int64_t t = 0; t + 2 < count; t += 3) {
+			const int64_t ia = ip != nullptr ? ip[t] : t;
+			const int64_t ib = ip != nullptr ? ip[t + 1] : t + 1;
+			const int64_t ic = ip != nullptr ? ip[t + 2] : t + 2;
+			if (ia < 0 || ib < 0 || ic < 0 || ia >= vcount || ib >= vcount || ic >= vcount) {
+				continue;
+			}
+			const Vector3 va = vp[ia];
+			const Vector3 vb = vp[ib];
+			const Vector3 vc = vp[ic];
+			const Vector3 da = va - center;
+			const Vector3 db = vb - center;
+			const Vector3 dc = vc - center;
+
+			const float pax = (da.dot(right_axis) + half_w) * inv_w;
+			const float pay = (y_top - va.y) * inv_h;
+			const float pbx = (db.dot(right_axis) + half_w) * inv_w;
+			const float pby = (y_top - vb.y) * inv_h;
+			const float pcx = (dc.dot(right_axis) + half_w) * inv_w;
+			const float pcy = (y_top - vc.y) * inv_h;
+
+			const float za = da.dot(out_normal);
+			const float zb = db.dot(out_normal);
+			const float zc = dc.dot(out_normal);
+
+			Vector3 fn;
+			if (np != nullptr) {
+				fn = (np[ia] + np[ib] + np[ic]).normalized();
+			} else {
+				fn = (vc - va).cross(vb - va).normalized();
+			}
+			if (fn.length_squared() < 1e-6f) {
+				fn = out_normal;
+			}
+			const float shade = 0.76f + 0.24f * std::max(fn.dot(key_dir), 0.0f)
+					+ 0.06f * std::max(fn.y, 0.0f);
+			Color c = b.base_col;
+			if (cp != nullptr) {
+				const Color vc_avg = (cp[ia] + cp[ib] + cp[ic]) / 3.0f;
+				c = Color(c.r * vc_avg.r, c.g * vc_avg.g, c.b * vc_avg.b);
+			}
+			const uint8_t cr = (uint8_t)std::clamp((int)std::llround(c.r * shade * 255.0f), 1, 255);
+			const uint8_t cg = (uint8_t)std::clamp((int)std::llround(c.g * shade * 255.0f), 1, 255);
+			const uint8_t cb = (uint8_t)std::clamp((int)std::llround(c.b * shade * 255.0f), 1, 255);
+
+			const int min_x = std::max((int)std::floor(std::min(pax, std::min(pbx, pcx))), 0);
+			const int max_x = std::min((int)std::ceil(std::max(pax, std::max(pbx, pcx))), size - 1);
+			const int min_y = std::max((int)std::floor(std::min(pay, std::min(pby, pcy))), 0);
+			const int max_y = std::min((int)std::ceil(std::max(pay, std::max(pby, pcy))), size - 1);
+			if (min_x > max_x || min_y > max_y) {
+				continue;
+			}
+
+			const float abx = pbx - pax;
+			const float aby = pby - pay;
+			const float acx = pcx - pax;
+			const float acy = pcy - pay;
+			const float area = abx * acy - aby * acx;
+
+			if (std::fabs(area) >= 0.02f) {
+				const float inv_area = 1.0f / area;
+				const float bcx = pcx - pbx;
+				const float bcy = pcy - pby;
+				const float cax = pax - pcx;
+				const float cay = pay - pcy;
+				for (int y = min_y; y <= max_y; y++) {
+					const float py_f = (float)y + 0.5f;
+					const float row_base_y = (float)y * (float)size;
+					(void)row_base_y;
+					const int row = y * size;
+					for (int x = min_x; x <= max_x; x++) {
+						const float px_f = (float)x + 0.5f;
+						const float w0 = (bcx * (py_f - pby) - bcy * (px_f - pbx)) * inv_area;
+						const float w1 = (cax * (py_f - pcy) - cay * (px_f - pcx)) * inv_area;
+						const float w2 = 1.0f - w0 - w1;
+						if (w0 < -1e-4f || w1 < -1e-4f || w2 < -1e-4f) {
+							continue;
+						}
+						const float z = za * w0 + zb * w1 + zc * w2;
+						const int di = row + x;
+						if (z > zp[di]) {
+							zp[di] = z;
+							const int o = di * 4;
+							px[o + 0] = cr;
+							px[o + 1] = cg;
+							px[o + 2] = cb;
+							px[o + 3] = 255;
+						}
+					}
+				}
+			}
+
+			if (std::min(max_x - min_x, max_y - min_y) <= 1 || std::fabs(area) < 0.75f) {
+				splat_segment(px, zp, size, pax, pay, za, pbx, pby, zb, cr, cg, cb);
+				splat_segment(px, zp, size, pbx, pby, zb, pcx, pcy, zc, cr, cg, cb);
+				splat_segment(px, zp, size, pcx, pcy, zc, pax, pay, za, cr, cg, cb);
+			}
+		}
+	}
+	return px_arr;
+}
+
+} // namespace
+
+Array FarKernels::rasterize_impostor_views(const Array &batches_in, const Vector3 &center,
+		double y_top, double span_y, double wx, double wz, const Vector3 &key_dir, int size) {
+	Array out;
+	if (size <= 0 || batches_in.is_empty()) {
+		return out;
+	}
+	std::vector<ImpostorBatch> batches;
+	batches.reserve(batches_in.size());
+	for (int64_t i = 0; i < batches_in.size(); i++) {
+		Dictionary d = batches_in[i];
+		ImpostorBatch b;
+		b.verts = d.get("v", PackedVector3Array());
+		if (b.verts.size() < 3) {
+			continue;
+		}
+		b.norms = d.get("n", PackedVector3Array());
+		b.idx = d.get("idx", PackedInt32Array());
+		b.vcols = d.get("cols", PackedColorArray());
+		b.base_col = d.get("color", Color(0.66f, 0.63f, 0.58f));
+		b.has_n = b.norms.size() == b.verts.size();
+		b.has_vc = b.vcols.size() == b.verts.size();
+		batches.push_back(std::move(b));
+	}
+
+	const Vector3 normals[4] = {
+		Vector3(0.0f, 0.0f, -1.0f), Vector3(1.0f, 0.0f, 0.0f),
+		Vector3(0.0f, 0.0f, 1.0f), Vector3(-1.0f, 0.0f, 0.0f)
+	};
+	const Vector3 rights[4] = {
+		Vector3(-1.0f, 0.0f, 0.0f), Vector3(0.0f, 0.0f, -1.0f),
+		Vector3(1.0f, 0.0f, 0.0f), Vector3(0.0f, 0.0f, 1.0f)
+	};
+	const float widths[4] = { (float)wx, (float)wz, (float)wx, (float)wz };
+
+	for (int v_idx = 0; v_idx < 4; v_idx++) {
+		out.push_back(rasterize_one_view(batches, center, (float)y_top, (float)span_y,
+				normals[v_idx], rights[v_idx], widths[v_idx] * 0.5f, key_dir, size));
+	}
+	return out;
+}
+
 void FarKernels::_bind_methods() {
 	ClassDB::bind_static_method("FarKernels",
 			D_METHOD("ring_positions", "radii", "segs", "params", "dem_rings"),
@@ -517,6 +727,9 @@ void FarKernels::_bind_methods() {
 	ClassDB::bind_static_method("FarKernels",
 			D_METHOD("terrain_grid_sat", "size", "step", "post_heights", "params", "drapes", "shore_domains"),
 			&FarKernels::terrain_grid_sat);
+	ClassDB::bind_static_method("FarKernels",
+			D_METHOD("rasterize_impostor_views", "batches", "center", "y_top", "span_y", "wx", "wz", "key_dir", "size"),
+			&FarKernels::rasterize_impostor_views);
 }
 
 } // namespace godot

@@ -26,6 +26,9 @@ const UP_WINDOWS := 2
 const HOLD_S := 10.0
 const HOLD_MAX_S := 160.0
 const SLOW_SUGGEST_WINDOWS := 4
+## Settling cooldown (seconds) after streaming or WorldCache saving finishes
+## so CPU/IO hitches never bleed into the next GPU performance window.
+const BUSY_SETTLE_S := 2.0
 
 ## Render scale per step lives in RenderSettings.render_scale_for, so
 ## the settings screen's summary and the governor cannot drift apart.
@@ -77,6 +80,9 @@ var sun: DirectionalLight3D
 ## view. Left null in tests, which skips the effect reductions.
 var environment: Environment
 var haze: HazeRig
+## Optional predicate returning true while streaming/building/saving CPU work is
+## active; pauses FPS step-downs and High-quality prompts until settled.
+var pause_down: Callable
 ## Effect-layer depth (EFFECTS_MAX = healthy). Healthy whenever the layer
 ## is inactive, so it never gates haze/scale on other presets.
 var effects_step := EFFECTS_MAX
@@ -97,6 +103,7 @@ func set_preset(preset_value: int) -> void:
 	_healthy = 0
 	_slow_windows = 0
 	_suggested_high = false
+	_settle_left = 0.0
 	_apply()
 
 func set_haze_ceiling(max_haze: int) -> void:
@@ -169,9 +176,20 @@ var _hold_s := HOLD_S
 var _healthy := 0
 var _slow_windows := 0
 var _suggested_high := false
+var _settle_left := 0.0
 
 func _process(delta: float) -> void:
 	if viewport == null:
+		return
+	if pause_down.is_valid() and bool(pause_down.call()):
+		_frames = 0
+		_elapsed = 0.0
+		_settle_left = BUSY_SETTLE_S
+		return
+	if _settle_left > 0.0:
+		_settle_left = maxf(_settle_left - delta, 0.0)
+		_frames = 0
+		_elapsed = 0.0
 		return
 	_frames += 1
 	_elapsed += delta
