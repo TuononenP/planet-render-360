@@ -54,7 +54,13 @@ const RUN_M := 420.0
 const PLATFORM_EDGE_M := 4.0
 ## Half width taken for a platform mapped as a line down its middle (m).
 const PLATFORM_LINE_M := 3.0
-const PLATFORM_OCCUPIED := 0.5
+const PLATFORM_OCCUPIED := 0.65
+## Minimum continuous route length (m) for a platform train to run as a
+## one-way through-train rather than a short shuttle or stationed train.
+const THROUGH_MIN_M := 360.0
+## Share of eligible through-station platform trains that move; the rest
+## stay stationed at their platform so a hub shows both parked and moving sets.
+const THROUGH_MOVING_SHARE := 0.55
 ## A train may overhang its platform by this much in all (m).
 const PLATFORM_OVER_M := 6.0
 const SIDE_M := 0.5
@@ -130,7 +136,7 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 					continue
 				s = route.nearest(p).x
 				if s < length * 0.5 + CLEAR_M or s > route.length_m - length * 0.5 - CLEAR_M \
-						or route.bridged(s - length * 0.5, s + length * 0.5):
+						or route.unsupported(s - length * 0.5, s + length * 0.5):
 					continue
 			var train := _stand(route, s, pick, cars, ground, m2u)
 			if train.is_empty() or not _clear(train, trains, m2u) or (not terminus and _indoors(train, solids)):
@@ -139,9 +145,27 @@ static func plan(data: LocationData, ground: GroundTruth, m2u: float) -> Array:
 			if terminus:
 				train["buffer"] = p
 				train["nose_m"] = nose - float(spot[6])
+				train["moving"] = false
+			else:
+				var route_taken := _route_role(trains, route)
+				var want_moving := route.length_m >= THROUGH_MIN_M and TransitVehicles._hash(p.x, p.y, 9.7) < THROUGH_MOVING_SHARE
+				if route_taken == "stationed":
+					want_moving = false
+				elif route_taken == "moving":
+					want_moving = true
+				train["moving"] = want_moving
+				train["through"] = want_moving and route.length_m >= THROUGH_MIN_M
 			trains.append(train)
 			break
 	return trains
+
+## Returns "moving" or "stationed" if `trains` already holds a train on `route`,
+## else "" so a single track never mixes a parked train with a moving one.
+static func _route_role(trains: Array, route: TramRoute) -> String:
+	for other: Dictionary in trains:
+		if other.get("route") == route:
+			return "moving" if bool(other.get("moving", false)) else "stationed"
+	return ""
 
 ## The heavy-rail ways of `data`, tunnels and roofed track included.
 static func _rails(data: LocationData) -> Array:
@@ -382,7 +406,12 @@ static func _solids(data: LocationData) -> Array:
 	for b in data.buildings:
 		if not (b is Dictionary):
 			continue
-		var outline: PackedVector2Array = (b as Dictionary).get("footprint", PackedVector2Array())
+		var bdict := b as Dictionary
+		# Elevated station concourses / skybridges (min_height >= 5 m) let trains
+		# pass freely underneath through their open track portals.
+		if float(bdict.get("min_height_m", 0.0)) >= 5.0:
+			continue
+		var outline: PackedVector2Array = bdict.get("footprint", PackedVector2Array())
 		if outline.size() < 3:
 			continue
 		var box := Rect2(outline[0], Vector2.ZERO)
@@ -446,7 +475,7 @@ static func _platform_spots(spots: Array, data: LocationData, ground: GroundTrut
 	var region := CityStyles.region_at(data.latitude, data.longitude)
 	var carries := func(rail: Dictionary) -> bool:
 		return TrainSpecs.carries_in(region, rail)
-	var routes := TramRoute.chains(data, ground, m2u, carries, false)
+	var routes := TramRoute.chains(data, ground, m2u, carries, true, true)
 	for platform in data.rail_platforms:
 		if not (platform is Dictionary):
 			continue

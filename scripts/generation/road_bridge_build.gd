@@ -257,9 +257,9 @@ static func _land_piers(side: RoadBuilder._Batch, pts: PackedVector2Array, dist:
 		if dist[i] < next:
 			continue
 		var p := pts[i]
-		# Not on a road passing under: the column moves on along the deck
-		# to the first clear spot (it stood in the lane of the way below).
-		if _on_road_below(p, surf, m2u):
+		# Not on a road or railway track passing under: the column moves on
+		# along the deck to the first clear spot.
+		if _on_road_below(p, surf, m2u) or _on_rail_below(p, surf, m2u):
 			continue
 		next = dist[i] + 30.0 * m2u
 		if surf.ground.water_at(p.x, p.y) > 0.0:
@@ -287,6 +287,33 @@ static func _on_road_below(p: Vector2, surf: RoadBuilder._Surface, m2u: float) -
 	for q: Vector2 in [p, p + Vector2(r, r), p + Vector2(r, -r), p + Vector2(-r, r), p + Vector2(-r, -r)]:
 		if StreetProps._on_road(q, surf.ground_roads, m2u):
 			return true
+	return false
+
+## True where a pier at `p` (2.5 m square, with a metre to spare) would
+## stand on a railway track on the ground or in a station portal below.
+static func _on_rail_below(p: Vector2, surf: RoadBuilder._Surface, m2u: float) -> bool:
+	if surf.place == null or surf.place.railways.is_empty():
+		return false
+	var portals := TramRoute.station_portals(surf.place, m2u)
+	var pier_r := (1.25 + PIER_CLEAR_M) * m2u
+	for raw in surf.place.railways:
+		if not (raw is Dictionary):
+			continue
+		var r := raw as Dictionary
+		if bool(r.get("tunnel", false)) and not portals.has(r):
+			continue
+		var pts: PackedVector2Array = r.get("points", PackedVector2Array())
+		if pts.size() < 2:
+			continue
+		var clear := pier_r + float(r.get("width_m", 3.3)) * 0.5 * m2u
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			if p.x < minf(a.x, b.x) - clear or p.x > maxf(a.x, b.x) + clear \
+					or p.y < minf(a.y, b.y) - clear or p.y > maxf(a.y, b.y) + clear:
+				continue
+			if p.distance_to(Geometry2D.get_closest_point_to_segment(p, a, b)) < clear:
+				return true
 	return false
 
 const PIER_CLEAR_M := 1.0

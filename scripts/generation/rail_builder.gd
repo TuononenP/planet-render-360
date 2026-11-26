@@ -136,15 +136,17 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	var beside := deck_index(data.railways, m2u)
 	if not beside.is_empty():
 		beside["decks"] = RailDecks.of(data, surf, m2u)
+	var portals := TramRoute.station_portals(data, m2u)
 	for w in data.railways:
 		if abort != null and abort.requested:
 			return
-		_way(batches, w, surf, spans, m2u, data, road_index, beside)
+		_way(batches, w, surf, spans, m2u, data, road_index, beside, portals)
 	if RailViaductLook.has_guideways(data):
 		var decks_ref: RailDecks = beside.get("decks", null)
 		if decks_ref == null:
 			decks_ref = RailDecks.of(data, surf, m2u)
 		RailViaductLook.build_elevated_stations(batches, data, surf, decks_ref, m2u)
+	RailPlatforms.build(batches, data, surf, m2u)
 	for key in batches:
 		var b: RoadBuilder._Batch = batches[key]
 		if b.indices.is_empty():
@@ -153,13 +155,15 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mi.name = "Rail_" + str(key)
 		mi.mesh = b.mesh()
 		mi.material_override = _material(str(key))
-		if not str(key) in ["deck", "deck_brick", "deck_concrete", "station_canopy"]:
+		if not str(key) in ["deck", "deck_brick", "deck_concrete", "station_canopy",
+				"platform_concrete", "platform_canopy"]:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
 
 static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
-		spans: Array, m2u: float, data: LocationData = null, road_index = null, beside: Dictionary = {}) -> void:
-	if not (w is Dictionary) or bool((w as Dictionary).get("tunnel", false)):
+		spans: Array, m2u: float, data: LocationData = null, road_index = null, beside: Dictionary = {},
+		portals: Dictionary = {}) -> void:
+	if not (w is Dictionary) or (bool((w as Dictionary).get("tunnel", false)) and not portals.has(w)):
 		return
 	var way: Dictionary = w
 	var pts: PackedVector2Array = way.get("points", PackedVector2Array())
@@ -436,6 +440,14 @@ static func _material(key: String) -> Material:
 			m = RoadSurface.paved_material("concrete", Color.html("#C8C5BD").srgb_to_linear())
 		"station_canopy":
 			m = RoadBuilder._pbr("sheet_metal", "#ECEAE4")
+		"platform_concrete":
+			m = RoadBuilder._pbr("concrete", "#B8B5AE")
+		"platform_edge":
+			m = RoadBuilder._pbr("concrete", "#D8B838")
+		"platform_canopy":
+			m = RoadBuilder._pbr("sheet_metal", "#C6CBCF")
+		"platform_lamp":
+			m = LandmarkMaterials.lit("#FFE8C2", 1.3)
 		_:
 			m = RoadBuilder._material(key)
 	_mats[key] = m

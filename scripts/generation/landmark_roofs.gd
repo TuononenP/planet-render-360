@@ -23,14 +23,15 @@ static func collect(data: LocationData) -> Array:
 		if c is Dictionary and (c as Dictionary).has("type") \
 				and float((c as Dictionary).get("height", 0.0)) > 0.0:
 			var cd := c as Dictionary
-			if str(LocationData.entry_for_type(str(cd["type"])).get("kind", "")) in NOT_ROOFS:
+			var reg := LocationData.entry_for_type(str(cd["type"]))
+			if str(reg.get("kind", "")) in NOT_ROOFS or bool(reg.get("no_roof_deck", false)):
 				continue
 			out.append([Vector2(float(cd.get("x", 0.0)), float(cd.get("z", 0.0))), cd,
 				float(cd["height"])])
 	if data.has_landmark_site and data.landmark_type != "none":
 		var entry := LocationData.entry_for_type(data.landmark_type)
 		if not entry.is_empty() and float(entry.get("height_m", 0.0)) > 0.0 \
-				and not str(entry.get("kind", "")) in NOT_ROOFS:
+				and not str(entry.get("kind", "")) in NOT_ROOFS and not bool(entry.get("no_roof_deck", false)):
 			out.append([WorldScale.xz_from_latlon(data.landmark_lat, data.landmark_lon,
 				data.latitude, data.longitude), entry, float(entry["height_m"])])
 	return out

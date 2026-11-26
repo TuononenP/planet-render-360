@@ -13,6 +13,9 @@ extends RefCounted
 ## Track centres nearer than this (metres) let two trams touch (the
 ## widest car is 2.65 m wide); twin tracks lie farther apart.
 const CLEAR_M := 2.9
+## Heavy-rail cars are 2.9–3.2 m wide, so switch/crossing conflict zones need
+## wider centre-to-centre clearance than street trams.
+const RAIL_CLEAR_M := 3.6
 ## Sample spacing along the routes (m); zones are padded by it.
 const STEP_M := 2.0
 ## Close stretches of two routes nearer than this along either (m) make
@@ -29,8 +32,8 @@ const LOOK_M := 120.0
 ## The zones between `routes` (distinct TramRoutes): each [route a,
 ## Vector2(from, to) along a, route b, Vector2(from, to) along b], arc
 ## lengths in metres.
-static func zones(routes: Array, m2u: float) -> Array:
-	var cell := CLEAR_M + STEP_M
+static func zones(routes: Array, m2u: float, clear_m: float = CLEAR_M) -> Array:
+	var cell := clear_m + STEP_M
 	# Samples by cell as [route index, s, point in metres].
 	var grid := {}
 	for i in routes.size():
@@ -52,7 +55,7 @@ static func zones(routes: Array, m2u: float) -> Array:
 			for dx in range(-1, 2):
 				for dz in range(-1, 2):
 					for f: Array in grid.get(key + Vector2i(dx, dz), []):
-						if int(f[0]) <= int(e[0]) or (e[2] as Vector2).distance_to(f[2]) >= CLEAR_M:
+						if int(f[0]) <= int(e[0]) or (e[2] as Vector2).distance_to(f[2]) >= clear_m:
 							continue
 						var pair := Vector2i(int(e[0]), int(f[0]))
 						if not close.has(pair):

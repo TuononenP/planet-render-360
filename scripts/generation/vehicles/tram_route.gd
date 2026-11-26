@@ -37,6 +37,11 @@ const DUP_STEP_M := 2.0
 const DUP_MIN_M := 4.0
 ## Half length of the chord pose_at() takes its heading from (m).
 const HEADING_M := 1.0
+## Maximum length (m) of a heavy-rail way tagged tunnel=yes that counts as a
+## surface station overbuild / bridge portal when running alongside mapped
+## platforms (e.g. Pasila station under Mall of Tripla & Pasilansilta).
+const PORTAL_MAX_M := 260.0
+const PORTAL_PLAT_M := 18.0
 
 ## The joined line, world XZ units.
 var points := PackedVector2Array()
@@ -51,16 +56,65 @@ var length_m := 0.0
 var _m2u := 1.0
 var _ground: GroundTruth
 
-## Routes over `data`'s track that `carries` accepts (Callable(rail) ->
-## bool; default: every tram way), longest first; with `one_per_rail` a
-## rail mapped twice carries one route (_distinct).
-static func chains(data: LocationData, ground: GroundTruth, m2u: float,
-		carries: Callable = Callable(), one_per_rail: bool = true) -> Array[TramRoute]:
-	var lines: Array = []
+## Heavy-rail ways tagged `tunnel=yes` that actually pass beneath a surface
+## station concourse or bridge overbuild alongside mapped platforms (not deep
+## underground tunnels): keyed by way reference so RailBuilder draws them and
+## TramRoute stitches continuous through-tracks across them.
+static func station_portals(data: LocationData, m2u: float) -> Dictionary:
+	var out := {}
+	if data == null or data.rail_platforms.is_empty():
+		return out
+	var plat_boxes: Array = []
+	var pad := PORTAL_PLAT_M * m2u
+	for raw in data.rail_platforms:
+		if not (raw is Dictionary):
+			continue
+		var pts: PackedVector2Array = (raw as Dictionary).get("points", PackedVector2Array())
+		if pts.size() < 2:
+			continue
+		var box := Rect2(pts[0], Vector2.ZERO)
+		for p in pts:
+			box = box.expand(p)
+		plat_boxes.append([box.grow(pad), pts])
+	if plat_boxes.is_empty():
+		return out
 	for r in data.railways:
-		if not (r is Dictionary) or bool((r as Dictionary).get("tunnel", false)):
+		if not (r is Dictionary) or not bool((r as Dictionary).get("tunnel", false)):
 			continue
 		var rail: Dictionary = r
+		if not TrainSpecs.carries(rail):
+			continue
+		var pts: PackedVector2Array = rail.get("points", PackedVector2Array())
+		if pts.size() < 2 or _polyline_length(pts) > PORTAL_MAX_M * m2u:
+			continue
+		var mid := pts[pts.size() / 2]
+		var hit := false
+		for pb: Array in plat_boxes:
+			if not (pb[0] as Rect2).has_point(mid):
+				continue
+			if _off_line(mid, pb[1]) <= pad:
+				hit = true
+				break
+		if hit:
+			out[rail] = true
+	return out
+
+## Routes over `data`'s track that `carries` accepts (Callable(rail) ->
+## bool; default: every tram way), longest first; with `one_per_rail` a
+## rail mapped twice carries one route (_distinct). With `include_portals`,
+## surface station-overbuild portal ways stitch continuously through stations
+## and heavy-rail bridge spans take their rail-head heights from RailDecks.
+static func chains(data: LocationData, ground: GroundTruth, m2u: float,
+		carries: Callable = Callable(), one_per_rail: bool = true,
+		include_portals: bool = false) -> Array[TramRoute]:
+	var portals := station_portals(data, m2u) if include_portals else {}
+	var lines: Array = []
+	for r in data.railways:
+		if not (r is Dictionary):
+			continue
+		var rail: Dictionary = r
+		if bool(rail.get("tunnel", false)) and not portals.has(rail):
+			continue
 		if carries.is_valid():
 			if not bool(carries.call(rail)):
 				continue
@@ -129,10 +183,55 @@ static func chains(data: LocationData, ground: GroundTruth, m2u: float,
 			route.cum.append(route.cum[k - 1] + route.points[k].distance_to(route.points[k - 1]))
 		route.length_m = route.cum[route.cum.size() - 1] / m2u
 		BridgeTramDeck.apply(route, data, m2u)
+		if include_portals and ground != null:
+			_apply_rail_decks(route, data, ground, m2u)
 		out.append(route)
 	out.sort_custom(func(a: TramRoute, b: TramRoute) -> bool:
 		return a.length_m > b.length_m)
 	return out
+
+## Populates `route.heights` on heavy-rail bridge segments using RailDecks so
+## moving trains cross rail viaducts at exact rail-head elevation.
+static func _apply_rail_decks(route: TramRoute, data: LocationData, ground: GroundTruth, m2u: float) -> void:
+	var has_bridge := false
+	for w in route.ways:
+		if bool((w as Dictionary).get("bridge", false)):
+			has_bridge = true
+			break
+	if not has_bridge:
+		return
+	var surf := RoadBuilder._Surface.new(data, ground)
+	var decks := RailDecks.of(data, surf, m2u)
+	var ys := route.heights
+	if ys.size() != route.points.size():
+		ys = PackedFloat32Array()
+		ys.resize(route.points.size())
+		ys.fill(NAN)
+	var i := 0
+	while i < route.ways.size():
+		if not bool((route.ways[i] as Dictionary).get("bridge", false)):
+			i += 1
+			continue
+		var j := i
+		while j + 1 < route.ways.size() and bool((route.ways[j + 1] as Dictionary).get("bridge", false)):
+			j += 1
+		var seg := PackedVector2Array()
+		var ok := true
+		for k in range(i, j + 2):
+			var p := route.points[k]
+			if not surf.inside(p):
+				ok = false
+				break
+			seg.append(p)
+		if ok and seg.size() >= 2:
+			var half := float((route.ways[i] as Dictionary).get("width_m", 3.3)) * m2u * 0.5
+			var deck := RoadBuilder.deck_profile(seg, surf, m2u, half, 0, false)
+			if deck.size() == seg.size():
+				deck = decks.level(seg, deck)
+				for k in seg.size():
+					ys[i + k] = deck[k] + RailBuilder.RAIL_HEIGHT_M * m2u
+		i = j + 1
+	route.heights = ys
 
 ## A route over the explicit line `line` (world XZ), `rails` holding the
 ## rail dict of the segment after each point: for a caller that walks
@@ -154,13 +253,18 @@ static func of(line: PackedVector2Array, rails: Array, ground: GroundTruth, m2u:
 	return route
 
 ## Ends of the tunnel ways `carries` accepts (world XZ units): where
-## track dives under.
-static func mouths(data: LocationData, carries: Callable = Callable()) -> PackedVector2Array:
+## track dives under. With `skip_portals`, surface station-overbuild portal
+## ways do not emit artificial tunnel mouths at station platforms.
+static func mouths(data: LocationData, carries: Callable = Callable(),
+		skip_portals: bool = false) -> PackedVector2Array:
+	var portals := station_portals(data, WorldScale.metres_to_units()) if skip_portals else {}
 	var out := PackedVector2Array()
 	for r in data.railways:
 		if not (r is Dictionary) or not bool((r as Dictionary).get("tunnel", false)):
 			continue
 		var rail: Dictionary = r
+		if portals.has(rail):
+			continue
 		if carries.is_valid():
 			if not bool(carries.call(rail)):
 				continue
