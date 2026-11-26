@@ -349,49 +349,60 @@ static func _band_mesh(data: LocationData, pos: PackedVector3Array,
 	var nrms := normals.slice(k0 * per, (k1 + 1) * per)
 	var cols := colors.slice(k0 * per, (k1 + 1) * per)
 	var loops := k1 - k0 + 1
-	var indices := PackedInt32Array()
-	for k in range(1, loops):
-		# Winding matches the shipped grid meshes (Godot front =
-		# clockwise): outer-first order, verified against the
-		# detailed mesh's geometric-normal sign in the T3.3 probe.
-		var inner := (k - 1) * per
-		var outer := k * per
-		for j in per:
-			var j1 := (j + 1) % per
-			indices.push_back(outer + j); indices.push_back(outer + j1); indices.push_back(inner + j)
-			indices.push_back(outer + j1); indices.push_back(inner + j1); indices.push_back(inner + j)
-	if skirt_u > 0.0:
+	var has_skirt := skirt_u > 0.0
+	if has_skirt:
 		# Outer skirt: same XZ as the edge loop, dropped, so the
 		# ring/far hand-off never shows a void sliver from any yaw.
 		var edge := (loops - 1) * per
-		var base := verts.size()
+		var old_n := verts.size()
+		verts.resize(old_n + per)
+		nrms.resize(old_n + per)
+		cols.resize(old_n + per)
 		for j in per:
 			var top: Vector3 = verts[edge + j]
-			verts.append(Vector3(top.x, top.y - skirt_u, top.z))
-			nrms.append(nrms[edge + j])
-			cols.append(cols[edge + j])
-		for j in per:
-			var j1 := (j + 1) % per
-			indices.push_back(edge + j); indices.push_back(base + j); indices.push_back(edge + j1)
-			indices.push_back(edge + j1); indices.push_back(base + j); indices.push_back(base + j1)
+			verts[old_n + j] = Vector3(top.x, top.y - skirt_u, top.z)
+			nrms[old_n + j] = nrms[edge + j]
+			cols[old_n + j] = cols[edge + j]
+	var indices := PackedInt32Array()
+	if FarSampler._native and ClassDB.class_has_method("FarKernels", "band_indices"):
+		indices = ClassDB.class_call_static("FarKernels", "band_indices", loops, per, has_skirt)
+	else:
+		for k in range(1, loops):
+			var inner := (k - 1) * per
+			var outer := k * per
+			for j in per:
+				var j1 := (j + 1) % per
+				indices.push_back(outer + j); indices.push_back(outer + j1); indices.push_back(inner + j)
+				indices.push_back(outer + j1); indices.push_back(inner + j1); indices.push_back(inner + j)
+		if has_skirt:
+			var edge := (loops - 1) * per
+			var base := loops * per
+			for j in per:
+				var j1 := (j + 1) % per
+				indices.push_back(edge + j); indices.push_back(base + j); indices.push_back(edge + j1)
+				indices.push_back(edge + j1); indices.push_back(base + j); indices.push_back(base + j1)
 	var fine: Dictionary = drapes[0] if drapes[0] != null else {}
 	var coarse: Dictionary = drapes[1] if drapes[1] != null else {}
 	indices = LandmarkTerrain.cut_indices(data, verts, indices)
-	# Typed locals for drape dict fields: avoid per-vertex Dictionary lookups.
-	var fine_empty: bool = fine.is_empty()
-	var coarse_empty: bool = coarse.is_empty()
 	var uvs := PackedVector2Array()
 	var uv2s := PackedVector2Array()
-	uvs.resize(verts.size())
-	uv2s.resize(verts.size())
-	for i in verts.size():
-		var v := verts[i]
-		# U/V once per vertex, reused for both drapes (bit-identical to per-drape global_px).
-		var uv_cache := FarSurface.merc_uv(data, v.x / m2u, v.z / m2u)
-		if not fine_empty:
-			uvs[i] = FarSurface.drape_uv_uv(fine, uv_cache.x, uv_cache.y)
-		if not coarse_empty:
-			uv2s[i] = FarSurface.drape_uv_uv(coarse, uv_cache.x, uv_cache.y)
+	if FarSampler._native and ClassDB.class_has_method("FarKernels", "band_drape_uvs"):
+		var uv_pair: Array = ClassDB.class_call_static("FarKernels", "band_drape_uvs", verts,
+			{"lat": data.latitude, "lon": data.longitude, "m2u": m2u}, fine, coarse)
+		uvs = uv_pair[0]
+		uv2s = uv_pair[1]
+	else:
+		var fine_empty: bool = fine.is_empty()
+		var coarse_empty: bool = coarse.is_empty()
+		uvs.resize(verts.size())
+		uv2s.resize(verts.size())
+		for i in verts.size():
+			var v := verts[i]
+			var uv_cache := FarSurface.merc_uv(data, v.x / m2u, v.z / m2u)
+			if not fine_empty:
+				uvs[i] = FarSurface.drape_uv_uv(fine, uv_cache.x, uv_cache.y)
+			if not coarse_empty:
+				uv2s[i] = FarSurface.drape_uv_uv(coarse, uv_cache.x, uv_cache.y)
 	return FarSurface.drape_mesh(verts, nrms, cols, uvs, uv2s, indices,
 		fine.get("texture", null), coarse.get("texture", null), false, data)
 

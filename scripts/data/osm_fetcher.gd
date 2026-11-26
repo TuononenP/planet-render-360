@@ -1,12 +1,8 @@
 class_name OsmFetcher
 extends Node
 
-## Real buildings + roads + water + trees from OpenStreetMap via Overpass.
-## Free, no key, direct from device; responses cached in user://cache.
-## v2 (T2.3): tiered per-layer queries (800 m detailed + a preset-scaled
-## low-detail ring), full footprint polygons, and rich tags normalised
-## into the LocationData §2.4–§2.6 shapes — generation never sees raw
-## OSM JSON. See docs/data-source-register.md.
+## Real buildings + roads + water + trees from OpenStreetMap via Overpass/Postpass.
+## Responses cached in user://cache; parsed into LocationData §2.4–§2.6 shapes.
 
 signal succeeded(buildings: Array, roads: Array, land: Array, landmarks: Array)
 ## Closure W2 companion: extras the frozen 4-arg signal cannot carry.
@@ -527,22 +523,15 @@ static func _mentions_shores(text: String) -> bool:
 static func _mentions_buildings(text: String) -> bool:
 	return text.contains("\"building\"")
 
-## A ring payload is usable when it is valid JSON with an element list
-## (empty is fine — the ring carries majors only, never buildings).
+## A payload is usable when it is valid JSON with an element list.
 static func _payload_usable(text: String) -> bool:
 	var parsed: Variant = JSON.parse_string(text)
 	return parsed is Dictionary and parsed.get("elements", null) is Array \
 		and str(parsed.get("remark", "")).strip_edges() == ""
 
-## Transient failures are worth another instance: any transport
-## error (timeout, cannot connect, ...) or a 429/5xx from an
-## overloaded server. A 403 is an instance's access policy, and a 406 is
-## Overpass's rate limit, so try a different public mirror; malformed
-## queries (400) still stop.
+## Transient failures are worth another instance (transport errors, 403/406/429/5xx).
 static func is_retryable(result: int, code: int) -> bool:
-	if result != HTTPRequest.RESULT_SUCCESS:
-		return true
-	return code in [403, 406, 429, 500, 502, 503, 504]
+	return result != HTTPRequest.RESULT_SUCCESS or code in [403, 406, 429, 500, 502, 503, 504]
 
 ## One instance returning neither buildings nor shore geometry is not authoritative: it may lag
 ## replication or hold a partial extract, so the payload is rejected and
@@ -738,9 +727,14 @@ func _on_postpass_done(result: int, code: int, _h: PackedStringArray, body: Pack
 	var gen := _parse_gen
 	var lat := _pending_lat
 	var lon := _pending_lon
+	var pp_path := CacheStore.osm_postpass_path(lat, lon, DETAILED_RADIUS_M)
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
-		_on_postpass_converted.call_deferred(gen,
-			_with_shores(PostpassFallback.to_overpass_json(body), lat, lon)))
+		var conv := _with_shores(PostpassFallback.to_overpass_json(body), lat, lon)
+		if int(conv["buildings"]) > 0 or conv["shores"]:
+			var stamped := PostpassFallback.stamp_pois(str(conv["json"]))
+			conv["json"] = stamped
+			conv["cached_path"] = pp_path if AtomicFile.write_text(pp_path, stamped) else ""
+		_on_postpass_converted.call_deferred(gen, conv))
 
 ## Marks a converted fallback payload with no buildings that still maps a
 ## shore (a harbour, a lake edge), which Overpass's own check accepts too.
@@ -759,13 +753,13 @@ func _on_postpass_converted(gen: int, converted: Dictionary) -> void:
 	if int(converted["buildings"]) == 0 and not converted["shores"]:
 		_postpass_failed(NO_BUILDINGS)
 		return
-	_detailed_text = PostpassFallback.stamp_pois(str(converted["json"]))
+	_detailed_text = str(converted["json"])
 	_detailed_cached = false
 	_from_postpass = true
-	# Under its own key, not osm_path: an Overpass answer and a Postpass
-	# one at the same spot stay apart (OsmNearbyCache ranks them).
-	_write_cache(CacheStore.osm_postpass_path(_pending_lat, _pending_lon, DETAILED_RADIUS_M),
-		_detailed_text)
+	var cpath := str(converted.get("cached_path", ""))
+	if cpath != "":
+		CacheStore.note_written(cpath)
+		OsmNearbyCache.note(cpath)
 	_detailed_done()
 
 ## Stops waiting on the network for the detailed layer (a streamed
@@ -944,15 +938,18 @@ func _finish() -> void:
 	var detailed := _detailed_text
 	var ring := _ring_text
 	var poi := _poi_text
-	if _transit_text != "":
-		poi = merge_payloads(poi, _transit_text)
-	if _bridge_text != "":
-		poi = merge_payloads(poi, _bridge_text)
-	if aero_text != "":
-		poi = merge_payloads(poi, aero_text)
+	var transit := _transit_text
+	var bridge := _bridge_text
 	var store_in_cache := cache_parsed
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
-		var parsed := OsmParseCache.load_or_parse(ckey, func() -> Dictionary: return parse_features(merge_payloads(merge_payloads(detailed, ring), poi), lat, lon))
+		var extra := poi
+		if transit != "":
+			extra = merge_payloads(extra, transit)
+		if bridge != "":
+			extra = merge_payloads(extra, bridge)
+		if aero_text != "":
+			extra = merge_payloads(extra, aero_text)
+		var parsed := OsmParseCache.load_or_parse(ckey, func() -> Dictionary: return parse_features(merge_payloads(merge_payloads(detailed, ring), extra), lat, lon))
 		if store_in_cache:
 			OsmParseCache.store(ckey, parsed)
 		_on_parsed.call_deferred(gen, parsed))

@@ -234,6 +234,12 @@ func _ready() -> void:
 			_picker.toast(title, message, tone))
 	_view.pref_changed.connect(func(key: String, value: Variant) -> void:
 		_settings.set_pref(key, value))
+	_view.preset_change_requested.connect(func(p: int) -> void:
+		_settings.set_preset(p)
+		_apply_preset(p)
+		if _settings_screen != null:
+			_settings_screen._refresh()
+		ViewTools.say(_view, "Switched to %s quality" % RenderSettings.preset_name(p), "", "good"))
 	_view.snapshot_ready.connect(func(lat: float, lon: float, image: Image) -> void:
 		if capture_mode:
 			return
@@ -504,11 +510,17 @@ func _retry_view() -> Dictionary:
 	view.merge(ViewLink.to_view(camera), true)
 	return view
 
-## Memory nearly out (MemoryGuard EMERGENCY): one preset lower from the
-## next stretch and the next place on, for this session only (a brief
-## squeeze must not lower the person's choice for good), said once.
+## Memory nearly out (MemoryGuard EMERGENCY): never silently drop Ultra to
+## High — ask the user with an actionable badge instead. Lower presets on
+## constrained mobile devices still step down once to avoid OS termination.
 func _on_memory_level(_level: int) -> void:
 	if not MemoryGuard.take_preset_drop() or _preset() <= RenderSettings.Preset.FAST:
+		return
+	if _preset() == RenderSettings.Preset.ULTRA:
+		ViewTools.suggest_high_quality(_view,
+			"Ultra is using a lot of memory here. Switch to High for smoother flying?")
+		return
+	if MemoryBudget.platform() == "desktop":
 		return
 	_memory_ceiling = _preset() - 1
 	_picker.set_quality_preset(_memory_ceiling)

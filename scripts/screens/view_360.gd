@@ -16,6 +16,8 @@ signal snapshot_ready(lat: float, lon: float, image: Image)
 ## A message for the user while the view is hidden (a video finishing
 ## after they left): main shows it on the screen they are on.
 signal toast_requested(title: String, message: String, tone: String)
+## Emitted when the user accepts an in-view quality prompt (e.g. Switch to High).
+signal preset_change_requested(preset: int)
 
 var _viewport: SubViewport
 var _container: SubViewportContainer
@@ -100,6 +102,8 @@ var _minimap: MiniMap
 var _fps: FpsCounter
 var _date_picker: DatePicker
 var _toast: Toast
+var _toast_action: Callable = Callable()
+var _high_suggested := false
 var _stream_badge: StreamBadge
 var _photo_busy := false
 ## Records the view as a video (ViewTools); null where that can't be done.
@@ -199,6 +203,7 @@ func _ready() -> void:
 	_governor.environment = _atmos.environment
 	_governor.haze = _haze
 	_governor.set_preset(_quality_preset)
+	_governor.suggest_high.connect(func() -> void: ViewTools.suggest_high_quality(self))
 	sync_haze()
 	_weather = WeatherFetcher.new()
 	add_child(_weather)
@@ -296,6 +301,8 @@ func _build_3d() -> void:
 ## render scale / shadow ceiling.
 func set_quality_preset(preset_value: int) -> void:
 	_quality_preset = RenderSettings.clamp_preset(preset_value)
+	if _quality_preset == RenderSettings.Preset.ULTRA:
+		_high_suggested = false
 	if _atmos != null:
 		_atmos.set_quality(_quality_preset)
 	Precipitation.set_quality(_precip, _quality_preset)

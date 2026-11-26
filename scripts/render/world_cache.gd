@@ -327,11 +327,11 @@ const PUMP_FRAME_SHARE := 0.25
 const PUMP_MAX_US := 33000
 const HURRY_US := 40000
 ## A background build or save (the streamer's way ahead, while the camera
-## moves) takes a small share instead, so frames stay smooth; it lands
-## later, which the streamer's adaptive trigger measures and allows for.
-const BG_PUMP_US := 1500
-const BG_FRAME_SHARE := 0.08
-const BG_MAX_US := 4000
+## moves) takes a modest share so frames stay smooth without starving
+## landmark/shader RenderingServer flushes.
+const BG_PUMP_US := 2500
+const BG_FRAME_SHARE := 0.14
+const BG_MAX_US := 6000
 ## A background build the camera is about to run out of ground for
 ## (BuildAbort.urgent) takes a foreground build's share, up to this.
 const BG_URGENT_MAX_US := 12000
@@ -365,6 +365,13 @@ static func _save_in_progress(path: String) -> bool:
 	if previous is Thread and previous.is_alive():
 		return true
 	_save_threads.erase(path)
+	return false
+
+## True while any background WorldCache save thread is actively writing.
+static func saving_any() -> bool:
+	for path in _save_threads.keys():
+		if _save_in_progress(str(path)):
+			return true
 	return false
 
 ## Whether a build packs its world for a save. A place opened in the

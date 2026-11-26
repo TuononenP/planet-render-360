@@ -129,6 +129,10 @@ const WARM_FARCITY_MIN_S := 10.0
 ## city, the sharper inner mosaic), then builds without them; the
 ## fetch-ahead of the next stretch fills their caches.
 const HURRY_EXTRAS_S := 4.0
+## On a live streamed run, cap how long to wait for non-essential OSM extras
+## (ring, bridges, POIs) after the detailed layer has landed.
+const STREAM_EXTRAS_WAIT_S := 2.0
+const HURRY_OSM_EXTRAS_S := 1.0
 ## On a live streamed run, how long to wait for the sharper inner mosaic once
 ## the main satellite mosaic is in hand (the ortho finishes caching in background).
 const STREAM_INNER_WAIT_S := 3.0
@@ -186,6 +190,9 @@ var _prewarm_task := -1
 var _ground_data: LocationData = null
 var _ground: GroundTruth = null
 var _ground_abort: BuildAbort = null
+var _promoted := false
+var _warm_landed := false
+var _run_preset := RenderSettings.Preset.HIGH
 
 func _ready() -> void:
 	_fetcher = DemFetcher.new()
@@ -385,16 +392,29 @@ func cancel() -> void:
 		PostpassGate.release_low()
 	if _ground_abort != null:
 		_ground_abort.requested = true
+	for f: Object in [_osm, _farcity, _city, _climate, _landcover]:
+		if f != null:
+			f.cancel()
+
+## Promotes an in-flight warm_only fetch-ahead pipeline to a live streamed run
+## so WorldStreamer adopts its network progress instead of re-fetching.
+func promote_to_live(fallback_far: Dictionary = {}) -> bool:
+	if _cancelled or not warm_only or _warm_landed:
+		return false
+	warm_only = false
+	_promoted = true
+	fallback_far_city = fallback_far
+	set_meta(PostpassGate.LOW_META, false)
+	PostpassGate.hold_low()
+	PostpassGate.promote_subtree(self)
 	if _osm != null:
-		_osm.cancel()
+		_osm.cache_parsed = false
 	if _farcity != null:
-		_farcity.cancel()
-	if _city != null:
-		_city.cancel()
-	if _climate != null:
-		_climate.cancel()
-	if _landcover != null:
-		_landcover.cancel()
+		_farcity.warm_only = false
+	if _prewarm_task < 0:
+		var preset := _run_preset
+		_prewarm_task = WorkerThreadPool.add_task(func() -> void: BuildPrewarm.run(preset), false, "BuildPrewarm")
+	return true
 
 ## Frees a finished streamed pipeline immediately unless an optional layer
 ## (_inner orthophoto or _farcity) broke out early and is still downloading
@@ -434,6 +454,9 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		quality_preset: int = RenderSettings.Preset.HIGH, focus: Dictionary = {},
 		view: Dictionary = {}) -> void:
 	_cancelled = false
+	_promoted = false
+	_warm_landed = false
+	_run_preset = quality_preset
 	var data := LocationData.new()
 	data.focus = focus
 	# A quick-pick preset's pin opens on its curated view, whichever
@@ -569,6 +592,29 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	if _cancelled:
 		cancelled.emit()
 		return
+	if _promoted:
+		if data.quality_preset > RenderSettings.Preset.FAST and not used_satellite:
+			_sat.textures = true
+			_inner.set_textures(true)
+			_sat_done = false
+			_sat_texture = null
+			_sat_image = null
+			_sat.fetch(data.latitude, data.longitude, RenderSettings.satellite_zoom_for(data.quality_preset),
+				RenderSettings.satellite_span_for(data.quality_preset, data.latitude))
+			_inner.fetch(data.latitude, data.longitude, data.quality_preset)
+			await _await_satellite(data)
+		if used_real_dem and not legacy_squash and data.dem_rings.is_empty():
+			_farfield.textures = true
+			_farfield_done = false
+			_farfield_rings = []
+			_farfield_drapes = []
+			_farfield.fetch(data.latitude, data.longitude, data.quality_preset > RenderSettings.Preset.FAST)
+			await _apply_far_field(data)
+		if _ground_task < 0 and _ground == null and not _cancelled:
+			_start_ground(data)
+		if _cancelled:
+			cancelled.emit()
+			return
 	# T3.7: far drapes are the same Esri source (register row).
 	if not used_satellite and not data.far_drapes.is_empty():
 		_credits[1] = IMAGERY_CREDIT
@@ -598,6 +644,9 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	if _cancelled:
 		cancelled.emit()
 		return
+	_warm_landed = true
+	if not warm_only:
+		PostpassGate.release_low()
 	progress_changed.emit(1.0, "Done")
 	data.data_notes = DataNotes.describe(degraded, data.quality_preset > RenderSettings.Preset.FAST)
 	finished.emit(data)
@@ -848,8 +897,9 @@ func _await_osm(data: LocationData) -> void:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
 		held = held + get_process_delta_time() if _osm.waiting_on_extras() else 0.0
-		if hurry and held >= HURRY_EXTRAS_S:
-			print("Streamed build is late: map data without the ring, bridge outlines and POIs")
+		var extras_cap := HURRY_OSM_EXTRAS_S if hurry else (STREAM_EXTRAS_WAIT_S if background and not warm_only else INF)
+		if held >= extras_cap:
+			print("Streamed build: map data without waiting for ring, bridge outlines and POIs (%.1f s)" % held)
 			_osm.settle()
 	if not _osm_done and background and not _cancelled:
 		# The way ahead cannot wait minutes on a slow Overpass: a saved

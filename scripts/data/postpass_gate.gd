@@ -108,6 +108,32 @@ static func leave_subtree(root: Node) -> void:
 		_busy = null
 		_next.call_deferred()
 
+## Elevates any queued Postpass requests under `root` from fetch-ahead (low)
+## to live priority when StreamScout's warm pipeline is adopted by WorldStreamer.
+static func promote_subtree(root: Node) -> void:
+	if root == null or not is_instance_valid(root):
+		return
+	var moved: Array = []
+	for i in range(_queue.size() - 1, -1, -1):
+		var o: Variant = _queue[i]["owner"]
+		if o is Node and (o == root or root.is_ancestor_of(o as Node)):
+			var entry: Dictionary = _queue[i]
+			entry["low"] = false
+			_queue.remove_at(i)
+			moved.push_front(entry)
+	for entry: Dictionary in moved:
+		if bool(entry.get("urgent", false)):
+			_queue.push_front(entry)
+		else:
+			var at := _queue.size()
+			for i in _queue.size():
+				if _queue[i]["low"]:
+					at = i
+					break
+			_queue.insert(at, entry)
+	if _busy == null and not _queue.is_empty():
+		_next.call_deferred()
+
 ## The server refused (429/503): no Postpass request for REFUSED_PAUSE_S.
 static func note_refused() -> void:
 	_paused_until_msec = Time.get_ticks_msec() + int(REFUSED_PAUSE_S * 1000.0)

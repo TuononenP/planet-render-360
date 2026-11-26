@@ -14,8 +14,11 @@ const VEER_FETCH_HOLD_S := 4.0
 ## heading counts as a veer (gentle curves keep the stretch).
 const VEER_CONE_DEG := 55.0
 ## Cooldown after a heading-induced drop before starting a fresh build
-## (bypassed when already near the detailed edge).
+## (bypassed when already near the detailed edge). Scaled down at high drone
+## speeds so 300 km/h flight never loses ~167 m waiting to re-trigger.
 const DROP_COOLDOWN_S := 2.0
+const FAST_MPS := 50.0
+const FAST_DROP_COOLDOWN_S := 0.4
 
 var stale_s := 0.0
 var cooldown_s := 0.0
@@ -27,9 +30,9 @@ func reset() -> void:
 func tick_cooldown(delta: float) -> void:
 	cooldown_s = maxf(cooldown_s - delta, 0.0)
 
-func note_drop() -> void:
+func note_drop(speed_mps := 0.0) -> void:
 	stale_s = 0.0
-	cooldown_s = DROP_COOLDOWN_S
+	cooldown_s = FAST_DROP_COOLDOWN_S if speed_mps >= FAST_MPS else DROP_COOLDOWN_S
 
 func cooling_down(near_edge: bool) -> bool:
 	return cooldown_s > 0.0 and not near_edge

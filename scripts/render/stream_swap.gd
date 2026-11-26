@@ -26,10 +26,9 @@ static func seat(v: View360, data: LocationData, new_xz: Vector2, agl: float) ->
 	v._atmos.set_coast(v._ground.render_y(0.0), data.waterways.any(func(w: Variant) -> bool:
 		return w is Dictionary and str((w as Dictionary).get("class", "")) == "coastline"))
 	v._atmos.set_probe_origin(v._rig.position)
-	if v._horizon != null:
-		v._horizon.set_place(data, v._ground)
-	if v._minimap != null:
-		v._minimap.set_place(data)
+	# Defer non-camera-critical UI/horizon updates off the swap frame.
+	var ground := v._ground
+	_defer_post_swap.call_deferred(v, data, ground)
 	v._walk._spans_for = null
 	v._walk._near_at = Vector2.INF
 	v._walk._near.clear()
@@ -43,3 +42,12 @@ static func seat(v: View360, data: LocationData, new_xz: Vector2, agl: float) ->
 		v._drone._agl = clampf(agl, ViewDrone.AGL_MIN_M, ViewDrone.AGL_MAX_M)
 	else:
 		v._drone._resync = true
+
+static func _defer_post_swap(v: View360, data: LocationData, ground: GroundTruth) -> void:
+	if not is_instance_valid(v) or v._data != data:
+		return
+	if v._horizon != null:
+		v._horizon.set_place(data, ground)
+	if v._minimap != null:
+		v._minimap.set_place(data)
+	ViewChrome.show_place(v, data)

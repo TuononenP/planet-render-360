@@ -41,6 +41,10 @@ var plan2_ll := Vector2.INF
 ## centre from the moment its fetch starts, given up or not).
 var fetched: Array[Vector2] = []
 var _warms: Array[GenerationPipeline] = []
+## Coordinates (lat/lon) of each active warm pipeline, and its bound callbacks
+## so take_warm() can promote and detach it cleanly.
+var _warm_ll: Dictionary = {}
+var _warm_cbs: Dictionary = {}
 ## Ring centres still to fetch (lat/lon), next first.
 var _ring: Array[Vector2] = []
 
@@ -138,27 +142,47 @@ func survey(lat: float, lon: float, heading: Vector2) -> void:
 
 ## Starts the plan ahead, then the next ring fetch while a pipeline slot is
 ## free and the streamer's own build is not on the network (`net_busy`).
-func pump(v: View360, net_busy: bool) -> void:
-	if warm_max() == 0 and not _warms.is_empty():
+## Throttles warm concurrency under memory pressure so scouts never push
+## dense city flights into MemoryGuard TIGHT/EMERGENCY.
+func pump(v: View360, net_busy: bool, urgent_busy: bool = false) -> void:
+	var cap := warm_max()
+	if cap == 0 and not _warms.is_empty():
 		# Memory is short: each holds a stretch's data. The ring stays,
 		# to be fetched once there is room again.
 		for w in _warms.duplicate():
 			_end_warm(w, true)
-	if _ring.is_empty() or warm_max() == 0:
+	if _ring.is_empty() or cap == 0 or net_busy or urgent_busy or WorldCache.saving_any():
 		return
-	# The plan ahead starts with the build it follows (its Postpass requests
-	# queue behind the build's own, PostpassGate), so it is fetched by the
-	# time that build lands, and beside a ring fetch (the oldest stops when
-	# the slots are full). The ring waits for the build's data, one at a time.
 	var ll: Vector2 = _ring[0]
-	if net_busy or (ll != plan_ll and not _warms.is_empty()):
+	var is_plan := ll == plan_ll or ll == plan2_ll
+	if (not is_plan and not _warms.is_empty()) or (is_plan and _warms.size() >= cap):
 		return
 	_ring.pop_front()
 	if ll in known:
 		return
-	while _warms.size() >= warm_max():
+	while _warms.size() >= cap:
 		_end_warm(_warms[0], true)
-	_warm(v, ll, "a stretch ahead" if ll == plan_ll or ll == plan2_ll else "a stretch around")
+	_warm(v, ll, "a stretch ahead" if is_plan else "a stretch around")
+
+## Adopts an in-flight warm pipeline for `ll`, promoting it to a live streamed
+## run so WorldStreamer keeps its in-flight network progress instead of
+## re-fetching from scratch. Returns null when none is running for `ll`.
+func take_warm(ll: Vector2, fallback_far: Dictionary = {}) -> GenerationPipeline:
+	for w in _warms:
+		if is_instance_valid(w) and _warm_ll.get(w, Vector2.INF) == ll:
+			if not w.promote_to_live(fallback_far):
+				return null
+			var cbs: Array = _warm_cbs.get(w, [])
+			if cbs.size() == 2:
+				if w.finished.is_connected(cbs[0]):
+					w.finished.disconnect(cbs[0])
+				if w.cancelled.is_connected(cbs[1]):
+					w.cancelled.disconnect(cbs[1])
+			_warms.erase(w)
+			_warm_ll.erase(w)
+			_warm_cbs.erase(w)
+			return w
+	return null
 
 func _warm(v: View360, ll: Vector2, what: String) -> void:
 	note(ll)
@@ -167,8 +191,9 @@ func _warm(v: View360, ll: Vector2, what: String) -> void:
 	warm.warm_only = true
 	v.add_child(warm)
 	_warms.append(warm)
+	_warm_ll[warm] = ll
 	var t0 := Time.get_ticks_msec()
-	warm.finished.connect(func(_d: LocationData) -> void:
+	var on_done := func(_d: LocationData) -> void:
 		WorldStreamer._log("STREAM warm: %s fetched in %.1f s" % [what,
 			(Time.get_ticks_msec() - t0) / 1000.0])
 		if warm.map_landed():
@@ -176,12 +201,17 @@ func _warm(v: View360, ll: Vector2, what: String) -> void:
 			fetched.append(ll)
 			while fetched.size() > KNOWN_MAX:
 				fetched.pop_front()
-		_end_warm(warm, false))
-	warm.cancelled.connect(func() -> void: _end_warm(warm, false))
+		_end_warm(warm, false)
+	var on_cancel := func() -> void: _end_warm(warm, false)
+	_warm_cbs[warm] = [on_done, on_cancel]
+	warm.finished.connect(on_done)
+	warm.cancelled.connect(on_cancel)
 	warm.run(ll.x, ll.y, "", v._quality_preset)
 
 func _end_warm(warm: GenerationPipeline, stop_it: bool) -> void:
 	_warms.erase(warm)
+	_warm_ll.erase(warm)
+	_warm_cbs.erase(warm)
 	if is_instance_valid(warm):
 		if stop_it:
 			warm.cancel()
@@ -189,17 +219,27 @@ func _end_warm(warm: GenerationPipeline, stop_it: bool) -> void:
 
 ## What the streamer's start line says of a centre picked from here:
 ## `planned` it was the plan ahead, else one known from before.
-func start_note(ll: Vector2, planned: bool, reused: bool) -> String:
+func start_note(ll: Vector2, planned: bool, reused: bool, adopted := false) -> String:
+	if adopted:
+		return ", adopted fetch ahead"
 	if planned:
 		return ", fetched ahead" if ll in fetched else ", fetch ahead not landed"
 	return ", reused" if reused else ""
 
 ## Fetch-only pipelines at once, at most (the oldest stops for a newer
 ## plan, so a twisting flight cannot pile them up): the device's tier
-## (MemoryBudget.WARM_MAX), none while MemoryGuard is short of memory.
+## (MemoryBudget.WARM_MAX), throttled early under memory pressure so scouts
+## never trip MemoryGuard TIGHT/EMERGENCY during dense city builds.
 static func warm_max() -> int:
-	return 0 if MemoryGuard.level >= MemoryGuard.Level.TIGHT \
-		else MemoryBudget.WARM_MAX[MemoryBudget.tier()]
+	if MemoryGuard.level >= MemoryGuard.Level.TIGHT:
+		return 0
+	var base: int = MemoryBudget.WARM_MAX[MemoryBudget.tier()]
+	if DisplayServer.get_name() == "headless":
+		return base
+	var u := MemoryBudget.usage()
+	if u >= 0.65:
+		return mini(base, 1)
+	return base
 
 ## Stops every fetch and the ring (the plan is forgotten too).
 func stop() -> void:

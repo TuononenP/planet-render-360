@@ -40,11 +40,11 @@ func _run() -> void:
 	_check(not is_instance_valid(parked_detached), "ParkedWorlds.forget frees detached parked world")
 	_check(pw.size() == 0, "ParkedWorlds.forget empties list")
 
-	# 3. High-RAM desktop cap keeps MemoryGuard responsive on 64-128 GB Macs.
-	_check(MemoryBudget.limit_for("desktop", 4 * GB, -1, 128 * GB) == MemoryBudget.DESKTOP_MAX_LIMIT,
-		"128 GB desktop caps at DESKTOP_MAX_LIMIT")
-	_check(MemoryBudget.limit_for("desktop", 4 * GB, -1, 16 * GB) == 12 * GB,
-		"16 GB desktop still plans on 12 GB")
+	# 3. Desktop plans on 50% of physical RAM without a low fixed cap.
+	_check(MemoryBudget.limit_for("desktop", 4 * GB, -1, 128 * GB) == 64 * GB,
+		"128 GB desktop plans on 50% of RAM (64 GB)")
+	_check(MemoryBudget.limit_for("desktop", 4 * GB, -1, 16 * GB) == 8 * GB,
+		"16 GB desktop plans on 50% of RAM (8 GB)")
 
 	# 4. SharedShader & StaticCaches trim / release run cleanly and empty caches.
 	var sh := SharedShader.of("shader_type spatial;")

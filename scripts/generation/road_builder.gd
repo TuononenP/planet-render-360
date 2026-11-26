@@ -65,7 +65,7 @@ const FINISH_HEX := {"asphalt": "#585552", "paving": "#8e887c",
 	"sett": "#8a8478", "gravel": "#9a8c72", "deck": "#a39d92"}
 ## Road-list chunks built in parallel (fixed, so the mesh never depends
 ## on the core count).
-const CHUNKS := 4
+const CHUNKS := 8
 ## A marked crossing is at least this wide (m), and drawn over the
 ## carriageways (rank 2 asphalt tops out at layer ~6.8).
 const CROSSING_MIN_M := 4.0
@@ -99,12 +99,31 @@ static func build_roads(data: LocationData, ground: GroundTruth = null, abort: B
 	var t := Time.get_ticks_msec()
 	_roads(root, data, ground, abort)
 	t = StreetProps._lap(timings, "roads", t)
-	RoadDecals.build(root, data, ground)
-	t = StreetProps._lap(timings, "decals", t)
-	KerbBuilder.build(root, data, ground)
-	t = StreetProps._lap(timings, "kerbs", t)
-	RailBuilder.build(root, data, ground, abort)
-	t = StreetProps._lap(timings, "rails", t)
+	if OS.get_thread_caller_id() != OS.get_main_thread_id() and (abort == null or not abort.requested):
+		var d_root := Node3D.new()
+		var k_root := Node3D.new()
+		var r_root := Node3D.new()
+		var td := WorkerThreadPool.add_task(func() -> void: RoadDecals.build(d_root, data, ground), false, "RoadDecals")
+		var tk := WorkerThreadPool.add_task(func() -> void:
+			PbrTextures.push_stage(MaterialLibrary._pbr_mats, 4)
+			KerbBuilder.build(k_root, data, ground)
+			PbrTextures.pop_stage(), false, "Kerbs")
+		RailBuilder.build(r_root, data, ground, abort)
+		WorkerThreadPool.wait_for_task_completion(td)
+		WorkerThreadPool.wait_for_task_completion(tk)
+		for sub_root: Node3D in [d_root, k_root, r_root]:
+			for c in sub_root.get_children():
+				sub_root.remove_child(c)
+				root.add_child(c)
+			sub_root.free()
+		t = StreetProps._lap(timings, "extras_par", t)
+	else:
+		RoadDecals.build(root, data, ground)
+		t = StreetProps._lap(timings, "decals", t)
+		KerbBuilder.build(root, data, ground)
+		t = StreetProps._lap(timings, "kerbs", t)
+		RailBuilder.build(root, data, ground, abort)
+		t = StreetProps._lap(timings, "rails", t)
 	print("ROADS timings ms ", timings)
 	return root
 

@@ -121,8 +121,37 @@ static func say(v: View360, title: String, message: String = "", tone: String = 
 		return
 	if v._toast == null:
 		return
+	_clear_toast_action(v)
 	v._toast.show_message(title, message, tone)
 	ViewChrome.layout(v)
+
+## Shows an actionable toast badge in the 360 view; pressing `action` runs `on_action`.
+static func prompt(v: View360, title: String, message: String, tone: String,
+		action: String, on_action: Callable) -> void:
+	if not v.is_visible_in_tree() or v._toast == null:
+		return
+	_clear_toast_action(v)
+	if on_action.is_valid():
+		v._toast_action = on_action
+		v._toast.action_pressed.connect(on_action)
+	v._toast.show_message(title, message, tone, action)
+	ViewChrome.layout(v)
+
+static func _clear_toast_action(v: View360) -> void:
+	if v._toast != null and v._toast_action.is_valid() \
+			and v._toast.action_pressed.is_connected(v._toast_action):
+		v._toast.action_pressed.disconnect(v._toast_action)
+	v._toast_action = Callable()
+
+## Asks the user once per session whether to switch from Ultra to High when
+## performance or memory is tight, instead of silently lowering Ultra.
+static func suggest_high_quality(v: View360, reason: String = "") -> void:
+	if v == null or v._quality_preset != RenderSettings.Preset.ULTRA or v._high_suggested:
+		return
+	v._high_suggested = true
+	var msg := reason if reason != "" else "Ultra is running slowly here. Switch to High for smoother flying?"
+	prompt(v, "Switch to High quality?", msg, "caution", "Switch to High", func() -> void:
+		v.preset_change_requested.emit(RenderSettings.Preset.HIGH))
 
 # --- Date ---
 

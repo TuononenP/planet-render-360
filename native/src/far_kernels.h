@@ -30,6 +30,15 @@ public:
 	// `water` holds the PolygonIndex objects of the OSM water.
 	static Array ring_colors(const PackedVector3Array &pos, int loops, int per,
 			const Dictionary &params, const Array &water);
+	// FarTerrainBuilder._band_mesh's triangle indices (with optional outer skirt).
+	static PackedInt32Array band_indices(int loops, int per, bool has_skirt);
+	// FarTerrainBuilder._band_mesh's drape UV / UV2 arrays: [uvs, uv2s].
+	static Array band_drape_uvs(const PackedVector3Array &verts, const Dictionary &params,
+			const Dictionary &fine, const Dictionary &coarse);
+	// TerrainBuilder._terrain_mesh's satellite-draped vertex grid + indices:
+	// [verts, normals, colors, tangents, uvs, water_levels, indices].
+	static Array terrain_grid_sat(int size, double step, const PackedFloat32Array &post_heights,
+			const Dictionary &params, const Array &drapes, Object *shore_domains);
 };
 
 } // namespace godot

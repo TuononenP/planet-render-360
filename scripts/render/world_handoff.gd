@@ -171,17 +171,20 @@ func busy() -> bool:
 		or not _revealing.is_empty()
 
 ## Assigns a top-level world child to a swap-reveal wave (0 = immediate on
-## swap frame, 1 = Buildings/Landmarks, 2 = Vegetation/Canopy, 3 = Props/vehicles).
+## swap frame: Terrain/Water/Roads/Buildings/Landmarks, 1 = FarCity,
+## 2 = Vegetation/Canopy, 3 = Props/vehicles). Uses `lod_layer` metadata so
+## flattened/merged children (LodCell_*, FarCity_*, VegTrees_*) match properly.
 static func _reveal_wave(node: Node) -> int:
 	if not (node is Node3D) or not (node as Node3D).visible:
 		return 0
 	var n := str(node.name)
-	if n == "Buildings" or n.begins_with("Landmark"):
+	var layer := str(node.get_meta("lod_layer", n))
+	if layer == "FarCity" or n.begins_with("FarCity"):
 		return 1
-	if n == "Vegetation" or n.begins_with("FarCanopy") or n.begins_with("VegTrees") \
+	if layer == "Vegetation" or n == "Vegetation" or n.begins_with("FarCanopy") or n.begins_with("VegTrees") \
 			or n.begins_with("GroundCover") or n.begins_with("GrassCarpet"):
 		return 2
-	if n in ["Props", "Trams", "Trains", "Boats", "Cars", "Vessels", "Aircraft"]:
+	if layer == "Props" or n in ["Props", "Trams", "Trains", "Boats", "Cars", "Vessels", "Aircraft"]:
 		return 3
 	return 0
 

@@ -315,8 +315,13 @@ func _finish() -> void:
 		return
 	_water_bodies = {}
 	if textures:
-		for d in out["drapes"]:
+		for i in (out["drapes"] as Array).size():
+			var d: Dictionary = out["drapes"][i]
 			d["texture"] = ImageTexture.create_from_image(d["image"])
+			if is_inside_tree() and i + 1 < (out["drapes"] as Array).size():
+				await get_tree().process_frame
+				if gen != _fetch_gen:
+					return
 	water_mask = out["water"]
 	timings = {"fetch_ms": fetch_ms, "assemble_ms": Time.get_ticks_msec() - t1,
 		"tiles": _queue.size(), "cached": _cached, "failed": _failed}

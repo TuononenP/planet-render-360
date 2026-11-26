@@ -371,10 +371,7 @@ var _ready_data: LocationData
 ## Stages the ready world into the scene and frees the old one, a slice
 ## a frame (WorldHandoff), so the swap frame does neither wholesale.
 var _handoff := WorldHandoff.new()
-## Builds a stretch's detail layer after its core and hands it over, so
-## the detail holds no swap the camera needs now (StreamDetail).
 var _detail := StreamDetail.new()
-## Fades the new ground in from the camera outward after a swap.
 var _reveal := RevealWave.new()
 var _last_pos := Vector2.INF
 var _last_yaw := INF
@@ -618,14 +615,12 @@ func apply_swap(v: View360, data: LocationData, built: Array) -> void:
 	else:
 		v._rebuild_world(built[1], false)
 	StreamSwap.seat(v, data, new_xz, agl)
-	ViewChrome.show_place(v, data)
 	var vel := _vel
 	arm(data.latitude, data.longitude, data.season, data.quality_preset)
 	note_spawn(new_xz)
 	_vel = vel
-	# Too far to be picked again.
-	_parked.prune(centre_lat, centre_lon, MAX_STEP_M + 1.0)
-	_scout.survey(data.latitude, data.longitude, vel)
+	_parked.prune.call_deferred(centre_lat, centre_lon, MAX_STEP_M + 1.0)
+	_scout.survey.call_deferred(data.latitude, data.longitude, vel)
 
 ## Per-frame: track velocity, swap a ready centre in (or drop it when
 ## the camera turned back), and start the next centre early enough that
@@ -682,9 +677,8 @@ func tick(v: View360, delta: float) -> void:
 		_cancel_pending()
 		invalidate("memory short")
 	_reveal.tick(pos, delta, v._quality_preset)
-	# Fetches ahead wait while the build's own data is on the network,
-	# and for the whole of a late build.
-	_scout.pump(v, state == State.FETCHING and (_fetched_msec == 0 or urgent()))
+	# Planned fetches overlap non-Postpass downloads; ring waits for live fetch.
+	_scout.pump(v, state == State.FETCHING and _fetched_msec == 0, state == State.FETCHING and urgent())
 	slowed = (state == State.FETCHING or state == State.READY) and not inside_detailed(pos)
 	_edge_s = detailed_ahead(pos, _vel) / _vel.length() if _vel.length() > 0.5 else INF
 	if state == State.FETCHING and _abort != null:
@@ -730,25 +724,23 @@ func tick(v: View360, delta: float) -> void:
 			_park_ready()
 			_cancel_pending()
 			invalidate("camera turned back")
-			_steer.note_drop()
+			_steer.note_drop(_vel.length())
 			return
 		if veered:
 			_park_ready()
 			_cancel_pending()
 			invalidate("camera heading off the ready stretch")
 			_miss_s = 0.0
-			_steer.note_drop()
+			_steer.note_drop(_vel.length())
 			if not _steer.cooling_down(near_edge):
 				_start_generation(v, pos, look)
 			return
 	var hold_turn := _turning_s > 0.0 and not near_edge and inside_detailed(pos)
 	if should_redirect(pos) or (veered and state == State.FETCHING and not redirected and not hold_turn):
-		# Turned away mid-build: aim the build where the camera went now,
-		# not after the stale one lands.
 		_cancel_pending()
 		invalidate("camera turned away mid-build")
 		_miss_s = 0.0
-		_steer.note_drop()
+		_steer.note_drop(_vel.length())
 		if not _steer.cooling_down(near_edge):
 			_start_generation(v, pos, look)
 		redirected = true
@@ -762,15 +754,11 @@ func tick(v: View360, delta: float) -> void:
 	if needs_recentre(pos, _planned_vel(), look, expected_build_s(v._quality_preset)):
 		_start_generation(v, pos, look)
 	elif DetailDrift.wanted(pos, View360.spawn_xz(v._data), _still_s, v._quality_preset):
-		_start_generation(v, pos, look, true)  # stopped off the detail rings
-	elif not _warmed and v.start_flying and v._drone.on \
-			and Time.get_ticks_msec() - _opened_msec >= int(WARM_S * 1000.0):
-		# A place opens in the drone with every cache cold: the first
-		# stretch, built before any flying, would land after the drone had
-		# crossed the edge. Start it where the camera looks.
+		_start_generation(v, pos, look, true)
+	elif not _warmed and v.start_flying and v._drone.on and not WorldCache.saving_any() \
+			and (_vel.length() >= ViewDrone.CRUISE_MPS or Time.get_ticks_msec() - _opened_msec >= int(WARM_S * 1000.0)):
 		_start_generation(v, pos, look)
 
-## Parks the ready world rather than dropping it, once fully staged.
 func _park_ready() -> void:
 	if _ready.size() < 2 or not (_ready[1] is Node3D) or _ready_data == null \
 			or not _handoff.ready_for(_ready[1]):
@@ -872,26 +860,28 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -
 	_fetched_msec = 0
 	for p in ["fetch", "build", "ready"]:
 		_worst.erase(p)
-	_log("STREAM gen %d: start %.0f m ahead at %.1f m/s (expect %.1f s)%s" % [gen,
-		target.distance_to(pos), _vel.length(), expected, _scout.start_note(ll, planned, reused)])
 	_abort = BuildAbort.new()
 	_abort.background = true
-	# A fresh pipeline per generation: a reused one aliases runs (its
-	# cancel flag and stage counters are shared), so a stale finish
-	# could claim the next generation. The token guards it regardless.
 	if _pipeline != null:
 		PostpassGate.leave_subtree(_pipeline)
 		_pipeline.cancel()
 		_pipeline.queue_free()
-	_pipeline = GenerationPipeline.new()
-	_pipeline.background = true
+	var fallback_far := {}
 	if v._data != null and (not v._data.far_landuse.is_empty() or not v._data.far_towers.is_empty()):
-		_pipeline.fallback_far_city = {
-			"landuse": v._data.far_landuse,
-			"towers": v._data.far_towers,
+		fallback_far = {
+			"landuse": v._data.far_landuse, "towers": v._data.far_towers,
 			"offset": remap_xz(Vector2.ZERO, v._data.latitude, v._data.longitude, ll.x, ll.y),
 		}
-	v.add_child(_pipeline)
+	var adopted := _scout.take_warm(ll, fallback_far)
+	_log("STREAM gen %d: start %.0f m ahead at %.1f m/s (expect %.1f s)%s" % [gen,
+		target.distance_to(pos), _vel.length(), expected, _scout.start_note(ll, planned, reused, adopted != null)])
+	if adopted != null:
+		_pipeline = adopted
+	else:
+		_pipeline = GenerationPipeline.new()
+		_pipeline.background = true
+		_pipeline.fallback_far_city = fallback_far
+		v.add_child(_pipeline)
 	var pipe := _pipeline
 	var p := SaveProgress.new()
 	p.rows = GenerationPipeline.STAGES.size()
@@ -913,7 +903,8 @@ func _start_generation(v: View360, pos: Vector2, look: Vector2, here := false) -
 	pipe.cancelled.connect(func() -> void:
 		if state == State.FETCHING and gen == generation:
 			mark_failed(gen, "cancelled"))
-	pipe.run(ll.x, ll.y, "", v._quality_preset)
+	if adopted == null:
+		pipe.run(ll.x, ll.y, "", v._quality_preset)
 
 func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipeline) -> void:
 	if _pipeline == pipe:
@@ -958,11 +949,12 @@ func _on_finished(v: View360, data: LocationData, gen: int, pipe: GenerationPipe
 		ViewTools.say(v, "Couldn't prepare the way ahead",
 			"Still exploring on distant ground; will try again as you go.", "caution")
 		return
-	# The vehicle plans, ahead and off the main thread (VehicleMover).
-	# WorldBuildGraph usually overlaps this with the build stages.
+	# Vehicle plans run off the core critical path inside StreamDetail.build_detail;
+	# only compute here when no detail pass was deferred.
 	var plan_ground: GroundTruth = built[0] if built.size() > 0 else null
-	if plan_ground != null and (not data.has_meta(VehicleMover.PLANS_GROUND) \
-			or data.get_meta(VehicleMover.PLANS_GROUND) != plan_ground):
+	if plan_ground != null and _abort.detail.is_empty() \
+			and (not data.has_meta(VehicleMover.PLANS_GROUND) \
+				or data.get_meta(VehicleMover.PLANS_GROUND) != plan_ground):
 		await FrameTask.run(VehicleMover.plan_ahead.bind(data, plan_ground), "Vehicle plans", v.get_tree())
 	if not is_instance_valid(v) or gen != generation:
 		if built.size() > 1 and built[1] is Node3D:

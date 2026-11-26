@@ -17,15 +17,9 @@ const MB := 1 << 20
 const ANDROID_SHARE := 0.55
 ## Android: MemAvailable the app leaves to the system even under its share.
 const ANDROID_RESERVE := 300 * MB
-## Desktop: the share of RAM before the guard steps in (swap exists there,
-## but a world that pages is as good as stalled), capped so high-RAM
-## workstations still shed parked worlds and scratch caches.
-const DESKTOP_SHARE := 0.75
-const DESKTOP_MAX_LIMIT := 12 * 1024 * MB
-## Desktop VRAM ceiling (bytes) so MemoryGuard engages on video-memory growth
-## even when system RAM has ample headroom. Sized so a single Ultra city build
-## (~4.7 GiB peak) finishes and saves cleanly while multi-world roaming sheds.
-const DESKTOP_VRAM_LIMIT := 6144 * MB
+## Desktop: half of physical RAM before the guard steps in (no separate VRAM
+## ceiling — desktop pressure is tracked against RAM alone).
+const DESKTOP_SHARE := 0.50
 ## Never plan on less than this, whatever a misread counter says.
 const MIN_LIMIT := 1024 * MB
 const ENV_LIMIT := "PR360_MEMORY_LIMIT_MB"
@@ -80,7 +74,7 @@ static func limit_for(plat: String, footprint: int, available: int, physical: in
 			if footprint >= 0 and available >= 0:
 				limit = mini(limit, footprint + available - ANDROID_RESERVE)
 		_:
-			limit = mini(int(physical * DESKTOP_SHARE), DESKTOP_MAX_LIMIT)
+			limit = int(physical * DESKTOP_SHARE)
 	return maxi(limit, MIN_LIMIT)
 
 ## The tier a limit falls in. Pure.
@@ -108,19 +102,10 @@ static func headroom_bytes(footprint := -1) -> int:
 	var fp := footprint if footprint >= 0 else MemoryLog.footprint()
 	return maxi(limit_bytes(fp) - fp, 0)
 
-## Video memory as a share of the desktop VRAM ceiling (0.0 in headless or mobile).
-static func vram_usage() -> float:
-	if platform() != "desktop" or DisplayServer.get_name() == "headless":
-		return 0.0
-	var vram := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED)
-	return float(vram) / float(DESKTOP_VRAM_LIMIT) if vram > 0 else 0.0
-
-## The footprint as a share of the limit (1.0 = at the limit).
-## Live desktop readings take the higher of RAM and VRAM pressure.
+## The footprint as a share of the RAM limit (1.0 = at the limit).
 static func usage(footprint := -1) -> float:
 	var fp := footprint if footprint >= 0 else MemoryLog.footprint()
-	var ram := float(fp) / float(maxi(limit_bytes(fp), 1))
-	return maxf(ram, vram_usage()) if footprint < 0 else ram
+	return float(fp) / float(maxi(limit_bytes(fp), 1))
 
 ## The device's tier, read once: it sizes every world this session, so a
 ## brief squeeze from another app must not change it mid-session.

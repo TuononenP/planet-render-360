@@ -28,9 +28,11 @@ func _run() -> void:
 	var squeezed := MemoryBudget.limit_for("android", 1000 * MB, 1500 * MB, 6 * GB)
 	_check(squeezed == 2500 * MB - MemoryBudget.ANDROID_RESERVE,
 		"Android takes the lower of its share and footprint + MemAvailable - reserve")
-	# Desktop: a share of RAM.
-	_check(MemoryBudget.limit_for("desktop", 4 * GB, -1, 16 * GB) == 12 * GB,
-		"desktop plans on 75% of RAM")
+	# Desktop: 50% of physical RAM, with no separate VRAM cap.
+	_check(MemoryBudget.limit_for("desktop", 4 * GB, -1, 16 * GB) == 8 * GB,
+		"desktop plans on 50% of RAM (16 GB -> 8 GB)")
+	_check(MemoryBudget.limit_for("desktop", 4 * GB, -1, 128 * GB) == 64 * GB,
+		"desktop scales at 50% of RAM (128 GB -> 64 GB)")
 	# Never planned below the floor, whatever the counters say.
 	_check(MemoryBudget.limit_for("ios", 100 * MB, 0, 0) == MemoryBudget.MIN_LIMIT,
 		"a misread counter never plans below MIN_LIMIT")

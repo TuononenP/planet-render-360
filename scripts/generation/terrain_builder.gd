@@ -183,70 +183,106 @@ static func tag_layer(c: Node, layer: String) -> void:
 ## (BuildingBuilder draws it from its own parts). True
 ## metre position (T5.2): no framing cut — the v1 ±105-unit window is
 ## gone; only the LANDMARK_MAX_M haze limit applies.
+static func _build_landmark_candidate(c: Dictionary, data: LocationData, ground: GroundTruth) -> Node3D:
+	var cx := float(c.get("x", 0.0))
+	var cz := float(c.get("z", 0.0))
+	if c.has("type"):
+		var c_type := str(c["type"])
+		var dist_m := Vector2(cx, cz).length()
+		var entry := LocationData.entry_for_type(c_type)
+		var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
+		var hero_y := _hero_y(data, ground, cx, cz, entry, half)
+		var cacheable := not bool(entry.get("deck_ends", false)) \
+			and c_type not in ["turku_kauppatori", "fori_ferry"] \
+			and str(entry.get("kind", "")) != "Airport" \
+			and c_type not in LandmarkTerrain.RELIEFS
+		if cacheable:
+			var fast_imp := LandmarkImpostor.build_cached_stripped(c_type, dist_m)
+			if fast_imp != null:
+				fast_imp.position = Vector3(cx, hero_y, cz)
+				fast_imp.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
+				fast_imp.set_meta("lod_layer", "Landmarks")
+				return fast_imp
+		var hero := _hero(c_type, entry, ground, Vector2(cx, cz), hero_y)
+		hero.position = Vector3(cx, hero_y, cz)
+		hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
+		if dist_m <= LandmarkImpostor.STRIP_REAL_M or not cacheable:
+			LandmarkTerrain.stitch(hero, ground, c_type)
+		var imp_mode := LandmarkImpostor.apply_if_far(hero, dist_m, c_type, cacheable)
+		if imp_mode != "stripped":
+			FountainWater.upgrade(hero, data.quality_preset)
+		if imp_mode != "stripped" and RenderQuality.ultra_desktop(data.quality_preset):
+			LandmarkLights.dress(hero, c_type)
+			LandmarkShader.upgrade(hero)
+			FacadeShader.upgrade(hero)
+		hero.set_meta("lod_layer", "Landmarks")
+		return hero
+	var arch_dist_m := Vector2(cx, cz).length()
+	var arch_kind := str(c.get("archetype", "tower"))
+	var node := LandmarkBuilder.build_archetype(
+		arch_kind, float(c.get("height", 30.0)),
+		Vector2(float(c.get("size_x", 12.0)), float(c.get("size_z", 12.0))),
+		ArchitectureStyle.region_for(data.latitude, data.longitude, data.country))
+	node.position = Vector3(cx, site_ground_y(data, ground, cx, cz,
+		float(c.get("size_x", 12.0)) * 0.5) - 0.3, cz)
+	node.rotation.y = float(c.get("yaw", 0.0))
+	var arch_imp := LandmarkImpostor.apply_if_far(node, arch_dist_m, arch_kind)
+	if arch_imp != "stripped" and LandmarkShader.enabled(data.quality_preset):
+		LandmarkShader.upgrade(node)
+	node.set_meta("lod_layer", "Landmarks")
+	return node
+
 static func _landmark_candidates(root: Node3D, data: LocationData, ground: GroundTruth) -> void:
-	var spent := {}  # model type -> ms, for the timings line
-	var t0 := Time.get_ticks_msec()
-	var last := ""
+	var items: Array = []
 	for c in data.landmark_candidates:
-		if last != "":
-			spent[last] = int(spent.get(last, 0)) + Time.get_ticks_msec() - t0
-		t0 = Time.get_ticks_msec()
-		last = str(c.get("type", c.get("archetype", "")))
 		if bool(c.get("mapped", false)):
 			continue
-		var cx := float(c.get("x", 0.0))
-		var cz := float(c.get("z", 0.0))
-		if Vector2(cx, cz).length() > LANDMARK_MAX_M:
+		if Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0))).length() > LANDMARK_MAX_M:
 			continue
-		if c.has("type"):
-			var c_type := str(c["type"])
-			var dist_m := Vector2(cx, cz).length()
-			var entry := LocationData.entry_for_type(c_type)
-			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
-			var hero_y := _hero_y(data, ground, cx, cz, entry, half)
-			var cacheable := not bool(entry.get("deck_ends", false)) \
-				and c_type not in ["turku_kauppatori", "fori_ferry"] \
-				and str(entry.get("kind", "")) != "Airport" \
-				and c_type not in LandmarkTerrain.RELIEFS
-			if cacheable:
-				var fast_imp := LandmarkImpostor.build_cached_stripped(c_type, dist_m)
-				if fast_imp != null:
-					fast_imp.position = Vector3(cx, hero_y, cz)
-					fast_imp.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
-					fast_imp.set_meta("lod_layer", "Landmarks")
-					root.add_child(fast_imp)
-					continue
-			var hero := _hero(c_type, entry, ground, Vector2(cx, cz), hero_y)
-			hero.position = Vector3(cx, hero_y, cz)
-			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
-			if dist_m <= LandmarkImpostor.STRIP_REAL_M or not cacheable:
-				LandmarkTerrain.stitch(hero, ground, c_type)
-			var imp_mode := LandmarkImpostor.apply_if_far(hero, dist_m, c_type, cacheable)
-			if imp_mode != "stripped":
-				FountainWater.upgrade(hero, data.quality_preset)
-			if imp_mode != "stripped" and RenderQuality.ultra_desktop(data.quality_preset):
-				LandmarkLights.dress(hero, c_type)
-				LandmarkShader.upgrade(hero)
-				FacadeShader.upgrade(hero)
-			hero.set_meta("lod_layer", "Landmarks")
-			root.add_child(hero)
-			continue
-		var arch_dist_m := Vector2(cx, cz).length()
-		var arch_kind := str(c.get("archetype", "tower"))
-		var node := LandmarkBuilder.build_archetype(
-			arch_kind, float(c.get("height", 30.0)),
-			Vector2(float(c.get("size_x", 12.0)), float(c.get("size_z", 12.0))),
-			ArchitectureStyle.region_for(data.latitude, data.longitude, data.country))
-		node.position = Vector3(cx, site_ground_y(data, ground, cx, cz,
-			float(c.get("size_x", 12.0)) * 0.5) - 0.3, cz)
-		node.rotation.y = float(c.get("yaw", 0.0))
-		var arch_imp := LandmarkImpostor.apply_if_far(node, arch_dist_m, arch_kind)
-		if arch_imp != "stripped" and LandmarkShader.enabled(data.quality_preset):
-			LandmarkShader.upgrade(node)
-		node.set_meta("lod_layer", "Landmarks")
-		root.add_child(node)
-	if last != "":
-		spent[last] = int(spent.get(last, 0)) + Time.get_ticks_msec() - t0
+		items.append(c)
+	if items.is_empty():
+		print("LANDMARKS timings ms (0 built; impostor views cached %d, rasterised %d) " % [
+			LandmarkImpostor.view_cache_hits, LandmarkImpostor.view_cache_misses])
+		return
+	var nodes: Array = []
+	var ms_list: Array = []
+	nodes.resize(items.size())
+	ms_list.resize(items.size())
+	var wbg = load("res://scripts/generation/world_build_graph.gd") as GDScript
+	var parallel: bool = items.size() >= 4 and not wbg.force_serial \
+		and OS.get_thread_caller_id() != OS.get_main_thread_id()
+	if parallel:
+		var workers := mini(items.size(), 4)
+		var next_idx := [0]
+		var mu := Mutex.new()
+		var tasks: Array[int] = []
+		for _w in workers:
+			tasks.append(WorkerThreadPool.add_task(func() -> void:
+				PbrTextures.push_stage(MaterialLibrary._pbr_mats, 5)
+				while true:
+					mu.lock()
+					var i: int = next_idx[0]
+					next_idx[0] = i + 1
+					mu.unlock()
+					if i >= items.size():
+						break
+					var t0 := Time.get_ticks_msec()
+					nodes[i] = _build_landmark_candidate(items[i], data, ground)
+					ms_list[i] = Time.get_ticks_msec() - t0
+				PbrTextures.pop_stage(), true, "Landmarks"))
+		for tid in tasks:
+			WorkerThreadPool.wait_for_task_completion(tid)
+	else:
+		for i in items.size():
+			var t0 := Time.get_ticks_msec()
+			nodes[i] = _build_landmark_candidate(items[i], data, ground)
+			ms_list[i] = Time.get_ticks_msec() - t0
+	var spent := {}
+	for i in items.size():
+		if nodes[i] != null:
+			root.add_child(nodes[i])
+		var key := str((items[i] as Dictionary).get("type", (items[i] as Dictionary).get("archetype", "")))
+		spent[key] = int(spent.get(key, 0)) + int(ms_list[i])
 	var top := spent.keys()
 	top.sort_custom(func(a: Variant, b: Variant) -> bool: return spent[a] > spent[b])
 	print("LANDMARKS timings ms (%d built; impostor views cached %d, rasterised %d) %s" % [
@@ -381,7 +417,49 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 	# Climate once per mesh, not per post (far_albedo_at's ClimateModel
 	# lookups cost seconds over the grid).
 	var climate := FarSurface.climate_params(data)
-	for z in size:
+	var used_native_grid := false
+	if has_sat and (shore or exact) and FarSampler._native \
+			and ClassDB.class_has_method("FarKernels", "terrain_grid_sat"):
+		var dom_native: Object = ground.shoreline.domains.native \
+			if shore and ground.shoreline.domains != null else null
+		if not shore or dom_native != null:
+			var heights_in := post_heights if shore else ground._surface
+			if heights_in.size() == size * size:
+				var sat_zoom := int(data.satellite_source.get("source_zoom", data.satellite_zoom)) \
+					if not data.satellite_source.is_empty() else data.satellite_zoom
+				var grid_params := {
+					"shore": shore,
+					"shore_empty": ground.shoreline != null and ground.shoreline.empty(),
+					"shore_bounds": ground.shoreline.bounds if shore else Rect2(),
+					"shore_bodies": ground.shoreline.domains.bodies if shore else [],
+					"water_level_m": ground.water_level_m,
+					"datum_m": ground.datum_m,
+					"y_scale": ground._y_scale,
+					"lat": data.latitude,
+					"lon": data.longitude,
+					"m2u": WorldScale.metres_to_units(),
+					"sat_zoom": sat_zoom,
+					"sat_origin_px": data.satellite_origin_px,
+					"sat_mosaic_px": float(satellite_span_tiles(data) * SatelliteFetcher.TILE_PX),
+					"gt_size": ground._size,
+					"gt_step_units": ground._step_units,
+					"gt_level": ground._level,
+					"tl": climate["tl"],
+					"sl": climate["sl"],
+					"forest": climate["forest"],
+					"meadow": climate["meadow"],
+				}
+				var res: Array = ClassDB.class_call_static("FarKernels", "terrain_grid_sat",
+					size, step, heights_in, grid_params, data.far_drapes, dom_native)
+				verts = res[0]
+				normals = res[1]
+				colors = res[2]
+				tangents = res[3]
+				uvs = res[4]
+				water_levels = res[5]
+				indices = res[6]
+				used_native_grid = true
+	for z in 0 if used_native_grid else size:
 		if abort != null and abort.requested:
 			return MeshInstance3D.new()  # partial rows: no mesh (dropped anyway)
 		for x in size:
@@ -466,7 +544,7 @@ static func _terrain_mesh(data: LocationData, ground: GroundTruth = null, abort:
 				fallback.set_pixel(x, z, lc.linear_to_srgb())
 	if shore:
 		print("SHORE TERRAIN vertices_ms=", Time.get_ticks_msec() - shore_started)
-	if not shore:
+	if not shore and not used_native_grid:
 		for z in size - 1:
 			for x in size - 1:
 				var a := z * size + x

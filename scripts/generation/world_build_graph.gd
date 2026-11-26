@@ -56,7 +56,6 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 		StreetProps._fence_material()
 		StreetProps._chainlink_material()
 	var hide := TerrainBuilder.debug_hide_buildings
-	var vehicle_box := [{}]
 	var layered := abort != null and abort.background
 	var keep := {}
 	var veg_layer := VegetationBuilder.Layer.CORE if layered else VegetationBuilder.Layer.ALL
@@ -76,8 +75,6 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 			if data.landmark_type != "none":
 				lm.add_child(TerrainBuilder._landmark(data, ground))
 			TerrainBuilder._landmark_candidates(lm, data, ground)
-			if abort != null and abort.background and not abort.requested:
-				vehicle_box[0] = VehicleMover.compute_plans(data, ground)
 			return lm),
 		_stage(BuildAbort.Step.VEGETATION, func() -> Node3D:
 			return VegetationBuilder.build_vegetation(data, ground, abort, veg_layer, keep)),
@@ -114,8 +111,6 @@ static func build(data: LocationData, ground: GroundTruth, abort: BuildAbort = n
 	for task in tasks:
 		WorkerThreadPool.wait_for_task_completion(task)
 	BuildingBuilder._suppress_begin_build = false
-	if (abort == null or not abort.requested) and not (vehicle_box[0] as Dictionary).is_empty():
-		VehicleMover.store_plans(data, ground, vehicle_box[0])
 	if (abort != null and abort.requested) or PbrTextures.cap_reached:
 		for st in stages:
 			if st.node != null:
@@ -163,11 +158,18 @@ static func build_detail(data: LocationData, ground: GroundTruth, keep: Dictiona
 		abort: BuildAbort = null) -> Node3D:
 	if not keep.has("mask") or (abort != null and abort.requested):
 		return null
+	var vehicle_box := [{}]
+	var vtask := WorkerThreadPool.add_task(func() -> void:
+		if abort == null or not abort.requested:
+			vehicle_box[0] = VehicleMover.compute_plans(data, ground), false, "VehiclePlans")
 	var node := VegetationBuilder.build_vegetation(data, ground, abort,
 		VegetationBuilder.Layer.DETAIL, keep)
+	WorkerThreadPool.wait_for_task_completion(vtask)
 	if abort != null and abort.requested:
 		node.free()
 		return null
+	if not (vehicle_box[0] as Dictionary).is_empty():
+		VehicleMover.store_plans(data, ground, vehicle_box[0])
 	for c in node.get_children():
 		TerrainBuilder.tag_layer(c, str(node.name))
 	StockholmGlare.apply(node, data)

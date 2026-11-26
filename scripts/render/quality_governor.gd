@@ -14,6 +14,10 @@ extends Node
 ## visibly pumping.
 
 signal quality_changed(step_name: String, fps: float)
+## Emitted once per Ultra session when FPS stays below DOWN_FPS for
+## SLOW_SUGGEST_WINDOWS consecutive windows so the HUD can offer a
+## user-confirmed switch to High instead of lowering Ultra automatically.
+signal suggest_high
 
 const WINDOW_S := 2.0
 const DOWN_FPS := 28.0
@@ -21,6 +25,7 @@ const UP_FPS := 55.0
 const UP_WINDOWS := 2
 const HOLD_S := 10.0
 const HOLD_MAX_S := 160.0
+const SLOW_SUGGEST_WINDOWS := 4
 
 ## Render scale per step lives in RenderSettings.render_scale_for, so
 ## the settings screen's summary and the governor cannot drift apart.
@@ -90,6 +95,8 @@ func set_preset(preset_value: int) -> void:
 	_hold_until = 0.0
 	_hold_s = HOLD_S
 	_healthy = 0
+	_slow_windows = 0
+	_suggested_high = false
 	_apply()
 
 func set_haze_ceiling(max_haze: int) -> void:
@@ -111,6 +118,14 @@ func at_ceiling() -> bool:
 ## first and haze last.
 func adapt(fps: float, window_s: float = WINDOW_S) -> int:
 	_clock += window_s
+	if ceiling_step == RenderSettings.Preset.ULTRA:
+		if fps < DOWN_FPS:
+			_slow_windows += 1
+			if _slow_windows >= SLOW_SUGGEST_WINDOWS and not _suggested_high:
+				_suggested_high = true
+				suggest_high.emit()
+		else:
+			_slow_windows = 0
 	if fps < DOWN_FPS:
 		_healthy = 0
 		if haze_step > 0:
@@ -152,6 +167,8 @@ var _clock := 0.0
 var _hold_until := 0.0
 var _hold_s := HOLD_S
 var _healthy := 0
+var _slow_windows := 0
+var _suggested_high := false
 
 func _process(delta: float) -> void:
 	if viewport == null:
@@ -164,9 +181,9 @@ func _process(delta: float) -> void:
 	var prev_haze := haze_step
 	var prev_effects := effects_step
 	var new_step := adapt(current_fps, _elapsed)
-	if MemoryGuard.level >= MemoryGuard.Level.CRITICAL:
-		# Memory short: the lowest step's smaller render targets and no
-		# shadow maps, held until MemoryGuard lets go (then FPS decides).
+	if MemoryGuard.level >= MemoryGuard.Level.CRITICAL and not RenderQuality.ultra_desktop(ceiling_step):
+		# Memory short on constrained tiers: the lowest step's smaller render
+		# targets and no shadow maps, held until MemoryGuard lets go.
 		new_step = 0
 		haze_step = 0
 		if _effects_active():
