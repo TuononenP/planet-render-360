@@ -76,6 +76,22 @@ static func filter_rows(rows: Array, query: String) -> Array:
 	return rows.filter(func(r: Dictionary) -> bool:
 		return matches_query(r["site"] as Dictionary, query))
 
+## The kinds in `rows`' sites, sorted: what the panel's kind filter offers.
+static func kinds_in(rows: Array) -> Array:
+	var seen := {}
+	for r in rows:
+		seen[str((r["site"] as Dictionary).get("kind", "Landmark"))] = true
+	var out := seen.keys()
+	out.sort()
+	return out
+
+## Rows whose site is of `kind` ("" keeps everything: All kinds).
+static func filter_kinds(rows: Array, kind: String) -> Array:
+	if kind == "":
+		return rows
+	return rows.filter(func(r: Dictionary) -> bool:
+		return str((r["site"] as Dictionary).get("kind", "")) == kind)
+
 ## Replace the rows; none reads as one plain line, not an error
 ## (`pending`: the articles that may fill it have not arrived; `query`:
 ## a search that matched nothing names what was searched). Rows that

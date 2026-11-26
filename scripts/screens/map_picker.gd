@@ -113,6 +113,9 @@ var _landmark_timer: Timer
 var _landmark_key := ""
 var _landmark_card: LandmarkCard
 var _landmark_box: MarginContainer
+var _legend_btn: Button
+var _legend_panel: PanelContainer
+var _legend_rows: VBoxContainer
 var _searcher: SearchFetcher
 var _search_busy: TextureRect
 var _search_busy_timer: Timer

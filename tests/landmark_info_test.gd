@@ -41,13 +41,14 @@ func _run() -> void:
 	_view_aim()
 	_registry_icons()
 	_marker_chips()
+	await _marker_access()
 	await _map_markers()
 	await _card_states()
 	_osm_tag()
 	await _callout_icon_tap()
 	DirAccess.remove_absolute(CACHE)
 	if failures.is_empty():
-		print("LANDMARK INFO OK: parsers, standoff, aim, registry icons, map markers, card states, OSM tag")
+		print("LANDMARK INFO OK: parsers, standoff, aim, registry icons, marker access and legend, map markers, card states, OSM tag")
 		quit(0)
 	else:
 		for f in failures:
@@ -170,6 +171,63 @@ func _marker_chips() -> void:
 		"OSM chip: %s" % [MapLandmarks.chip_lines(mill)])
 	_check(MapLandmarks.chip_lines({"name": "X", "kind": "Bridge"}) == ["X", "Bridge"],
 		"a sourceless site still names its kind")
+
+## The markers lend themselves to assistive tech and to the legend:
+## hovering names the marker on the map view, and the placed markers
+## report the categories on screen.
+func _marker_access() -> void:
+	var map := MapTileView.new()
+	map.size = Vector2(800, 600)
+	root.add_child(map)
+	map.zoom_level = 14
+	map.centre_lat = 48.8584
+	map.centre_lon = 2.2945
+	await process_frame
+	var target := {}
+	for s in map.landmarks.sites():
+		if str(s.get("name", "")) == "Eiffel Tower":
+			target = s
+	_check(not target.is_empty(), "the Eiffel marker is placed")
+	var motion := InputEventMouseMotion.new()
+	motion.position = map.landmarks.screen_point(target)
+	map._gui_input(motion)
+	_check(map.accessibility_name == "Eiffel Tower, Building · Curated landmark",
+		"the hovered marker lends the map its name: '%s'" % map.accessibility_name)
+	_check(map.landmarks.hover_text() == map.accessibility_name, "hover text matches")
+	map.mouse_exited.emit()
+	_check(map.accessibility_name == "" and map.landmarks.hover_text() == "",
+		"leaving the map clears the marker name")
+	var cats := map.landmarks.visible_categories()
+	_check(not cats.is_empty() and cats.has(["Building", "building-2"]),
+		"placed categories include the tower: %s" % [cats.slice(0, 3)])
+	for c in cats:
+		_check(c.size() == 2 and UiIcon.texture(str(c[1]), 15) != null,
+			"every legend row has an icon: %s" % [c])
+	map.queue_free()
+	await process_frame
+	var picker := MapPicker.new()
+	root.add_child(picker)
+	picker.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	picker.size = Vector2(390, 844)
+	await process_frame
+	await process_frame
+	picker._canvas.set_lat_lon(48.8584, 2.2945)
+	picker._canvas.zoom_level = 14
+	await process_frame
+	MapLandmarkHome.toggle_legend(picker)
+	_check(picker._legend_panel.visible, "the toggle opens the marker key")
+	var shown := picker._canvas.landmarks.visible_categories()
+	var rows := picker._legend_rows.get_children()
+	var want := mini(shown.size(), 10)
+	_check(rows.size() == want or (shown.is_empty() and rows.size() == 1),
+		"the key lists what is placed: %d rows" % rows.size())
+	if not shown.is_empty():
+		var first := (rows[0] as HBoxContainer).get_child(1) as Label
+		_check(first.text == str(shown[0][0]), "the first row names the first category: " + first.text)
+	MapLandmarkHome.toggle_legend(picker)
+	_check(not picker._legend_panel.visible, "the toggle closes it again")
+	picker.queue_free()
+	await process_frame
 
 func _view_aim() -> void:
 	var data := LocationData.new()

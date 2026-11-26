@@ -113,6 +113,31 @@ func toggle_at(pos: Vector2) -> Dictionary:
 func chip_shown(id: String) -> bool:
 	return id != "" and (id == _hover_id or id == _pinned_id)
 
+## What a screen reader says for the hovered marker: the chip's lines
+## as one line, "" when nothing is hovered (the map keeps its default).
+func hover_text() -> String:
+	if _hover_id == "":
+		return ""
+	for item in _placed:
+		if str((item[1] as Dictionary).get("id", "")) == _hover_id:
+			var lines := chip_lines(item[1])
+			return "%s, %s" % [str(lines[0]), str(lines[1])]
+	return ""
+
+## The placed markers' categories, first-ranked first, one row each:
+## what the map legend names. Only markers on screen count, so the
+## legend mirrors the map.
+func visible_categories() -> Array:
+	var out: Array = []
+	var seen := {}
+	for item in layout():
+		var s := item[1] as Dictionary
+		var key := "%s|%s" % [str(s.get("kind", "")), str(s.get("icon", ""))]
+		if not seen.has(key):
+			seen[key] = true
+			out.append([str(s.get("kind", "Landmark")), str(s.get("icon", "landmark"))])
+	return out
+
 ## Pointer moved over the map: highlight the marker under it.
 func hover_at(pos: Vector2) -> bool:
 	var s := hit_at(pos)
@@ -122,27 +147,38 @@ func hover_at(pos: Vector2) -> bool:
 		queue_redraw()
 	return id != ""
 
+## Markers the open chip covers read dimmed, so the chip's text
+## stays legible where markers crowd.
+const DIM_ALPHA := 0.3
+
 func _draw() -> void:
 	var hover: Array = []
 	var pinned: Array = []
-	for item in layout():
+	var placed := layout()
+	for item in placed:
 		var s: Dictionary = item[1]
-		var p: Vector2 = item[0]
-		var on := str(s["id"]) == selected_id
-		draw_circle(p + Vector2(0, 2), RADIUS + 1.0, Color(0, 0, 0, 0.28), true, -1.0, true)
-		draw_circle(p, RADIUS, UiTheme.TEAL if on else HudStyle.GLASS_STRONG, true, -1.0, true)
-		draw_circle(p, RADIUS, UiTheme.GLASS_EDGE, false, 1.0, true)
-		var tex := UiIcon.texture(str(s.get("icon", "landmark")), ICON)
-		if tex != null:
-			draw_texture_rect(tex, Rect2(p - Vector2(ICON, ICON) / 2.0, Vector2(ICON, ICON)),
-				false, UiTheme.ON_ACCENT if on else UiTheme.INK)
 		if str(s["id"]) == _hover_id:
 			hover = item
 		elif str(s["id"]) == _pinned_id:
 			pinned = item
 	var chip := hover if not hover.is_empty() else pinned
+	var cover := Rect2(-100000.0, -100000.0, 0.0, 0.0)
 	if not chip.is_empty():
-		_draw_chip(chip[0], chip[1])
+		cover = _chip_rect(chip[0], chip_lines(chip[1]))
+	for item in placed:
+		var s: Dictionary = item[1]
+		var p: Vector2 = item[0]
+		var on := str(s["id"]) == selected_id
+		var a := DIM_ALPHA if cover.has_point(p) else 1.0
+		draw_circle(p + Vector2(0, 2), RADIUS + 1.0, Color(0, 0, 0, 0.28 * a), true, -1.0, true)
+		draw_circle(p, RADIUS, Color(UiTheme.TEAL if on else HudStyle.GLASS_STRONG, a), true, -1.0, true)
+		draw_circle(p, RADIUS, Color(UiTheme.GLASS_EDGE, a), false, 1.0, true)
+		var tex := UiIcon.texture(str(s.get("icon", "landmark")), ICON)
+		if tex != null:
+			draw_texture_rect(tex, Rect2(p - Vector2(ICON, ICON) / 2.0, Vector2(ICON, ICON)),
+				false, Color(UiTheme.ON_ACCENT if on else UiTheme.INK, a))
+	if not chip.is_empty():
+		_draw_chip(chip[0], chip[1], cover)
 
 ## Where a site's marker data comes from, as the chip names it: the
 ## curated registry, a Wikipedia article, or OpenStreetMap.
@@ -165,8 +201,7 @@ static func chip_lines(s: Dictionary) -> Array:
 		meta += " · " + src
 	return [str(s.get("name", "")), meta]
 
-func _draw_chip(p: Vector2, s: Dictionary) -> void:
-	var lines := chip_lines(s)
+func _chip_rect(p: Vector2, lines: Array) -> Rect2:
 	var title_font := UiTheme.sans(600)
 	var meta_font := UiTheme.sans(400)
 	var title_fs := roundi(14 * UiTheme.text_scale)
@@ -178,8 +213,18 @@ func _draw_chip(p: Vector2, s: Dictionary) -> void:
 		p + Vector2(-wide / 2.0 - 12.0, -RADIUS - 14.0 - (title_ts.y + 4.0 + meta_ts.y) - 12.0),
 		Vector2(wide + 24.0, title_ts.y + 4.0 + meta_ts.y + 12.0))
 	box.position.x = clampf(box.position.x, 8.0, maxf(size.x - box.size.x - 8.0, 8.0))
+	return box
+
+func _draw_chip(p: Vector2, s: Dictionary, box: Rect2) -> void:
+	var lines := chip_lines(s)
+	var title_font := UiTheme.sans(600)
+	var meta_font := UiTheme.sans(400)
+	var title_fs := roundi(14 * UiTheme.text_scale)
+	var meta_fs := roundi(12 * UiTheme.text_scale)
+	var title_ts := title_font.get_string_size(str(lines[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, title_fs)
 	draw_style_box(UiTheme.style(UiTheme.CARD, UiTheme.RADIUS_M, UiTheme.GLASS_EDGE, true), box)
 	draw_string(title_font, box.position + Vector2(12, 6 + title_font.get_ascent(title_fs)), str(lines[0]),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, title_fs, UiTheme.INK)
 	draw_string(meta_font, box.position + Vector2(12, 6 + title_ts.y + 4.0 + meta_font.get_ascent(meta_fs)),
 		str(lines[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, meta_fs, UiTheme.MUTED)
+

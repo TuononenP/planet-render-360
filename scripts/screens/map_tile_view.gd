@@ -175,7 +175,9 @@ func _ready() -> void:
 	landmarks = MapLandmarks.new(self)
 	add_child(landmarks)
 	draw.connect(landmarks.queue_redraw)
-	mouse_exited.connect(func() -> void: landmarks.hover_at(Vector2(-1e4, -1e4)))
+	mouse_exited.connect(func() -> void:
+		landmarks.hover_at(Vector2(-1e4, -1e4))
+		accessibility_name = "")
 	_pin = MapPin.new()
 	add_child(_pin)
 	_pin.point = _focus()
@@ -393,6 +395,9 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and landmarks != null:
 		var over := landmarks.hover_at((event as InputEventMouseMotion).position)
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if over else Control.CURSOR_ARROW
+		# The markers are drawn, so a screen reader would skip them:
+		# lend the hovered one the map's accessible name instead.
+		accessibility_name = landmarks.hover_text()
 	elif event is InputEventMagnifyGesture:
 		var mg := event as InputEventMagnifyGesture
 		magnify(mg.factor, mg.position)

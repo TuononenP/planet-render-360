@@ -36,6 +36,12 @@ var _list_scroll := 0
 ## The latest rows and whether more may still arrive: what Back shows.
 var _rows: Array = []
 var _pending := false
+## The kind filter under the search: "" for All kinds, else one of
+## _kind_options (the kinds in _rows). Both the nearby rows and the
+## city-wide provider matches pass through it.
+var _kind: OptionButton
+var _kind_value := ""
+var _kind_options: Array = []
 ## The current search text, and where city-wide matches come from: a
 ## Callable taking the query String and returning ranked rows (see
 ## ViewCallouts.search_rows). Empty until ViewChrome sets it; without
@@ -77,6 +83,12 @@ func _init(fetcher: WikiFetcher) -> void:
 	_search.visible = false
 	_search.text_changed.connect(_on_search_changed)
 	col.add_child(_search)
+	_kind = OptionButton.new()
+	_kind.tooltip_text = "Filter by kind"
+	_kind.visible = false
+	UiTheme.apply_option(_kind)
+	_kind.item_selected.connect(_on_kind_selected)
+	col.add_child(_kind)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -122,18 +134,40 @@ func _on_search_changed(text: String) -> void:
 	_query = text
 	_apply_search()
 
-## Show the nearby rows, or the city-wide matches for `_query`.
+func _on_kind_selected(index: int) -> void:
+	_kind_value = "" if index <= 0 else str(_kind_options[index - 1])
+	_apply_search()
+
+## The kinds in the latest rows, offered beside the search. Keeps the
+## choice when the rows still carry it, else falls back to All kinds.
+func _refresh_kinds() -> void:
+	var options := LandmarkList.kinds_in(_rows)
+	if options == _kind_options:
+		return
+	_kind_options = options
+	_kind.clear()
+	_kind.add_item("All kinds")
+	for k in options:
+		_kind.add_item(str(k))
+	if _kind_value != "" and _kind_value not in options:
+		_kind_value = ""
+	_kind.select(0 if _kind_value == "" else options.find(_kind_value) + 1)
+
+## Show the nearby rows, or the city-wide matches for `_query`: both
+## pass through the kind filter, so Back keeps one filtered list.
 func _apply_search() -> void:
 	if not is_listing():
 		return
 	var q := _query.strip_edges()
 	if q == "":
-		list.set_rows(_rows, _pending)
+		list.set_rows(LandmarkList.filter_kinds(_rows, _kind_value), _pending)
 		return
+	var base: Array
 	if _search_provider.is_valid():
-		list.set_rows(_search_provider.call(q) as Array, false, q)
+		base = _search_provider.call(q) as Array
 	else:
-		list.set_rows(LandmarkList.filter_rows(_rows, q), false, q)
+		base = LandmarkList.filter_rows(_rows, q)
+	list.set_rows(LandmarkList.filter_kinds(base, _kind_value), false, q)
 
 ## The nearest landmarks (LandmarkList.rank rows); `pending` while the
 ## nearby articles that may add more are still on their way. Opening
@@ -146,8 +180,9 @@ func open_list(rows: Array, pending: bool = false) -> void:
 		_search.set_block_signals(true)
 		_search.text = ""
 		_search.set_block_signals(false)
-	list.set_rows(rows, pending)
+	_refresh_kinds()
 	_show(true, false, not visible)
+	_apply_search()
 
 ## Back from a card to the list it was opened from, with any rows that
 ## arrived meanwhile, and focus on the landmark just read. A search in
@@ -162,7 +197,7 @@ func _apply_or_show_all() -> void:
 	if _query.strip_edges() != "":
 		_apply_search()
 	else:
-		list.set_rows(_rows, _pending)
+		list.set_rows(LandmarkList.filter_kinds(_rows, _kind_value), _pending)
 
 ## New rows (late nearby articles): shown now when the list is up, else
 ## when Back returns to it. An active search re-queries, so late rows
@@ -170,11 +205,9 @@ func _apply_or_show_all() -> void:
 func update_list(rows: Array, pending: bool = false) -> void:
 	_rows = rows
 	_pending = pending
+	_refresh_kinds()
 	if is_listing():
-		if _query.strip_edges() != "":
-			_apply_search()
-		else:
-			list.set_rows(rows, pending)
+		_apply_search()
 
 ## Keyboard focus into the list (opened with L): the nearest landmark.
 func focus_list() -> void:
@@ -187,6 +220,7 @@ func _show(listing: bool, from_list: bool, fade: bool) -> void:
 	card.visible = not listing
 	_back.visible = from_list
 	_search.visible = listing
+	_kind.visible = listing
 	_title.text = LIST_TITLE if listing else ""
 	_scroll.scroll_vertical = 0
 	visible = true
@@ -224,6 +258,7 @@ func place(rect: Rect2, bottom_anchored: bool) -> void:
 	var chrome := get_theme_stylebox("panel").get_minimum_size().y + _top.get_combined_minimum_size().y
 	if _search.visible:
 		chrome += _search.get_combined_minimum_size().y + 8.0
+		chrome += _kind.get_combined_minimum_size().y + 8.0
 	var want := _body.get_combined_minimum_size().y + chrome
 	# shadow-3 falls away from the scene: up off a bottom sheet, down
 	# under a side panel.

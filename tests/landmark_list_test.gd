@@ -22,6 +22,7 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(CACHE)
 	_rank()
 	await _rows()
+	_kind_filter()
 	await _large_text()
 	await _callout_ids()
 	await _panel_flow()
@@ -31,7 +32,7 @@ func _run() -> void:
 	DirAccess.remove_absolute(CACHE)
 	CacheStore.dir_override = ""
 	if failures.is_empty():
-		print("LANDMARK LIST OK: ranking, rows, ids, list -> card -> back, late rows, focus, button and L key")
+		print("LANDMARK LIST OK: ranking, rows, kind filter, ids, list -> card -> back, late rows, focus, button and L key")
 		quit(0)
 	else:
 		for f in failures:
@@ -144,6 +145,35 @@ func _rows() -> void:
 
 ## At the largest text size a row grows with its text and nothing spills
 ## out of it or under the Go there button.
+## The panel's kind filter: the rows' kinds are offered, picking one
+## keeps nearest-first order, and kinds that arrive later rebuild it.
+func _kind_filter() -> void:
+	var rows := LandmarkList.rank(_around(), Vector3(0, 30, 0))
+	_check(LandmarkList.kinds_in(rows) == ["Building", "Place of worship"], "the rows' kinds: %s" % [LandmarkList.kinds_in(rows)])
+	_check(LandmarkList.filter_kinds(rows, "").size() == 3, "All kinds keeps every row")
+	var kept := LandmarkList.filter_kinds(rows, "Building")
+	_check(kept.size() == 2 and str(kept[0]["site"]["name"]) == "Mid bridge"
+		and str(kept[1]["site"]["name"]) == "Far tower", "a kind keeps nearest-first order")
+	_check(LandmarkList.filter_kinds(rows, "Castle").is_empty(), "an absent kind matches nothing")
+	var wiki := WikiFetcher.new()
+	wiki.offline_mode = true
+	root.add_child(wiki)
+	var panel := LandmarkPanel.new(wiki)
+	root.add_child(panel)
+	panel.open_list(rows)
+	_check(panel._kind.item_count == 3 and panel._kind.get_item_text(1) == "Building",
+		"the filter offers the rows' kinds")
+	panel._on_kind_selected(1)
+	_check(panel.list.row_count() == 2, "picking a kind filters the open list")
+	panel.update_list(rows.slice(0, 1))
+	_check(panel._kind.selected == 0 and panel._kind_value == "" and panel.list.row_count() == 1,
+		"a lost kind falls back to All kinds")
+	panel._on_kind_selected(1)
+	_check(panel.list.row_count() == 1 and _labels(panel.list).has("Near chapel"),
+		"the remaining kind shows its row")
+	panel.queue_free()
+	wiki.queue_free()
+
 func _large_text() -> void:
 	var was := UiTheme.text_scale
 	UiTheme.text_scale = 2.0
