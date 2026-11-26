@@ -59,21 +59,52 @@ static func tint_for(x: float, z: float, chroma: float = 0.0, tone: float = 0.0)
 ## building's residual against its shared material, FacadeMaterials).
 static func tint(root: Node, first: int, x: float, z: float, chroma: float = 0.0,
 		tone: float = 0.0, wall_vt: Color = Color.WHITE, roof_vt: Color = Color.WHITE) -> void:
+	var n_children := root.get_child_count()
+	if first >= n_children:
+		return
 	var c := tint_for(x, z, chroma * ROOF_CHROMA, tone) * roof_vt
 	var wall_c := WallVariety.tint_for(x, z, chroma, tone) * wall_vt
-	var foot := _wall_foot(root, first)
-	for k in range(first, root.get_child_count()):
+	var foot := INF
+	var targets: Array[MeshInstance3D] = []
+	for k in range(first, n_children):
 		var mi := root.get_child(k) as MeshInstance3D
 		if mi == null or not (mi.mesh is ArrayMesh):
 			continue
 		var mesh := mi.mesh as ArrayMesh
+		var over := mi.material_override
 		var hit := false
-		for s in MeshArrays.surface_count(mesh):
-			var sm := mi.material_override if mi.material_override != null \
-				else _surface_material(mesh, s)
-			hit = hit or is_roof(sm) or WallVariety.is_wall(sm)
+		if over != null:
+			var is_w := WallVariety.is_wall(over)
+			hit = is_w or is_roof(over)
+			if is_w:
+				for s in MeshArrays.surface_count(mesh):
+					var verts: PackedVector3Array = MeshArrays.surface(mesh, s)[Mesh.ARRAY_VERTEX]
+					if WallVariety._native:
+						foot = minf(foot, ClassDB.class_call_static("TintKernels", "min_y", verts))
+					else:
+						for v in verts:
+							foot = minf(foot, v.y)
+		else:
+			for s in MeshArrays.surface_count(mesh):
+				var sm := _surface_material(mesh, s)
+				var is_w := WallVariety.is_wall(sm)
+				if is_w:
+					hit = true
+					var verts: PackedVector3Array = MeshArrays.surface(mesh, s)[Mesh.ARRAY_VERTEX]
+					if WallVariety._native:
+						foot = minf(foot, ClassDB.class_call_static("TintKernels", "min_y", verts))
+					else:
+						for v in verts:
+							foot = minf(foot, v.y)
+				elif is_roof(sm):
+					hit = true
 		if hit:
-			mi.mesh = _recoloured(mesh, mi.material_override, c, wall_c, foot)
+			targets.append(mi)
+	for mi in targets:
+		var mesh := mi.mesh as ArrayMesh
+		var res := _recoloured(mesh, mi.material_override, c, wall_c, foot)
+		if res != mesh:
+			mi.mesh = res
 
 ## Lowest wall vertex of one building's meshes: its storey bands are separate
 ## surfaces, and the foot shade must start once, at the ground.
@@ -101,15 +132,29 @@ static func _wall_foot(root: Node, first: int) -> float:
 ## A held mesh (MeshArrays.hold) is coloured in place: its first upload.
 static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color, foot: float) -> ArrayMesh:
 	var held := mesh.get_surface_count() == 0
+	var defer := held and MeshArrays.is_deferred()
+	if defer and mesh.has_meta(MeshArrays.META):
+		# Fast path: mutate held CPU arrays in place without duplicating or rewriting meta.
+		var all: Array = mesh.get_meta(MeshArrays.META)
+		var mats: Array = mesh.get_meta(MeshArrays.MATS_META, [])
+		for s in all.size():
+			var arrays: Array = all[s]
+			if (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+				continue
+			var mat: Material = mats[s] as Material if s < mats.size() else null
+			var active := over if over != null else mat
+			if is_roof(active):
+				arrays[Mesh.ARRAY_COLOR] = weathered(arrays[Mesh.ARRAY_VERTEX], arrays[Mesh.ARRAY_NORMAL], c)
+			elif WallVariety.is_wall(active):
+				var own: Color = mesh.get_meta(WALL_TINT, Color.WHITE)
+				arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c * own, foot)
+		return mesh
 	var src: Array = []
 	for s in MeshArrays.surface_count(mesh):
 		src.append(MeshArrays.surface(mesh, s))
 	var out := mesh if held else ArrayMesh.new()
-	var defer := held and MeshArrays.is_deferred()
 	if held:
 		out.set_meta(MeshArrays.META, [])
-		if defer:
-			out.set_meta(MeshArrays.MATS_META, [])
 	var kept := 0
 	for s in src.size():
 		var mat := _surface_material(mesh, s)
@@ -124,14 +169,11 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 			# A gable end carries its wall's paint on a shared white render.
 			var own: Color = mesh.get_meta(WALL_TINT, Color.WHITE)
 			arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c * own, foot)
-		if defer:
-			MeshArrays.deferred_surface(out, arrays, mat)
-		else:
-			out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-			if mat != null:
-				out.surface_set_material(kept, mat)
-			kept += 1
-			MeshArrays.keep_surface(out, arrays)
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		if mat != null:
+			out.surface_set_material(kept, mat)
+		kept += 1
+		MeshArrays.keep_surface(out, arrays)
 	return out
 
 ## Per-vertex colours of one roof surface: `c`, on a pitched surface darkened

@@ -241,7 +241,8 @@ static func _roof_target(m: Material, b: Dictionary, style: Dictionary,
 	if set_name == "" or str(m.get_meta("roof_set", "")) != set_name or set_name == "glass":
 		return Color(0, 0, 0, 0)
 	var paint: Color = style.get("roof_colour", Color(0, 0, 0, 0))
-	var tag := MaterialLibrary.parse_colour_tag(str(b.get("roof_colour", "")))
+	var rcol := str(b.get("roof_colour", ""))
+	var tag := MaterialLibrary.parse_colour_tag(rcol) if rcol != "" else Color(0, 0, 0, 0)
 	if tag.a > 0.0:
 		paint = Color.from_hsv(tag.h, minf(tag.s, 0.42), tag.v)
 	elif hint.a > 0.0 and not MaterialLibrary._degenerate_roof_sample(hint):
@@ -268,10 +269,15 @@ static func _nearest(mats: Array, target: Color) -> int:
 	var best := 0
 	var best_d := INF
 	for i in mats.size():
-		var base := ((mats[i] as StandardMaterial3D).albedo_color).srgb_to_linear()
-		var r := residual(mats[i] as Material, target)
-		var d := Vector3(base.r * r.r - target.r, base.g * r.g - target.g,
-			base.b * r.b - target.b).length_squared()
+		var sm := mats[i] as StandardMaterial3D
+		var base := sm.albedo_color.srgb_to_linear()
+		var rr := clampf(target.r / maxf(base.r, 0.02), RESIDUAL_MIN, 1.0)
+		var rg := clampf(target.g / maxf(base.g, 0.02), RESIDUAL_MIN, 1.0)
+		var rb := clampf(target.b / maxf(base.b, 0.02), RESIDUAL_MIN, 1.0)
+		var dr := base.r * rr - target.r
+		var dg := base.g * rg - target.g
+		var db := base.b * rb - target.b
+		var d := dr * dr + dg * dg + db * db
 		if d < best_d:
 			best_d = d
 			best = i
@@ -314,7 +320,8 @@ static func _pattern(b: Dictionary, style: Dictionary, set_name: String) -> Stri
 
 static func _wall_tint(b: Dictionary, style: Dictionary, set_name: String,
 		seed_v: float) -> Color:
-	var tag := MaterialLibrary.parse_colour_tag(str(b.get("colour", "")))
+	var col_s := str(b.get("colour", ""))
+	var tag := MaterialLibrary.parse_colour_tag(col_s) if col_s != "" else Color(0, 0, 0, 0)
 	var painted: Color = style.get("wall_colour", Color(0, 0, 0, 0))
 	if tag.a > 0.0:
 		var q := Color(roundf(tag.r * 16.0) / 16.0,

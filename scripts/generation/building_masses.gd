@@ -210,21 +210,36 @@ static func plan(b: Dictionary, ctx: Dictionary) -> Array:
 ## list order as plan() called in that order would: of two sharing a key
 ## the first keeps it, and only it counts in partial_outlines.
 static func prepare(list: Array, ctx: Dictionary) -> void:
+	var n := list.size()
+	if n == 0:
+		return
 	var keys := PackedStringArray()
-	for b: Dictionary in list:
-		keys.append(_plan_key(b))
+	keys.resize(n)
+	for k in n:
+		keys[k] = _plan_key(list[k])
 	var plans: Array = []
-	plans.resize(list.size())
-	var group := WorkerThreadPool.add_group_task(func(k: int) -> void:
-		plans[k] = _compute(list[k], ctx), list.size(), -1, true, "BuildingPlans")
-	WorkerThreadPool.wait_for_group_task_completion(group)
-	for k in list.size():
-		_mutex.lock()
-		var fresh := not _plans.has(keys[k])
-		if fresh:
+	plans.resize(n)
+	# In debug builds, cap GDScript worker fan-out to avoid ObjectDB lock
+	# contention with concurrent Roads/Vegetation/Terrain stages.
+	var chunks := mini(n, 4 if OS.is_debug_build() else 8)
+	if chunks <= 1:
+		for k in n:
+			plans[k] = _compute(list[k], ctx)
+	else:
+		var group := WorkerThreadPool.add_group_task(func(c: int) -> void:
+			for k in range(n * c / chunks, n * (c + 1) / chunks):
+				plans[k] = _compute(list[k], ctx), chunks, -1, true, "BuildingPlans")
+		WorkerThreadPool.wait_for_group_task_completion(group)
+	var fresh_flags := PackedByteArray()
+	fresh_flags.resize(n)
+	_mutex.lock()
+	for k in n:
+		if not _plans.has(keys[k]):
 			_plans[keys[k]] = plans[k]
-		_mutex.unlock()
-		if fresh and not ((list[k] as Dictionary).get("parts", []) as Array).is_empty():
+			fresh_flags[k] = 1
+	_mutex.unlock()
+	for k in n:
+		if fresh_flags[k] != 0 and not ((list[k] as Dictionary).get("parts", []) as Array).is_empty():
 			_note_partial(list[k], plans[k])
 
 ## The plan memo's key: position and outline, and the OSM source.
