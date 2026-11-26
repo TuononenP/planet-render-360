@@ -540,13 +540,9 @@ static func _liner_site(pts: PackedVector2Array, total: float, share: float, len
 		LINER_ALONG_M, LINER_ACROSS_M)
 	if not site.is_empty():
 		return site
-	# Squeeze past instead of vanishing: the same window with no hulls
-	# finds open water, so only berthed hulls block the liner. Water,
-	# bridge or eye blockage still drops it.
-	var open_water := _liner_search(pts, total, share, length, beam, ground, mask, bridge_list, eye, [], m,
-		LINER_ALONG_M, LINER_ACROSS_M)
-	if open_water.is_empty():
-		return {}
+	# Squeeze past instead of vanishing: search a wider window before
+	# giving up. Every cell still passes the water, bridge, eye and hull
+	# checks, so a truly blocked fairway still drops the liner.
 	return _liner_search(pts, total, share, length, beam, ground, mask, bridge_list, eye, taken, m,
 		LINER_ALONG_WIDE_M, LINER_ACROSS_WIDE_M)
 
