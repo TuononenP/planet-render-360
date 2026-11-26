@@ -20,6 +20,7 @@ static var high_contrast := false
 ## recorded videos (VideoRecorder.QUALITY_LONG index), and the folder
 ## they save to with no dialog ("" asks every time; PhotoMode.chosen_video_dir).
 static var horizon_labels := false
+static var landmark_callouts := true
 static var minimap := false
 static var photo_stamp := true
 static var fps_counter := false
@@ -35,6 +36,7 @@ static func apply(s: RenderSettings) -> void:
 	solid_panels = _or_os(s.pref("solid_panels"), "accessibility_should_reduce_transparency")
 	high_contrast = _or_os(s.pref("high_contrast"), "accessibility_should_increase_contrast")
 	horizon_labels = bool(s.pref("horizon_labels"))
+	landmark_callouts = bool(s.pref("landmark_callouts"))
 	minimap = bool(s.pref("minimap"))
 	photo_stamp = bool(s.pref("photo_stamp"))
 	fps_counter = bool(s.pref("fps_counter"))

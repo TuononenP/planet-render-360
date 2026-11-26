@@ -26,6 +26,7 @@ const PICK_PX := 80.0
 ## Two sites this close (metres) are one place: the first one wins.
 const SAME_SITE_M := 60.0
 
+var enabled := true
 var _view: View360
 var _data: LocationData
 var _ground: GroundTruth
@@ -147,6 +148,12 @@ func clear() -> void:
 	_suppressed.clear()
 	queue_redraw()
 
+func set_enabled(on: bool) -> void:
+	enabled = on
+	visible = on
+	if not on:
+		clear()
+
 ## Esc: close the open callouts. Returns false when none were open.
 func dismiss() -> bool:
 	if _cards.is_empty():
@@ -166,7 +173,7 @@ func dismiss() -> bool:
 ## from auto-showing) when it was up. Returns whether it is shown now.
 func toggle_site(s: Dictionary) -> bool:
 	var id := str(s.get("id", ""))
-	if id == "":
+	if not enabled or id == "":
 		return false
 	if _cards.has(id) or _pinned.has(id):
 		if _cards.has(id):
@@ -228,6 +235,8 @@ static func _segment_distance(pt: Vector2, a: Vector2, b: Vector2) -> float:
 ## A scene tap at `pt`: toggles the landmark under it, if any. Returns
 ## true when a landmark took the tap (so it does not also walk there).
 func toggle_at(pt: Vector2) -> bool:
+	if not enabled:
+		return false
 	var s := site_at(pt)
 	if s.is_empty():
 		return false
@@ -243,7 +252,7 @@ func _behind_sheet(cam: Camera3D, s: Dictionary) -> bool:
 		and _view._sheet.get_global_rect().grow(grow).has_point(global_position + cam.unproject_position(s["pos"]))
 
 func _process(delta: float) -> void:
-	if not is_visible_in_tree() or _sites.is_empty() or _view == null or _view._rig == null:
+	if not enabled or not is_visible_in_tree() or _sites.is_empty() or _view == null or _view._rig == null:
 		return
 	var cam := _view._rig.camera
 	if cam == null:

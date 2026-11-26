@@ -531,7 +531,7 @@ func _view_wiring() -> void:
 		"the copied link carries time, season and date: " + link)
 
 	# HUD tools exist, the keys reach them.
-	for key in ["date", "photo", "link", "labels", "map"]:
+	for key in ["date", "photo", "link", "labels", "callouts", "map"]:
 		_check(view._tool_btns.has(key) and (view._tool_btns[key] as Button).tooltip_text != "", "tool button: " + key)
 	_check(view._sun_arc._play_btn != null and view._sun_arc._play_btn.tooltip_text == "Play the day", "the arc has a play button")
 	_check(view._season_btn == view._date_picker.seasons and view._season_btn.item_count == 4,
@@ -564,6 +564,19 @@ func _view_wiring() -> void:
 	_check(view._horizon._fetched_for == Vector2(INF, INF), "a failed label request can be retried")
 	(view._tool_btns["labels"] as Button).pressed.emit()
 	_check(not view._horizon.enabled, "the labels button turns labels off")
+	_check(view._callouts.enabled and UiPrefs.landmark_callouts, "landmark callouts start on")
+	_check((view._tool_btns["callouts"] as Button).get_meta("selected", false), "the callouts chip starts selected")
+	press.call(KEY_K)
+	_check(not view._callouts.enabled and not UiPrefs.landmark_callouts and emitted.has(["landmark_callouts", false]),
+		"K turns landmark callouts off and saves it")
+	_check(not (view._tool_btns["callouts"] as Button).get_meta("selected", true), "the callouts chip goes off with it")
+	press.call(KEY_K)
+	_check(view._callouts.enabled and UiPrefs.landmark_callouts and emitted.has(["landmark_callouts", true]),
+		"and K turns them back on")
+	(view._tool_btns["callouts"] as Button).pressed.emit()
+	_check(not view._callouts.enabled and not UiPrefs.landmark_callouts, "the callouts button turns callouts off")
+	(view._tool_btns["callouts"] as Button).pressed.emit()
+	_check(view._callouts.enabled and UiPrefs.landmark_callouts, "the callouts button turns callouts back on")
 	press.call(KEY_M)
 	_check(UiPrefs.minimap and view._minimap.visible, "M shows the mini-map")
 	press.call(KEY_M)

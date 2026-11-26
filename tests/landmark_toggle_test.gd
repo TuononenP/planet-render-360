@@ -150,6 +150,22 @@ func _view_click_toggle() -> void:
 		"clicking the landmark's base picks it")
 	await _click(view, base_pt)
 	_check(not view._callouts._cards.has(id), "clicking the landmark's base hides its callout")
+	# Disabling callouts clears open cards, stops auto-show and scene clicks,
+	# while keeping the site list intact for Nearby.
+	view._callouts.toggle_site(stored)
+	_check(view._callouts._cards.has(id), "callout is up before disabling")
+	view._callouts.set_enabled(false)
+	_check(view._callouts._cards.is_empty() and not view._callouts.visible,
+		"disabling callouts clears open cards immediately")
+	_check(not view._callouts.toggle_at(base_pt) and view._callouts._cards.is_empty(),
+		"clicking a landmark does not open a callout while disabled")
+	_check(not view._callouts.nearest().is_empty(),
+		"Nearby landmarks list still sees sites while callouts are disabled")
+	await create_timer(0.6).timeout
+	_check(view._callouts._cards.is_empty(), "auto-callout stays off while disabled")
+	view._callouts.set_enabled(true)
+	await create_timer(0.6).timeout
+	_check(view._callouts._cards.has(id), "re-enabling callouts brings auto-callout back")
 	view.queue_free()
 	await process_frame
 

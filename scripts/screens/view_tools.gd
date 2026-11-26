@@ -10,6 +10,7 @@ extends RefCounted
 ## and calls into here).
 
 const CHIPS := [["labels", "tag", "Labels", "Name peaks, towns and lakes (N)"],
+	["callouts", "map-pin", "Callouts", "Landmark callouts (K)"],
 	["map", "map", "Mini-map", "Mini-map (M)"],
 	["nearby", "landmark", "Nearby", "Nearby landmarks (L)"]]
 const ACTIONS := [["photo", "camera", "Save photo", "Save a photo (P)"],
@@ -78,6 +79,7 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._toast = Toast.new()
 	v._hud.add_child(v._toast)
 	v._horizon.set_enabled(UiPrefs.horizon_labels)
+	v._callouts.set_enabled(UiPrefs.landmark_callouts)
 	v._minimap.visible = UiPrefs.minimap
 	v._fps.visible = UiPrefs.fps_counter
 	sync(v)
@@ -96,6 +98,8 @@ static func _action(v: View360, key: String) -> void:
 			toggle_record(v)
 		"labels":
 			toggle_labels(v)
+		"callouts":
+			toggle_callouts(v)
 		"map":
 			toggle_minimap(v)
 		"nearby":
@@ -108,6 +112,7 @@ static func sync(v: View360) -> void:
 	if v._tool_btns.is_empty():
 		return
 	HudParts.apply_chip(v._tool_btns["labels"], v._horizon.enabled)
+	HudParts.apply_chip(v._tool_btns["callouts"], v._callouts.enabled)
 	HudParts.apply_chip(v._tool_btns["map"], UiPrefs.minimap)
 	ViewChrome.sync_nearby(v)
 	var picked := ViewConditions.date_text(v._date)
@@ -406,6 +411,12 @@ static func toggle_labels(v: View360) -> void:
 	UiPrefs.horizon_labels = not v._horizon.enabled
 	v._horizon.set_enabled(UiPrefs.horizon_labels)
 	v.pref_changed.emit("horizon_labels", UiPrefs.horizon_labels)
+	sync(v)
+
+static func toggle_callouts(v: View360) -> void:
+	UiPrefs.landmark_callouts = not v._callouts.enabled
+	v._callouts.set_enabled(UiPrefs.landmark_callouts)
+	v.pref_changed.emit("landmark_callouts", UiPrefs.landmark_callouts)
 	sync(v)
 
 ## Flips the preference, not the inset's visibility: a sheet may be hiding

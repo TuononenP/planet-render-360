@@ -65,7 +65,7 @@ const PREF_DEFAULTS := {
 	"imperial": false, "dms": false, "clock_12h": false,
 	"text_scale": 1.0,
 	"onboarded": false,
-	"horizon_labels": false, "minimap": false, "photo_stamp": true,
+	"horizon_labels": false, "landmark_callouts": true, "minimap": false, "photo_stamp": true,
 	"video_quality": 1,  # VideoRecorder.QUALITY_LONG: 720p, 1080p, Native
 	"video_dir": "",  # desktop: the folder videos save to; "" asks every time
 	"fps_counter": false,
