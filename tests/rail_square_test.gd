@@ -41,6 +41,7 @@ func _run() -> void:
 	_check_parse(failures)
 	_check_build(failures)
 	_check_underpass(failures)
+	_check_midspan_tjunction(failures)
 	_check_bridge_connections(failures)
 	_check_window(failures)
 	if failures.is_empty():
@@ -153,6 +154,34 @@ func _check_underpass(failures: Array[String]) -> void:
 		if absf(bank - far) > 0.05 * m2u:
 			failures.append("bridge end moved %.2f m (native=%s)" % [(far - bank) / m2u, native])
 	Underpasses._native = native_available
+
+## A footway crosswalk or ramp joining a bridge way at an interior vertex
+## (mid-span T-junction) is in mid-air, not a ground abutment: it must not
+## stamp a keep embankment across the railway tracks passing below.
+func _check_midspan_tjunction(failures: Array[String]) -> void:
+	var d := _flat(256)
+	var m2u := WorldScale.metres_to_units()
+	var c := Vector2(400.0, 400.0) * m2u
+	d.roads = [
+		{"points": PackedVector2Array([c + Vector2(-8, -40) * m2u, c + Vector2(-8, 0) * m2u, c + Vector2(-8, 40) * m2u]),
+			"class": "footway", "width_m": 2.0, "bridge": true, "tunnel": false, "layer": 1},
+		{"points": PackedVector2Array([c + Vector2(8, -40) * m2u, c + Vector2(8, 0) * m2u, c + Vector2(8, 40) * m2u]),
+			"class": "cycleway", "width_m": 2.5, "bridge": true, "tunnel": false, "layer": 1},
+		# Crosswalk joining the two parallel bridge ways at their mid-span vertices.
+		{"points": PackedVector2Array([c + Vector2(-8, 0) * m2u, c + Vector2(8, 0) * m2u]),
+			"class": "footway", "width_m": 2.0, "bridge": true, "tunnel": false, "layer": 1},
+	]
+	d.railways = [
+		{"points": PackedVector2Array([c + Vector2(-300, 0) * m2u, c + Vector2(300, 0) * m2u]),
+			"class": "rail", "width_m": 3.3, "bridge": false, "tunnel": false, "layer": 0},
+	]
+	var ground := GroundTruth.new(d)
+	var far := ground.height_at_world(c.x - 280.0 * m2u, c.y)
+	var under := ground.height_at_world(c.x, c.y)
+	var drop := (far - under) / m2u
+	var want := RoadBuilder.DECK_DEPTH_M + Underpasses.CLEAR_RAIL_M
+	if absf(drop - want) > 0.8:
+		failures.append("mid-span T-junction blocked rail underpass cut: %.2f m, want ~%.2f m" % [drop, want])
 
 ## A mapped bridge can end on a footpath, as Bruce's Stairs does in San
 ## Francisco. Neither connection should dig a trench along that path.

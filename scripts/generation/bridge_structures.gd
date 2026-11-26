@@ -425,7 +425,7 @@ static func _level(s: Structure, index: RoadBridgeDecks.Index, surf: RoadBuilder
 			spine_li = li
 	var line: Dictionary = index.lines[spine_li]
 	s.spine_line = spine_li
-	s.spine = RoadBuilder._resample(line["points"], SPINE_STEP_M * m2u)
+	s.spine = RoadBuilder._resample(BridgeFork.spine_chain(s, spine_li, index, m2u), SPINE_STEP_M * m2u)
 	s.heights = _own(s.spine, line, surf, m2u)
 	s.dist = PackedFloat32Array([0.0])
 	for i in range(1, s.spine.size()):

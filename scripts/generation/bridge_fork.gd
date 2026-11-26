@@ -10,6 +10,67 @@ extends RefCounted
 
 ## Longest chain of members followed.
 const MAX_LINKS := 6
+## Minimum dot product for a continuing road member to extend the spine.
+const CHAIN_DOT := 0.5
+
+## Chains `spine_li` forward and backward through continuing same-kind
+## members of `s` (e.g. a bridge whose undivided approaches split into
+## narrower one-way carriageways over the main span) so the spine spans
+## abutment to abutment instead of stopping mid-deck.
+static func spine_chain(s: BridgeStructures.Structure, spine_li: int,
+		index: RoadBridgeDecks.Index, m2u: float) -> PackedVector2Array:
+	var pts: PackedVector2Array = (index.lines[spine_li]["points"] as PackedVector2Array).duplicate()
+	if pts.size() < 2:
+		return pts
+	var snap := BridgeStructures.FORK_SNAP_M * m2u
+	var used := {spine_li: true}
+	for pass_i in 2:
+		for _step in MAX_LINKS:
+			var tip := pts[pts.size() - 1]
+			var dir := (tip - pts[pts.size() - 2]).normalized()
+			var best_li := -1
+			var best_rev := false
+			var best_half := -1.0
+			var best_dot := -1.0
+			for li in s.members:
+				if used.has(li):
+					continue
+				var line: Dictionary = index.lines[li]
+				if not s.path and str(line["cls"]) in RoadBridgeDecks.PATH_CLASSES:
+					continue
+				var lp: PackedVector2Array = line["points"]
+				if lp.size() < 2:
+					continue
+				var rev := false
+				var next_dir := Vector2.ZERO
+				if lp[0].distance_to(tip) <= snap:
+					next_dir = (lp[1] - lp[0]).normalized()
+				elif lp[lp.size() - 1].distance_to(tip) <= snap:
+					rev = true
+					next_dir = (lp[lp.size() - 2] - lp[lp.size() - 1]).normalized()
+				else:
+					continue
+				var dot := dir.dot(next_dir)
+				if dot < CHAIN_DOT:
+					continue
+				var half := float(line["half"])
+				if half > best_half + 1e-4 or (absf(half - best_half) <= 1e-4 and dot > best_dot):
+					best_li = li
+					best_rev = rev
+					best_half = half
+					best_dot = dot
+			if best_li < 0:
+				break
+			used[best_li] = true
+			var add: PackedVector2Array = index.lines[best_li]["points"]
+			if best_rev:
+				for k in range(add.size() - 2, -1, -1):
+					pts.append(add[k])
+			else:
+				for k in range(1, add.size()):
+					pts.append(add[k])
+		pts.reverse()
+	return pts
 
 ## The landing level (plus the deck's lift) of the free ends reachable from
 ## `p` through `s`'s members, or NAN when none goes on as a road.

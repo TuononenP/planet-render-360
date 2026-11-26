@@ -61,6 +61,7 @@ func _init() -> void:
 	_switchback(failures)
 	_arm(failures)
 	_fork_end(failures)
+	_chained_split(failures)
 	_rise_for_path(failures)
 	if failures.is_empty():
 		print("bridge structures: OK")
@@ -409,6 +410,48 @@ func _fork_end(failures: Array[String]) -> void:
 		failures.append("a spine end forking into branches that land on roads should be an abutment")
 	for li in s.members:
 		_meets(s, li, surf, failures, "a forked end", 0.5)
+
+## An undivided 6 m bridge approach splitting into two 3 m one-way carriageways
+## over a cut railway trench and rejoining into a 6 m approach: the spine must
+## chain abutment to abutment so the mid-span stays level over the trench.
+func _chained_split(failures: Array[String]) -> void:
+	var d := _flat()
+	d.land_polygons = []
+	d.roads = [
+		{"class": "secondary", "width_m": 6.0, "lanes": 2, "bridge": true, "layer": 1,
+			"points": PackedVector2Array([Vector2(-40, 0), Vector2(-20, 0)])},
+		{"class": "secondary", "width_m": 3.0, "lanes": 1, "oneway": 1, "bridge": true, "layer": 1,
+			"points": PackedVector2Array([Vector2(-20, 0), Vector2(-15, -3), Vector2(15, -3), Vector2(20, 0)])},
+		{"class": "secondary", "width_m": 3.0, "lanes": 1, "oneway": 1, "bridge": true, "layer": 1,
+			"points": PackedVector2Array([Vector2(20, 0), Vector2(15, 3), Vector2(-15, 3), Vector2(-20, 0)])},
+		{"class": "secondary", "width_m": 6.0, "lanes": 2, "bridge": true, "layer": 1,
+			"points": PackedVector2Array([Vector2(20, 0), Vector2(40, 0)])},
+		{"class": "secondary", "width_m": 6.0, "lanes": 2,
+			"points": PackedVector2Array([Vector2(-80, 0), Vector2(-40, 0)])},
+		{"class": "secondary", "width_m": 6.0, "lanes": 2,
+			"points": PackedVector2Array([Vector2(40, 0), Vector2(80, 0)])},
+	]
+	d.railways = [
+		{"class": "rail", "width_m": 3.3, "bridge": false, "tunnel": false, "layer": 0,
+			"points": PackedVector2Array([Vector2(0, -150), Vector2(0, 150)])},
+		{"class": "rail", "width_m": 3.3, "bridge": false, "tunnel": false, "layer": 0,
+			"points": PackedVector2Array([Vector2(18, -150), Vector2(18, 150)])},
+	]
+	d.bridge_areas = [{"points": _rect(-40, -6, 40, 6), "layer": 1}]
+	var surf := RoadBuilder._Surface.new(d, GroundTruth.new(d))
+	var plan := surf.road_bridges.structures
+	plan.prepare(surf, 1.0)
+	if plan.structures.size() != 1:
+		failures.append("chained split bridge should be one structure")
+		return
+	var s: BridgeStructures.Structure = plan.structures[0]
+	var span := s.dist[s.dist.size() - 1]
+	if span < 75.0:
+		failures.append("chained split spine should span ~80 m, got %.1f m" % span)
+	var deck_joint := s.surface_at(Vector2(20, 0))
+	var deck_end := s.surface_at(Vector2(-39, 0))
+	if deck_end - deck_joint > 1.0:
+		failures.append("chained split deck sagged at mid-bridge joint: %.2f vs %.2f m" % [deck_joint, deck_end])
 
 ## A T-shaped outline: a road bridge and a cycleway arm leaving its side.
 ## The arm meets the road's level and comes down to the ground at its far

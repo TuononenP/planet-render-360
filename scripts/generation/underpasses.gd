@@ -77,11 +77,18 @@ static func carve(surface: PackedFloat32Array, level: PackedFloat32Array,
 	# a pillar of uncut ground standing among the tracks below.
 	var keep := {}
 	var hs := float(size) * 0.5
+	# A bridge end that lands on any vertex of another bridge way (an
+	# end-to-end viaduct joint or a mid-span T-junction like a crosswalk
+	# or access ramp) is in mid-air, not a ground bank: kept, it left a
+	# pillar of uncut ground standing among the tracks below.
 	var joints := {}
 	for b in bridges:
-		var ends: PackedVector2Array = b["points"]
-		for e in [ends[0], ends[ends.size() - 1]]:
-			joints[_node(e, m2u)] = int(joints.get(_node(e, m2u), 0)) + 1
+		var seen := {}
+		for p: Vector2 in b["points"]:
+			var k := _node(p, m2u)
+			if not seen.has(k):
+				seen[k] = true
+				joints[k] = int(joints.get(k, 0)) + 1
 	for b in bridges:
 		var ends: PackedVector2Array = b["points"]
 		for end_i: int in [0, ends.size() - 1]:
