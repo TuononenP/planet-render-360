@@ -225,7 +225,7 @@ static func prepare(list: Array, ctx: Dictionary) -> void:
 			_plans[keys[k]] = plans[k]
 		_mutex.unlock()
 		if fresh and not ((list[k] as Dictionary).get("parts", []) as Array).is_empty():
-			_note_partial(list[k])
+			_note_partial(list[k], plans[k])
 
 ## The plan memo's key: position and outline, and the OSM source.
 static func _plan_key(b: Dictionary) -> String:
@@ -267,12 +267,17 @@ static func _compute(b: Dictionary, ctx: Dictionary) -> Array:
 		if not base.is_empty():
 			out = _plan_masses(b, ctx, [base] + masses, false, look, parent_res, legacy,
 				parent_shape, fh)
+		else:
+			var shells := _uncovered_shells(b, out, fh)
+			if not shells.is_empty():
+				out = _plan_masses(b, ctx, shells + masses, false, look, parent_res, legacy,
+					parent_shape, fh)
 		_seat_lifts(out)
 		_seat_floaters(b, out)
 	return out
 
-## Counts `b` in partial_outlines when its parts cover under 90% of it.
-static func _note_partial(b: Dictionary) -> void:
+## Counts `b` in partial_outlines when planned masses still cover under 90% of it.
+static func _note_partial(b: Dictionary, planned: Array = []) -> void:
 	var fp: Variant = b.get("footprint", null)
 	if not (fp is PackedVector2Array) or (fp as PackedVector2Array).size() < 3:
 		return
@@ -281,8 +286,9 @@ static func _note_partial(b: Dictionary) -> void:
 	if total <= 0.0:
 		return
 	var covered := 0.0
-	for p in b.get("parts", []):
-		var pf: Variant = (p as Dictionary).get("footprint", null)
+	var check_list: Array = planned if not planned.is_empty() else (b.get("parts", []) as Array)
+	for item in check_list:
+		var pf: Variant = (item as Dictionary).get("ring" if not planned.is_empty() else "footprint", null)
 		if pf is PackedVector2Array and (pf as PackedVector2Array).size() >= 3:
 			for piece in Geometry2D.intersect_polygons(outline, pf):
 				covered += absf(RingGeometry.signed_area(piece))
@@ -488,6 +494,109 @@ static func _missing_base(b: Dictionary, planned: Array) -> Dictionary:
 	base["roof_height_m"] = 0.0
 	base["roof_levels"] = 0
 	return base
+
+## Extrudes the uncovered lower podium/wing of `b`'s outline when mapped parts
+## all stand on the ground (no raw min_height / min_level), cover under 85% of
+## the footprint without forming a hollow wrapper collar, and `b` carries its
+## own lower base height below a taller mapped tower/annex part (e.g. an
+## 8-storey hotel `building:part` on one corner of a 4-storey block). Never
+## extrudes S3DB wrapper outlines that merely bound same-height setback parts.
+static func _uncovered_shells(b: Dictionary, planned: Array, fh: float) -> Array:
+	if planned.is_empty() or bool(b.get("mapped_landmark", false)) \
+			or str(b.get("kind", "")) in ["bridge", "roof"] \
+			or float(b.get("min_height_m", 0.0)) > 0.0 or int(b.get("min_level", 0)) > 0:
+		return []
+	for rp in b.get("parts", []):
+		var rpd := rp as Dictionary
+		if float(rpd.get("min_height_m", 0.0)) > 0.0 or int(rpd.get("min_level", 0)) > 0:
+			return []
+	var fp: Variant = b.get("footprint", null)
+	if not (fp is PackedVector2Array) or (fp as PackedVector2Array).size() < 3:
+		return []
+	var max_part_top := 0.0
+	for m in planned:
+		var md := m as Dictionary
+		if float(md["min_m"]) > 0.0:
+			return []
+		max_part_top = maxf(max_part_top, float(md["wall_m"]) + float(md["rh_m"]))
+	var lv := int(b.get("levels", 0))
+	var b_src := str(b.get("height_source", ""))
+	var parent_base_m := 0.0
+	if lv > 0 and (b_src == "levels" or float(b.get("height", 0.0)) >= max_part_top - 0.5):
+		parent_base_m = float(lv) * fh
+	elif b_src in ["tag_height", "hel_lod2", "register"]:
+		parent_base_m = float(b.get("height", 0.0))
+	if parent_base_m <= 0.0 or max_part_top < parent_base_m + maxf(fh * 0.8, 2.5):
+		return []
+	var outline := BuildingWalls._clean_ring(fp as PackedVector2Array)
+	var total := absf(RingGeometry.signed_area(outline))
+	if total <= 0.0:
+		return []
+	var covered := 0.0
+	var m2u := WorldScale.metres_to_units()
+	var m2 := m2u * m2u
+	var rem: Array = [outline]
+	for m in planned:
+		var pr: PackedVector2Array = (m as Dictionary)["ring"]
+		for piece in Geometry2D.intersect_polygons(outline, pr):
+			covered += absf(RingGeometry.signed_area(piece))
+		var cutters := Geometry2D.offset_polygon(pr, 0.03 * m2u)
+		if cutters.is_empty():
+			cutters = [pr]
+		for cut in cutters:
+			var next_rem: Array = []
+			for poly in rem:
+				for cp in Geometry2D.clip_polygons(poly, cut):
+					if Geometry2D.is_polygon_clockwise(cp):
+						return []  # Wrapper collar around an interior part: S3DB setback outline.
+					next_rem.append(cp)
+			rem = next_rem
+	if covered >= total * 0.85 or rem.is_empty():
+		return []
+	var outers: Array[PackedVector2Array] = []
+	for poly in rem:
+		var p := poly as PackedVector2Array
+		if p.size() < 3:
+			continue
+		if Geometry2D.is_polygon_clockwise(p):
+			return []  # Wrapper collar around an interior part: S3DB setback outline.
+		outers.append(p)
+	var orig_holes: Array[PackedVector2Array] = []
+	for h in b.get("holes", []):
+		if h is PackedVector2Array and (h as PackedVector2Array).size() >= 3:
+			orig_holes.append(h as PackedVector2Array)
+	var shells: Array = []
+	for outer in outers:
+		var sh_holes: Array = []
+		var hole_area := 0.0
+		for h in orig_holes:
+			for piece in Geometry2D.intersect_polygons(outer, h):
+				if piece.size() >= 3:
+					hole_area += absf(RingGeometry.signed_area(piece))
+					sh_holes.append(piece)
+		var area_m2 := (absf(RingGeometry.signed_area(outer)) - hole_area) / m2
+		if area_m2 < 40.0:
+			continue
+		var perim_u := 0.0
+		for i in outer.size():
+			perim_u += outer[i].distance_to(outer[(i + 1) % outer.size()])
+		if perim_u <= 0.0 or (area_m2 / (perim_u / m2u)) < 1.2:
+			continue
+		var sh := b.duplicate()
+		sh.erase("parts")
+		sh["footprint"] = outer
+		sh["holes"] = sh_holes
+		var bb := RingGeometry.aabb(outer)
+		sh["x"] = bb.get_center().x
+		sh["z"] = bb.get_center().y
+		if lv > 0 and float(lv) * fh <= parent_base_m + 0.1:
+			sh["height_source"] = "levels"
+			sh["height"] = float(lv) * fh
+		else:
+			sh["height_source"] = "tag_height"
+			sh["height"] = parent_base_m
+		shells.append(sh)
+	return shells
 
 ## A mass's base above the ground (metres): min_height, or min_level
 ## storeys of the look's floor height `fh`, whichever is higher.

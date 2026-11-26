@@ -149,8 +149,9 @@ void fragment() {
 		vec2 iuv = UV * inner_map.xy + inner_map.zw;
 		vec2 ie = min(iuv, 1.0 - iuv);
 		float inside = smoothstep(0.0, 0.1, min(ie.x, ie.y));
-		vec3 inner = max(texture(photo_inner, iuv).rgb * inner_gain + inner_bias, vec3(0.0));
-		hf = mix(hf, t_dehaze(inner * photo_gain), inside);
+		vec4 inner_s = texture(photo_inner, iuv);
+		vec3 inner = max(inner_s.rgb * inner_gain + inner_bias, vec3(0.0));
+		hf = mix(hf, t_dehaze(inner * photo_gain), inside * inner_s.a);
 	}
 	float exg = (2.0 * lf.g - lf.r - lf.b) / max(lf.r + lf.g + lf.b, 1e-3);
 	float veg = smoothstep(veg_lo, veg_hi, exg);

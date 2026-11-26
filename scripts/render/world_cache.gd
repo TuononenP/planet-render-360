@@ -442,7 +442,10 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	var last_us := [Time.get_ticks_usec()]
 	var pump := func() -> void:
 		var t := Time.get_ticks_usec()
-		var budget := pump_budget_us(t - last_us[0], background)
+		var streaming := is_instance_valid(view) and view is View360 \
+			and (view as View360)._streamer != null \
+			and (view as View360)._streamer.state != WorldStreamer.State.IDLE
+		var budget := pump_budget_us(t - last_us[0], background or streaming)
 		while th.is_alive() and Time.get_ticks_usec() - t < budget:
 			RenderingServer.force_sync()
 		last_us[0] = t

@@ -28,8 +28,13 @@ var _hsy := false
 ## layer: the canopy and surface classes load beside each other.
 var _band_http: Array[HTTPRequest] = []
 const BAND_PARALLEL := 4
+const COG_PARALLEL := 6
 ## Where the last canopy came from: "meta", "hsy", "hsy+meta" or "".
 var canopy_source := ""
+## In-flight window fetches keyed by cache path so warm + live runs never
+## download the same canopy or land-cover window twice concurrently.
+static var _inflight := {}  # path -> Array[Callable]
+var _owned_paths: Array[String] = []
 
 func _ready() -> void:
 	_cover_fetcher = CogFetcher.new()
@@ -53,6 +58,21 @@ func cancel() -> void:
 	for task in _workers:
 		WorkerThreadPool.wait_for_task_completion(task)
 	_workers.clear()
+	for p in _owned_paths:
+		_finish_inflight(p, null, "", true)
+	_owned_paths.clear()
+
+func _release_inflight(path: String, img: Image, src: String, cancelled := false) -> void:
+	if _owned_paths.has(path):
+		_owned_paths.erase(path)
+		_finish_inflight(path, img, src, cancelled)
+
+static func _finish_inflight(path: String, img: Image, src: String, cancelled := false) -> void:
+	var waiters: Array = _inflight.get(path, [])
+	_inflight.erase(path)
+	for cb: Callable in waiters:
+		if cb.is_valid():
+			cb.call(img, src, cancelled)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
@@ -109,6 +129,22 @@ func _fetch_cog(kind: String, lat: float, lon: float, reader: CogFetcher, gen: i
 			return cached
 	if offline_mode:
 		return null
+	while _inflight.has(path):
+		var shared := {"done": false, "img": null, "cancelled": false}
+		(_inflight[path] as Array).append(func(img: Image, _src: String, cancelled: bool) -> void:
+			shared["img"] = img
+			shared["cancelled"] = cancelled
+			shared["done"] = true)
+		while not shared["done"] and gen == _generation and is_inside_tree():
+			await get_tree().process_frame
+		if gen != _generation:
+			return null
+		if shared["img"] != null:
+			return shared["img"]
+		if not bool(shared["cancelled"]) or not is_inside_tree():
+			return null
+	_inflight[path] = []
+	_owned_paths.append(path)
 	var box := {}
 	var abort := _abort
 	var task := WorkerThreadPool.add_task(func() -> void:
@@ -120,30 +156,42 @@ func _fetch_cog(kind: String, lat: float, lon: float, reader: CogFetcher, gen: i
 		WorkerThreadPool.wait_for_task_completion(task)
 		_workers.erase(task)
 	if gen != _generation:
+		_release_inflight(path, null, "", true)
 		return null
 	var plan: Dictionary = box.get("plan", {})
-	if plan.is_empty() or (plan["groups"] as Array).size() > MAX_GROUPS:
+	var groups: Array = plan.get("groups", []) if not plan.is_empty() else []
+	if plan.is_empty() or groups.size() > MAX_GROUPS:
+		_release_inflight(path, null, "")
 		return null
 	var tiles: Array = []
-	for group in plan["groups"]:
-		var state := {"done": false, "result": {}}
-		var callback := func(result: Dictionary) -> void:
-			state["done"] = true
-			state["result"] = result
-		reader.finished.connect(callback, CONNECT_ONE_SHOT)
-		reader.fetch_tile(group["url"], group["x"], group["y"], group["reduction"])
-		while not state["done"] and gen == _generation:
+	tiles.resize(groups.size())
+	var gstate := {"next": 0, "pending": 0, "failed": false}
+	while (int(gstate["next"]) < groups.size() or int(gstate["pending"]) > 0) \
+			and gen == _generation and not bool(gstate["failed"]) and is_inside_tree():
+		while int(gstate["next"]) < groups.size() and int(gstate["pending"]) < COG_PARALLEL \
+				and not bool(gstate["failed"]):
+			var gi := int(gstate["next"])
+			gstate["next"] = gi + 1
+			gstate["pending"] = int(gstate["pending"]) + 1
+			var group: Dictionary = groups[gi]
+			(func() -> void:
+				var tile := await reader.read_tile(group["url"], group["x"], group["y"], group["reduction"])
+				gstate["pending"] = int(gstate["pending"]) - 1
+				if gen != _generation:
+					return
+				if tile.is_empty() or int(tile.get("index", -1)) != int(group["index"]) \
+						or int(tile.get("ifd", {}).get("width", 0)) != int(group["width"]) \
+						or int(tile.get("ifd", {}).get("tile_width", 0)) != int(plan["tile_size"]):
+					gstate["failed"] = true
+				else:
+					tiles[gi] = tile["pixels"]).call()
+		if int(gstate["pending"]) > 0:
 			await get_tree().process_frame
-		if gen != _generation:
-			if reader.finished.is_connected(callback):
-				reader.finished.disconnect(callback)
-			return null
-		var tile: Dictionary = state["result"]
-		if tile.is_empty() or int(tile.get("index", -1)) != int(group["index"]) \
-				or int(tile.get("ifd", {}).get("width", 0)) != int(group["width"]) \
-				or int(tile.get("ifd", {}).get("tile_width", 0)) != int(plan["tile_size"]):
-			return null
-		tiles.append(tile["pixels"])
+	if bool(gstate["failed"]):
+		reader.cancel()
+	if gen != _generation or bool(gstate["failed"]):
+		_release_inflight(path, null, "", gen != _generation)
+		return null
 	box = {}
 	task = WorkerThreadPool.add_task(func() -> void: box["bytes"] = assemble(plan, tiles, abort))
 	_workers.append(task)
@@ -153,9 +201,11 @@ func _fetch_cog(kind: String, lat: float, lon: float, reader: CogFetcher, gen: i
 		WorkerThreadPool.wait_for_task_completion(task)
 		_workers.erase(task)
 	if gen != _generation:
+		_release_inflight(path, null, "", true)
 		return null
 	var bytes: PackedByteArray = box.get("bytes", PackedByteArray())
 	if bytes.size() != size * size:
+		_release_inflight(path, null, "")
 		return null
 	var image := Image.create_from_data(size, size, false, Image.FORMAT_L8, bytes)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(CacheStore.base_dir()))
@@ -165,6 +215,7 @@ func _fetch_cog(kind: String, lat: float, lon: float, reader: CogFetcher, gen: i
 		CacheStore.note_written(path)
 	else:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(temp))
+	_release_inflight(path, image, "meta")
 	return image
 
 ## HSY's canopy bands composed over Meta's CHM (HsyCanopy), cached as
@@ -180,16 +231,47 @@ func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 				return cached
 	if offline_mode:
 		return null
+	var hsy_key := cache_path("canopy_hsym", lat, lon)
+	while _inflight.has(hsy_key):
+		var shared := {"done": false, "img": null, "src": "", "cancelled": false}
+		(_inflight[hsy_key] as Array).append(func(img: Image, src: String, cancelled: bool) -> void:
+			shared["img"] = img
+			shared["src"] = src
+			shared["cancelled"] = cancelled
+			shared["done"] = true)
+		while not shared["done"] and gen == _generation and is_inside_tree():
+			await get_tree().process_frame
+		if gen != _generation:
+			return null
+		if shared["img"] != null:
+			canopy_source = str(shared["src"])
+			return shared["img"]
+		if not bool(shared["cancelled"]) or not is_inside_tree():
+			return null
+	_inflight[hsy_key] = []
+	_owned_paths.append(hsy_key)
 	var urls: Array = []
 	for i in HsyCanopy.LAYERS.size():
 		urls.append(HsyCanopy.band_url(i, lat, lon, CANOPY_SIZE))
-	var bodies: Variant = await _fetch_bands(urls, gen)
-	if not (bodies is Array):
-		if gen == _generation:
-			print("HSY canopy bands unavailable; Meta canopy instead")
-		return null
-	var chm: Image = await _fetch_cog("canopy", lat, lon, reader, gen)
+	# Overlap HSY WMS bands and Meta CHM COG tiles instead of awaiting sequentially.
+	var both := {"bands_done": false, "bodies": null, "chm_done": false, "chm": null}
+	(func() -> void:
+		both["bodies"] = await _fetch_bands(urls, gen)
+		both["bands_done"] = true).call()
+	(func() -> void:
+		both["chm"] = await _fetch_cog("canopy", lat, lon, reader, gen)
+		both["chm_done"] = true).call()
+	while (not bool(both["bands_done"]) or not bool(both["chm_done"])) \
+			and gen == _generation and is_inside_tree():
+		await get_tree().process_frame
 	if gen != _generation:
+		_release_inflight(hsy_key, null, "", true)
+		return null
+	var bodies: Variant = both["bodies"]
+	var chm: Image = both["chm"]
+	if not (bodies is Array):
+		_release_inflight(hsy_key, null, "")
+		print("HSY canopy bands unavailable; Meta canopy instead")
 		return null
 	var box := {}
 	var task := WorkerThreadPool.add_task(func() -> void:
@@ -202,6 +284,7 @@ func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 		WorkerThreadPool.wait_for_task_completion(task)
 		_workers.erase(task)
 	if gen != _generation or box.get("image") == null:
+		_release_inflight(hsy_key, null, "", gen != _generation)
 		return null
 	var image: Image = box["image"]
 	var kind := "canopy_hsym" if chm != null else "canopy_hsy"
@@ -209,6 +292,7 @@ func _fetch_hsy(lat: float, lon: float, reader: CogFetcher, gen: int) -> Image:
 	if image.save_png(path) == OK:
 		CacheStore.note_written(path)
 	canopy_source = "hsy+meta" if chm != null else "hsy"
+	_release_inflight(hsy_key, image, canopy_source)
 	return image
 
 ## The PNG bodies of `urls`, BAND_PARALLEL at a time, in order; null

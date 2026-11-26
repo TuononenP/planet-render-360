@@ -481,8 +481,10 @@ func run(lat: float, lon: float, place_name_override: String = "",
 	if not warm_only:
 		PostpassGate.hold_low()  # released once its layers are in (_await_far_city)
 	_farcity.coarse = background
+	_farcity.warm_only = warm_only
 	_sat_took = 0.0
 	_climate_took = 0.0
+	_osm.cache_parsed = warm_only
 	_osm.fetch(lat, lon, RenderSettings.Preset.HIGH, data.quality_preset > RenderSettings.Preset.FAST)
 	_city.offline = _osm.offline_mode
 	_city_credits = []
@@ -734,8 +736,9 @@ func _apply_far_field(data: LocationData) -> void:
 	data.dem_rings = _farfield_rings
 	data.far_drapes = _farfield_drapes
 	data.far_water_mask = _farfield.water_mask
-	print("FAR-FIELD fetch: %s rings=%d drapes=%d water=%s" % [str(_farfield.timings),
-		data.dem_rings.size(), data.far_drapes.size(), not data.far_water_mask.is_empty()])
+	if not warm_only:
+		print("FAR-FIELD fetch: %s rings=%d drapes=%d water=%s" % [str(_farfield.timings),
+			data.dem_rings.size(), data.far_drapes.size(), not data.far_water_mask.is_empty()])
 
 func _build_far_procedural(data: LocationData) -> void:
 	# Offline backdrop: same noise family as _build_dem, wider and

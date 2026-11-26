@@ -31,9 +31,9 @@ const MAX_PART_PX := 1920
 const TILE_PX := 256
 ## Spherical-mercator half circumference (m).
 const HALF_C := PI * 6378137.0
-## A part whose every channel varies less than this is the server's
-## blank fill past the data, not imagery.
-const BLANK_STD := 2.0 / 255.0
+## A part whose sRGB channels vary less than this across point samples is
+## the server's flat nodata fill past coverage, not dark water imagery.
+const BLANK_SRGB_STD := 1.2 / 255.0
 
 ## The source for a mosaic at (lat, lon) of span tiles at zoom, "" none.
 static func source_for(lat: float, lon: float, zoom: int, span: int) -> String:
@@ -75,15 +75,37 @@ static func part_url(src: String, origin_px: Vector2, part_px: int, zoom: int) -
 static func credit(src: String) -> String:
 	return str((SOURCES.get(src, {}) as Dictionary).get("credit", ""))
 
-## Whether `img` is blank fill (no data there): flat in every channel.
+## Whether `img` is blank fill (no data there): flat in every sRGB channel.
+## Point-sampled in sRGB without box-blurring or linearising, so dark coastal
+## water ripples are never mistaken for pure white/black WMS nodata fill.
 static func is_blank(img: Image) -> bool:
 	if img == null or img.is_empty():
 		return true
-	var small := img.duplicate() as Image
-	small.resize(32, 32, Image.INTERPOLATE_BILINEAR)
-	var stats := channel_stats(small)
-	var std: Vector3 = stats[1]
-	return std.x < BLANK_STD and std.y < BLANK_STD and std.z < BLANK_STD
+	var w := img.get_width()
+	var h := img.get_height()
+	var sx := maxi(1, w / 64)
+	var sy := maxi(1, h / 64)
+	var sum := Vector3.ZERO
+	var sq := Vector3.ZERO
+	var n := 0
+	var y := 0
+	while y < h:
+		var x := 0
+		while x < w:
+			var c := img.get_pixel(x, y)
+			var v := Vector3(c.r, c.g, c.b)
+			sum += v
+			sq += v * v
+			n += 1
+			x += sx
+		y += sy
+	if n <= 1:
+		return true
+	var mean := sum / float(n)
+	var var3 := sq / float(n) - mean * mean
+	return sqrt(maxf(var3.x, 0.0)) < BLANK_SRGB_STD \
+		and sqrt(maxf(var3.y, 0.0)) < BLANK_SRGB_STD \
+		and sqrt(maxf(var3.z, 0.0)) < BLANK_SRGB_STD
 
 ## Per-channel (mean, std) of an image's pixels, in linear colour.
 static func channel_stats(img: Image) -> Array:

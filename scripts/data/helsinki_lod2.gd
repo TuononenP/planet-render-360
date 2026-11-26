@@ -41,8 +41,10 @@ const ESTIMATED := ["default", "estimate", "levels"]
 static var _manifest: Dictionary = {}
 ## Decoded cells by key: a streamed world reads the same cells again.
 ## Merges run on worker threads (CityOpenData.merge), two at once while
-## streaming: the caches are shared under one lock.
+## streaming: the caches are shared under one lock and bounded to DECODED_MAX.
+const DECODED_MAX := 32
 static var _decoded: Dictionary = {}
+static var _decoded_order: Array[String] = []
 static var _lock := Mutex.new()
 
 static func _cells() -> Dictionary:
@@ -110,6 +112,10 @@ static func rows_for(lat: float, lon: float) -> Array:
 		if cached == null:
 			cached = read_cell(key)
 			_lock.lock()
+			if not _decoded.has(key):
+				_decoded_order.append(str(key))
+				while _decoded_order.size() > DECODED_MAX:
+					_decoded.erase(_decoded_order.pop_front())
 			_decoded[key] = cached
 			_lock.unlock()
 		rows.append_array(cached)

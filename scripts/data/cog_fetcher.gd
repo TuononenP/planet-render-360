@@ -14,19 +14,28 @@ const REQUEST_TIMEOUT_S := 15.0
 
 ## Decoded tiles kept for the session, most recent last: neighbouring
 ## places (the streamer's centres 1-2 km apart) need the same few source
-## tiles, which were downloaded and decoded again for every one.
-const TILE_CACHE_SIZE := 24
+## tiles; 96 tiles (~6-24 MB L8) covers multi-stretch canopy windows without
+## thrashing.
+const TILE_CACHE_SIZE := 96
 
 var _generation := 0
 var _requests: Array[HTTPRequest] = []
 var _tasks: Array[int] = []
+var _owned_meta_urls: Array[String] = []
 ## Header and IFD chain per URL, shared by every reader (main thread).
 static var _metadata := {}
+static var _meta_loading := {}
 static var _tiles := {}
 static var _tile_order: Array[String] = []
 
 func cancel() -> void:
 	_generation += 1
+	for u in _owned_meta_urls:
+		var st: Variant = _meta_loading.get(u, null)
+		if st is Dictionary:
+			(st as Dictionary)["cancelled"] = true
+		_meta_loading.erase(u)
+	_owned_meta_urls.clear()
 	for req in _requests:
 		if is_instance_valid(req):
 			req.cancel_request()
@@ -42,44 +51,89 @@ func _notification(what: int) -> void:
 ## the finest available overview no coarser than four source pixels.
 func fetch_tile(url: String, x: int, y: int, reduction: float = 1.0) -> void:
 	cancel()
-	_fetch(url, x, y, reduction, _generation)
+	var res := await _read_internal(url, x, y, reduction, _generation)
+	if res.has("_superseded"):
+		return
+	finished.emit(res)
 
-func _fetch(url: String, x: int, y: int, reduction: float, gen: int) -> void:
-	var record: Dictionary = _metadata.get(url, {})
-	if record.is_empty():
+## Concurrent-safe awaitable tile read sharing this reader's generation
+## without cancelling sibling tile reads in the same window.
+func read_tile(url: String, x: int, y: int, reduction: float = 1.0) -> Dictionary:
+	var res := await _read_internal(url, x, y, reduction, _generation)
+	return {} if res.has("_superseded") else res
+
+func _ensure_metadata(url: String, gen: int) -> Dictionary:
+	while true:
+		var record: Dictionary = _metadata.get(url, {})
+		if not record.is_empty():
+			return record
+		if _meta_loading.has(url):
+			var st: Dictionary = _meta_loading[url]
+			while _meta_loading.has(url) and _meta_loading[url] == st \
+					and gen == _generation and is_inside_tree():
+				await get_tree().process_frame
+			if gen != _generation:
+				return {"_superseded": true}
+			record = _metadata.get(url, {})
+			if not record.is_empty():
+				return record
+			if bool(st.get("cancelled", false)) and is_inside_tree():
+				continue
+			return {}
+		var own := {"cancelled": false}
+		_meta_loading[url] = own
+		_owned_meta_urls.append(url)
 		var fetched_header := await _range(url, 0, HEADER_BYTES - 1, gen)
 		if gen != _generation:
-			return
+			_release_meta_url(url, own, true)
+			return {"_superseded": true}
 		var first := CogReader.first_ifd(fetched_header)
 		if first < 0:
-			finished.emit({})
-			return
+			_release_meta_url(url, own, false)
+			return {}
 		var chain := CogReader.parse_ifds(fetched_header, 0, first)
 		var found: Array = chain["ifds"]
 		var next := int(chain["next"])
 		while next > 0 and found.size() < MAX_IFDS:
 			var extra := await _range(url, next, next + IFD_BYTES - 1, gen)
 			if gen != _generation:
-				return
+				_release_meta_url(url, own, true)
+				return {"_superseded": true}
 			var tail := CogReader.parse_ifds(extra, next, next)
 			if (tail["ifds"] as Array).is_empty():
-				finished.emit({})
-				return
+				_release_meta_url(url, own, false)
+				return {}
 			found.append_array(tail["ifds"])
 			next = int(tail["next"])
 		if next != 0 or found.size() > MAX_IFDS:
-			finished.emit({})
-			return
+			_release_meta_url(url, own, false)
+			return {}
 		record = {"header": fetched_header, "ifds": found}
 		_metadata[url] = record
+		_release_meta_url(url, own, false)
+		return record
+	return {}
+
+func _release_meta_url(url: String, own: Dictionary, cancelled: bool) -> void:
+	if cancelled:
+		own["cancelled"] = true
+	_owned_meta_urls.erase(url)
+	if _meta_loading.get(url, null) == own:
+		_meta_loading.erase(url)
+
+func _read_internal(url: String, x: int, y: int, reduction: float, gen: int) -> Dictionary:
+	var record := await _ensure_metadata(url, gen)
+	if record.has("_superseded") or gen != _generation:
+		return {"_superseded": true}
+	if record.is_empty():
+		return {}
 	var header: PackedByteArray = record["header"]
 	var ifds: Array = record["ifds"]
 	var base := CogReader.overview(ifds, 1.0)
 	var ifd := CogReader.overview(ifds, reduction)
 	if base.is_empty() or ifd.is_empty() or x < 0 or y < 0 \
 			or x >= int(base["width"]) or y >= int(base["height"]):
-		finished.emit({})
-		return
+		return {}
 	var px := floori(float(x) * float(ifd["width"]) / float(base["width"]))
 	var py := floori(float(y) * float(ifd["height"]) / float(base["height"]))
 	var tile := CogReader.tile_index(ifd, px, py)
@@ -89,19 +143,27 @@ func _fetch(url: String, x: int, y: int, reduction: float, gen: int) -> void:
 	if _tiles.has(key):
 		_tile_order.erase(key)
 		_tile_order.append(key)
-		finished.emit({"ifd": ifd, "index": tile, "pixel": Vector2i(px % width, py % height),
-			"pixels": _tiles[key]})
-		return
-	var offset := await _table_entry(url, ifd["offsets"], tile, header, gen)
-	var length := await _table_entry(url, ifd["sizes"], tile, header, gen)
+		return {"ifd": ifd, "index": tile, "pixel": Vector2i(px % width, py % height),
+			"pixels": _tiles[key]}
+	var pair := [0, 0]
+	var pair_left := [2]
+	(func() -> void:
+		pair[0] = await _table_entry(url, ifd["offsets"], tile, header, gen)
+		pair_left[0] -= 1).call()
+	(func() -> void:
+		pair[1] = await _table_entry(url, ifd["sizes"], tile, header, gen)
+		pair_left[0] -= 1).call()
+	while pair_left[0] > 0 and gen == _generation and is_inside_tree():
+		await get_tree().process_frame
 	if gen != _generation:
-		return
+		return {"_superseded": true}
+	var offset: int = pair[0]
+	var length: int = pair[1]
 	if offset <= 0 or length <= 0 or length > MAX_TILE_BYTES:
-		finished.emit({})
-		return
+		return {}
 	var compressed := await _range(url, offset, offset + length - 1, gen)
 	if gen != _generation:
-		return
+		return {"_superseded": true}
 	var box := {}
 	var predictor := int(ifd.get("predictor", 1))
 	var task := WorkerThreadPool.add_task(func() -> void:
@@ -113,14 +175,13 @@ func _fetch(url: String, x: int, y: int, reduction: float, gen: int) -> void:
 		WorkerThreadPool.wait_for_task_completion(task)
 		_tasks.erase(task)
 	if gen != _generation:
-		return
+		return {"_superseded": true}
 	var pixels: PackedByteArray = box.get("pixels", PackedByteArray())
 	if pixels.is_empty():
-		finished.emit({})
-		return
+		return {}
 	_remember(key, pixels)
-	finished.emit({"ifd": ifd, "index": tile, "pixel": Vector2i(px % width, py % height),
-		"pixels": pixels})
+	return {"ifd": ifd, "index": tile, "pixel": Vector2i(px % width, py % height),
+		"pixels": pixels}
 
 static func _remember(key: String, pixels: PackedByteArray) -> void:
 	_tiles[key] = pixels

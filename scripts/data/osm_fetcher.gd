@@ -225,6 +225,10 @@ static func roads_to_v1(roads: Array) -> Array:
 ## Test hook (DEM/Satellite T2.1/T2.2 precedent): when true, fetch()
 ## serves the on-device cache or fails immediately — never the network.
 var offline_mode := false
+## True on warm-only scout runs whose parsed Dictionary is never mutated
+## in place by CityOpenData / HeritageZones / Lod2MeshBuilder, so it is
+## safe to store directly in OsmParseCache for the upcoming live build.
+var cache_parsed := false
 ## ISO 3166-1 alpha-2 country of the last parsed viewpoint ("" unknown:
 ## API fallback, or a payload cached before the query asked for it).
 var country := ""
@@ -946,9 +950,11 @@ func _finish() -> void:
 		poi = merge_payloads(poi, _bridge_text)
 	if aero_text != "":
 		poi = merge_payloads(poi, aero_text)
+	var store_in_cache := cache_parsed
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
 		var parsed := parse_features(merge_payloads(merge_payloads(detailed, ring), poi), lat, lon)
-		OsmParseCache.store(ckey, parsed)
+		if store_in_cache:
+			OsmParseCache.store(ckey, parsed)
 		_on_parsed.call_deferred(gen, parsed))
 
 func _join_parse() -> void:

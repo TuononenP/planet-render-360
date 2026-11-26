@@ -122,14 +122,20 @@ func _part_done(gen: int, i: int, body: PackedByteArray, fresh: bool) -> void:
 	if gen != _gen:
 		return
 	if body.is_empty():
-		_failed = true
+		_bytes[i] = PackedByteArray()
+		_fresh[i] = 0
 	else:
 		_bytes[i] = body
 		_fresh[i] = 1 if fresh else 0
 	_remaining -= 1
 	if _remaining > 0:
 		return
-	if _failed:
+	var any_body := false
+	for b in _bytes:
+		if b is PackedByteArray and not (b as PackedByteArray).is_empty():
+			any_body = true
+			break
+	if not any_body:
 		failed.emit("Orthophoto unavailable")
 		return
 	if not textures:
@@ -152,25 +158,37 @@ func _validate_warm(gen: int) -> void:
 	var fresh_flags := _fresh.duplicate()
 	var out := {}
 	_task = WorkerThreadPool.add_task(func() -> void:
+		var valid := 0
+		var bad: Array[int] = []
 		for i in parts * parts:
 			if fresh_flags[i] == 0:
+				if bytes[i] is PackedByteArray and not (bytes[i] as PackedByteArray).is_empty():
+					valid += 1
 				continue
 			var img := Image.new()
-			if _decode_part(img, bytes[i]) != OK or OrthoSource.is_blank(img):
-				out["error"] = "part %d unreadable or blank" % i
-				out["bad_part"] = i
-				_warm_validated.call_deferred(gen, out)
-				return
-		out["ok"] = true
+			if _decode_part(img, bytes[i]) != OK:
+				bad.append(i)
+			elif OrthoSource.is_blank(img):
+				# Blank sea/edge quadrant: keep cached on partial mosaics so revisits skip WMS.
+				if parts == 1:
+					bad.append(i)
+			else:
+				valid += 1
+		out["bad_parts"] = bad
+		out["ok"] = valid > 0
+		if valid == 0:
+			out["error"] = "part %d unreadable or blank" % bad[0] if not bad.is_empty() else "all parts blank"
 		_warm_validated.call_deferred(gen, out), false, "Validate orthophoto")
 
 func _warm_validated(gen: int, out: Dictionary) -> void:
 	_join()
 	if gen != _gen:
 		return
+	for bp: int in out.get("bad_parts", []):
+		if bp < _fresh.size():
+			_fresh[bp] = 0
+		DirAccess.remove_absolute(cache_path(_src, _zoom, _span, _lat, _lon, bp))
 	if not bool(out.get("ok", false)):
-		if out.has("bad_part"):
-			DirAccess.remove_absolute(cache_path(_src, _zoom, _span, _lat, _lon, int(out["bad_part"])))
 		failed.emit("Orthophoto: %s" % str(out.get("error", "unreadable")))
 		return
 	_write_fresh_parts()
@@ -201,23 +219,54 @@ func _stitch(gen: int) -> void:
 	var bytes := _bytes.duplicate()
 	var out := {}
 	_task = WorkerThreadPool.add_task(func() -> void:
-		var size := parts * part_px
-		var mosaic := Image.create(size, size, false, Image.FORMAT_RGB8)
-		for i in parts * parts:
+		var total_parts := parts * parts
+		var decoded: Array = []
+		decoded.resize(total_parts)
+		var bad: Array[int] = []
+		var valid_count := 0
+		var first_valid: Image = null
+		for i in total_parts:
+			var b: Variant = bytes[i]
 			var img := Image.new()
-			if _decode_part(img, bytes[i]) != OK or OrthoSource.is_blank(img):
-				out["error"] = "part %d unreadable or blank" % i
-				out["bad_part"] = i
-				_stitched.call_deferred(gen, out)
-				return
-			if img.get_format() != Image.FORMAT_RGB8:
-				img.convert(Image.FORMAT_RGB8)
+			if not (b is PackedByteArray) or (b as PackedByteArray).is_empty() \
+					or _decode_part(img, b) != OK:
+				bad.append(i)
+				continue
+			if OrthoSource.is_blank(img):
+				if total_parts == 1:
+					bad.append(i)
+				continue
 			if img.get_width() != part_px or img.get_height() != part_px:
 				img.resize(part_px, part_px, Image.INTERPOLATE_BILINEAR)
+			decoded[i] = img
+			valid_count += 1
+			if first_valid == null:
+				first_valid = img
+		if valid_count == 0:
+			out["error"] = "part %d unreadable or blank" % (bad[0] if not bad.is_empty() else 0)
+			out["bad_parts"] = bad
+			_stitched.call_deferred(gen, out)
+			return
+		var size := parts * part_px
+		var partial := valid_count < total_parts
+		var fmt := Image.FORMAT_RGBA8 if partial else Image.FORMAT_RGB8
+		var mosaic := Image.create(size, size, false, fmt)
+		if partial:
+			var fill := first_valid.get_pixel(first_valid.get_width() / 2, first_valid.get_height() / 2)
+			mosaic.fill(Color(fill.r, fill.g, fill.b, 0.0))
+		for i in total_parts:
+			var img: Image = decoded[i]
+			if img == null:
+				continue
+			if img.get_format() != fmt:
+				img.convert(fmt)
 			mosaic.blit_rect(img, Rect2i(0, 0, part_px, part_px), Vector2i(i % parts, i / parts) * part_px)
-		var thumb := mosaic.duplicate() as Image
-		thumb.resize(THUMB_PX, THUMB_PX, Image.INTERPOLATE_BILINEAR)
-		out["thumb"] = thumb
+		var thumb_src: Image = first_valid.duplicate() as Image if partial else mosaic.duplicate() as Image
+		if thumb_src.get_format() != Image.FORMAT_RGB8:
+			thumb_src.convert(Image.FORMAT_RGB8)
+		thumb_src.resize(THUMB_PX, THUMB_PX, Image.INTERPOLATE_BILINEAR)
+		out["thumb"] = thumb_src
+		out["bad_parts"] = bad
 		mosaic.generate_mipmaps()
 		out["mosaic"] = mosaic
 		_stitched.call_deferred(gen, out), false, "Stitch orthophoto")
@@ -226,10 +275,11 @@ func _stitched(gen: int, out: Dictionary) -> void:
 	_join()
 	if gen != _gen:
 		return
+	for bp: int in out.get("bad_parts", []):
+		if bp < _fresh.size():
+			_fresh[bp] = 0
+		DirAccess.remove_absolute(cache_path(_src, _zoom, _span, _lat, _lon, bp))
 	if out.has("error") or not out.has("mosaic"):
-		# Only drop the offending blank/damaged part, preserving valid sibling parts.
-		if out.has("bad_part"):
-			DirAccess.remove_absolute(cache_path(_src, _zoom, _span, _lat, _lon, int(out["bad_part"])))
 		failed.emit("Orthophoto: %s" % str(out.get("error", "no mosaic")))
 		return
 	_write_fresh_parts()

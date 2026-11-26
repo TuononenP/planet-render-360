@@ -41,7 +41,9 @@ const RELIEF_KEY := Vector3(0.42, 0.78, -0.46)
 ## in every stretch of a flight with the same mesh, so its four views are
 ## kept (the textures, mipmaps and octahedron are made fresh each time, so
 ## no resource is shared between worlds). Oldest out past VIEW_CACHE_MAX.
-const VIEW_CACHE_MAX := 48
+const VIEW_CACHE_MAX := 96
+const DISK_DIR := "user://impostors"
+const DISK_VERSION := 1
 static var view_cache_enabled := true
 static var view_cache_hits := 0
 static var view_cache_misses := 0
@@ -51,6 +53,7 @@ static var _view_keys: Array = []
 ## lets distant landmarks (> STRIP_REAL_M) skip rebuilding and discarding their hero mesh.
 static var _type_bakes := {}
 static var _type_keys: Array = []
+static var _disk_tag := ""
 static var _views_mutex := Mutex.new()
 
 static func clear_view_cache() -> void:
@@ -101,6 +104,68 @@ static func _remember_type_bake(type: String, spec: Dictionary) -> void:
 			_type_bakes.erase(_type_keys.pop_front())
 	_type_bakes[type] = spec
 	_views_mutex.unlock()
+	if DisplayServer.get_name() != "headless":
+		_save_disk_bake(type, spec)
+
+static func _bake_disk_path(type: String) -> String:
+	_views_mutex.lock()
+	if _disk_tag == "":
+		var acc := "%d|%d|%s" % [DISK_VERSION, SIZE, str(ProjectSettings.get_setting("application/config/version", ""))]
+		if OS.is_debug_build():
+			acc += "|" + str(hash(FileAccess.get_file_as_string("res://scripts/generation/landmark_impostor.gd")))
+		_disk_tag = "%08x" % (hash(acc) & 0xffffffff)
+		_drop_stale_disk_bakes(_disk_tag)
+	var tag := _disk_tag
+	_views_mutex.unlock()
+	var safe := type.replace("/", "_").replace(":", "_")
+	return "%s/imp_%s_%s.bin" % [DISK_DIR, tag, safe]
+
+static func _drop_stale_disk_bakes(tag: String) -> void:
+	if not DirAccess.dir_exists_absolute(DISK_DIR):
+		return
+	var prefix := "imp_%s_" % tag
+	for f in DirAccess.get_files_at(DISK_DIR):
+		if f.begins_with("imp_") and not f.begins_with(prefix):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(DISK_DIR.path_join(f)))
+
+static func _save_disk_bake(type: String, spec: Dictionary) -> void:
+	var path := _bake_disk_path(type)
+	if FileAccess.file_exists(path):
+		return
+	DirAccess.make_dir_recursive_absolute(DISK_DIR)
+	var tmp := "%s.tmp-%d-%d" % [path, OS.get_process_id(), OS.get_thread_caller_id()]
+	var f := FileAccess.open_compressed(tmp, FileAccess.WRITE, FileAccess.COMPRESSION_FASTLZ)
+	if f == null:
+		return
+	f.store_var(spec)
+	f.close()
+	if DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(path)) != OK:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+
+static func _load_disk_bake(type: String) -> Dictionary:
+	if DisplayServer.get_name() == "headless":
+		return {}
+	var path := _bake_disk_path(type)
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open_compressed(path, FileAccess.READ, FileAccess.COMPRESSION_FASTLZ)
+	if f == null:
+		return {}
+	var v: Variant = f.get_var()
+	f.close()
+	if not (v is Dictionary):
+		return {}
+	var d := v as Dictionary
+	if not (d.get("views") is Array) or (d["views"] as Array).size() != 4:
+		return {}
+	_views_mutex.lock()
+	if not _type_bakes.has(type):
+		_type_keys.append(type)
+		while _type_keys.size() > VIEW_CACHE_MAX:
+			_type_bakes.erase(_type_keys.pop_front())
+	_type_bakes[type] = d
+	_views_mutex.unlock()
+	return d
 
 ## Builds a stripped far-impostor landmark node directly from the cached bake
 ## for `type` when `dist_m > STRIP_REAL_M`, avoiding building and immediately
@@ -114,6 +179,12 @@ static func build_cached_stripped(type: String, dist_m: float) -> Node3D:
 	if not spec.is_empty():
 		view_cache_hits += 1
 	_views_mutex.unlock()
+	if spec.is_empty():
+		spec = _load_disk_bake(type)
+		if not spec.is_empty():
+			_views_mutex.lock()
+			view_cache_hits += 1
+			_views_mutex.unlock()
 	if spec.is_empty():
 		return null
 	var views: Array = spec["views"]
@@ -180,11 +251,11 @@ static func apply_if_far(root: Node3D, dist_m: float, label: String = "", cache_
 	if not bool(baked.get("ok", false)):
 		record_fallback(label, str(baked.get("note", "impostor bake failed")))
 		return ""
-	if cache_type and label != "" and baked.has("spec") and not _has_seat_meta(root):
+	var strip := dist_m > STRIP_REAL_M
+	if cache_type and label != "" and baked.has("spec") and (strip or not _has_seat_meta(root)):
 		var spec: Dictionary = baked["spec"]
 		spec["name"] = str(root.name)
 		_remember_type_bake(label, spec)
-	var strip := dist_m > STRIP_REAL_M
 	var far_r0 := band_r0_for(dist_m)
 	var imp := MeshInstance3D.new()
 	imp.name = "Impostor"

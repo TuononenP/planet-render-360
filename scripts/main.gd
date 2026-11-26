@@ -137,6 +137,7 @@ func _ready() -> void:
 	# The window's close button and the app menu's Quit come through
 	# _request_exit too, so a world still saving is waited for there.
 	get_tree().auto_accept_quit = false
+	StaticCaches.hook_exit(get_tree())
 	# The memory in the stream log, for when iOS ends the app without a report.
 	add_child(MemoryLog.new())
 	# Sheds what can be rebuilt before the OS ends the app for its memory.

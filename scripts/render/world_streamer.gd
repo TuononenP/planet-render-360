@@ -377,6 +377,10 @@ var _detail := StreamDetail.new()
 ## Fades the new ground in from the camera outward after a swap.
 var _reveal := RevealWave.new()
 var _last_pos := Vector2.INF
+var _last_yaw := INF
+var _turning_s := 0.0
+const TURN_RATE_RAD_S := 0.35
+const TURN_SETTLE_S := 0.35
 var _vel := Vector2.ZERO
 ## Recent peak speed, decaying PACE_DECAY_MPS2: steps and leads are sized
 ## by it, not by the speed of a camera still easing back from the cap.
@@ -544,6 +548,8 @@ func reset_for_new_place() -> void:
 	_vel = Vector2.ZERO
 	_pace = 0.0
 	_last_pos = Vector2.INF
+	_last_yaw = INF
+	_turning_s = 0.0
 
 ## The view is going away: stop fetchers and builds, drop the ready
 ## world, and forget the view so late callbacks touch nothing.
@@ -656,6 +662,13 @@ func tick(v: View360, delta: float) -> void:
 		_vel = _vel.lerp(inst, 1.0 - exp(-3.0 * delta)) \
 			if _last_pos != pos else _vel * exp(-3.0 * delta)
 	_last_pos = pos
+	if _last_yaw != INF and delta > 0.0:
+		var yaw_rate := absf(angle_difference(v._rig.yaw, _last_yaw)) / delta
+		if _vel.length() > 15.0 and yaw_rate > TURN_RATE_RAD_S:
+			_turning_s = TURN_SETTLE_S
+		else:
+			_turning_s = maxf(_turning_s - delta, 0.0)
+	_last_yaw = v._rig.yaw
 	# The pace to plan for: a camera just eased past an edge (or turning)
 	# is still on its way back to full speed.
 	_pace = maxf(_vel.length(), _pace - PACE_DECAY_MPS2 * delta)
@@ -721,7 +734,8 @@ func tick(v: View360, delta: float) -> void:
 			_miss_s = 0.0
 			_start_generation(v, pos, look)
 			return
-	if should_redirect(pos) or (veered and state == State.FETCHING and not redirected):
+	var hold_turn := _turning_s > 0.0 and not near_edge and inside_detailed(pos)
+	if should_redirect(pos) or (veered and state == State.FETCHING and not redirected and not hold_turn):
 		# Turned away mid-build: aim the build where the camera went now,
 		# not after the stale one lands.
 		_cancel_pending()
@@ -733,6 +747,8 @@ func tick(v: View360, delta: float) -> void:
 	if state == State.FETCHING or state == State.READY:
 		return
 	if state == State.DEGRADED and Time.get_ticks_msec() < retry_at_msec:
+		return
+	if hold_turn:
 		return
 	if needs_recentre(pos, _planned_vel(), look, expected_build_s(v._quality_preset)):
 		_start_generation(v, pos, look)

@@ -56,6 +56,19 @@ var _gen := 0
 var _pending := 0
 var _values := {}
 var _t0 := 0
+var _owned_cell := Vector2i(-1, -1)
+
+const CELL_CACHE_MAX := 128
+static var _cell_cache: Dictionary = {}
+static var _cell_order: Array[Vector2i] = []
+static var _ifd_cache: Dictionary = {}
+static var _inflight_cells: Dictionary = {}  # Vector2i -> Array[Callable]
+
+static func clear_static_caches() -> void:
+	_cell_cache.clear()
+	_cell_order.clear()
+	_ifd_cache.clear()
+	_inflight_cells.clear()
 
 static func cache_path(lat: float, lon: float) -> String:
 	return "%s/climate_v%d_%d_%d.json" % [CacheStore.base_dir(), CacheStore.DATA_VERSION,
@@ -66,7 +79,16 @@ static func cell_of(lat: float, lon: float) -> Vector2i:
 	return Vector2i(clampi(int(floor((lon - ORIGIN_LON) / STEP_DEG)), 1, WIDTH - 2),
 		clampi(int(floor((ORIGIN_LAT - lat) / STEP_DEG)), 1, HEIGHT - 2))
 
-func cancel() -> void:
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		cancel()
+
+func cancel(release_inflight := true) -> void:
+	if release_inflight and _owned_cell.x >= 0:
+		var cell := _owned_cell
+		_owned_cell = Vector2i(-1, -1)
+		_notify_waiters(cell, {"_cancelled": true})
+	_pending = 0
 	_gen += 1
 	for c in get_children():
 		if c is HTTPRequest:
@@ -87,20 +109,45 @@ func fetch(lat: float, lon: float) -> void:
 		if parsed is Dictionary and (parsed as Dictionary).has("t_warm_c") \
 				and ((parsed as Dictionary).has("precip_dry_mm") or offline_mode):
 			CacheStore.note_read(path)
+			var cell_hit := cell_of(lat, lon)
+			_remember_cell(cell_hit, parsed)
 			timings = {"ms": Time.get_ticks_msec() - _t0, "cached": true}
 			finished.emit.call_deferred(parsed)
 			return
+	var cell := cell_of(lat, lon)
+	if _cell_cache.has(cell):
+		var mem_hit: Dictionary = (_cell_cache[cell] as Dictionary).duplicate()
+		_store(mem_hit)
+		timings = {"ms": Time.get_ticks_msec() - _t0, "cached": true}
+		finished.emit.call_deferred(mem_hit)
+		return
 	if offline_mode:
 		timings = {"ms": 0, "cached": false, "error": "offline"}
 		finished.emit.call_deferred({})
 		return
-	_pending = VARS.size()
 	var gen := _gen
+	if _inflight_cells.has(cell):
+		(_inflight_cells[cell] as Array).append(func(shared: Dictionary) -> void:
+			if gen != _gen:
+				return
+			if bool(shared.get("_cancelled", false)):
+				if is_inside_tree():
+					fetch(_lat, _lon)
+				return
+			if not shared.is_empty():
+				_store(shared)
+			timings = {"ms": Time.get_ticks_msec() - _t0, "cached": true}
+			_gen += 1
+			finished.emit(shared.duplicate()))
+		return
+	_inflight_cells[cell] = []
+	_owned_cell = cell
+	_pending = VARS.size()
 	for v in VARS:
 		_fetch_var(str(v), gen)
 	get_tree().create_timer(CHELSA_BUDGET_S).timeout.connect(func() -> void:
 		if gen == _gen and _pending > 0:
-			cancel()
+			cancel(false)
 			_fetch_fallback())
 
 ## The credit line for a fetched climate Dictionary.
@@ -110,11 +157,14 @@ static func credit_for(climate: Dictionary) -> String:
 ## One variable: IFD → strip table entries → rows → median of 3 × 3.
 func _fetch_var(v: String, gen: int) -> void:
 	var url := BASE % v
-	var head := await _range(url, 0, 16383, gen)
-	var ifd := parse_ifd(head)
+	var ifd: Dictionary = _ifd_cache.get(url, {})
 	if ifd.is_empty():
-		_done(v, NAN, gen)
-		return
+		var head := await _range(url, 0, 16383, gen)
+		ifd = parse_ifd(head)
+		if ifd.is_empty():
+			_done(v, NAN, gen)
+			return
+		_ifd_cache[url] = ifd
 	var cell := cell_of(_lat, _lon)
 	var r0 := cell.y - 1
 	var so := int(ifd["strip_offsets"]) + 4 * r0
@@ -136,9 +186,25 @@ func _fetch_var(v: String, gen: int) -> void:
 		var raw := decode_row(strips[k], cell.x - 1, 3, int(ifd["predictor"]))
 		for x in raw:
 			if x <= int(row[3]):
-				cells.append(float(x) * float(row[1]) + float(row[2]))
+				cells.append(snappedf(float(x) * float(row[1]) + float(row[2]), 0.01))
 	cells.sort()
 	_done(v, cells[cells.size() / 2] if not cells.is_empty() else NAN, gen)
+
+static func _remember_cell(cell: Vector2i, out: Dictionary) -> void:
+	if out.is_empty() or not out.has("t_warm_c"):
+		return
+	if not _cell_cache.has(cell):
+		_cell_order.append(cell)
+		while _cell_order.size() > CELL_CACHE_MAX:
+			_cell_cache.erase(_cell_order.pop_front())
+	_cell_cache[cell] = out.duplicate()
+
+static func _notify_waiters(cell: Vector2i, out: Dictionary) -> void:
+	var waiters: Array = _inflight_cells.get(cell, [])
+	_inflight_cells.erase(cell)
+	for cb: Callable in waiters:
+		if cb.is_valid():
+			cb.call(out)
 
 func _done(v: String, value: float, gen: int) -> void:
 	if gen != _gen:
@@ -153,14 +219,19 @@ func _done(v: String, value: float, gen: int) -> void:
 		return
 	var out := _values.duplicate()
 	out["source"] = SOURCE
+	var cell := _owned_cell if _owned_cell.x >= 0 else cell_of(_lat, _lon)
+	_owned_cell = Vector2i(-1, -1)
+	_remember_cell(cell, out)
 	_store(out)
 	timings = {"ms": Time.get_ticks_msec() - _t0, "cached": false, "vars": _values.size()}
 	_gen += 1
 	finished.emit(out)
+	_notify_waiters(cell, out)
 
 ## ERA5 normals from Open-Meteo when CHELSA failed or ran over budget.
 func _fetch_fallback() -> void:
 	var gen := _gen
+	var cell := _owned_cell if _owned_cell.x >= 0 else cell_of(_lat, _lon)
 	var http := HTTPRequest.new()
 	http.timeout = FALLBACK_TIMEOUT_S
 	add_child(http)
@@ -168,17 +239,23 @@ func _fetch_fallback() -> void:
 	if http.request(FALLBACK_URL % [_lat, _lon], ["User-Agent: " + USER_AGENT, "Accept: application/json"]) == OK:
 		var res: Array = await http.request_completed
 		if gen != _gen:
+			if _owned_cell == cell:
+				_owned_cell = Vector2i(-1, -1)
+				_notify_waiters(cell, {"_cancelled": true})
 			return
 		if int(res[0]) == HTTPRequest.RESULT_SUCCESS and int(res[1]) == 200:
 			out = normals_from_daily(JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8()))
 	http.queue_free()
+	_owned_cell = Vector2i(-1, -1)
 	if not out.is_empty():
 		out["source"] = FALLBACK_SOURCE
+		_remember_cell(cell, out)
 		_store(out)
 	timings = {"ms": Time.get_ticks_msec() - _t0, "cached": false, "vars": _values.size(),
 		"fallback": not out.is_empty()}
 	_gen += 1
 	finished.emit(out)
+	_notify_waiters(cell, out)
 
 func _store(out: Dictionary) -> void:
 	var f := FileAccess.open(cache_path(_lat, _lon), FileAccess.WRITE)

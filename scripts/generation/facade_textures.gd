@@ -196,7 +196,9 @@ static func facade_texs(set_name: String, rows: int, detail: int,
 ## a season or preset rebuild, or the next place, reuses compositions
 ## whose inputs are identical, so the pixels are too. end_build keeps
 ## only what that build used, which its world references anyway.
+const STORE_CAP := 256
 static var _store := {}
+static var _store_order: Array[String] = []
 static var _store_used := {}
 ## Milliseconds the last build spent composing (BUILDINGS timings).
 static var compose_ms := 0
@@ -205,11 +207,14 @@ static func composed(inputs: Array, make: Callable) -> Dictionary:
 	var k := var_to_str(inputs)
 	_store_used[k] = true
 	if _store.has(k):
+		_store_order.erase(k)
+		_store_order.append(k)
 		return _store[k] as Dictionary
 	var t0 := Time.get_ticks_msec()
 	var d: Dictionary = make.call()
 	compose_ms += Time.get_ticks_msec() - t0
 	_store[k] = d
+	_store_order.append(k)
 	return d
 
 ## The exact composer inputs the last build used (BuildPrewarm remembers
@@ -235,7 +240,10 @@ static func prewarm(keys: PackedStringArray, loader: Callable) -> void:
 	WorkerThreadPool.wait_for_group_task_completion(group)
 	for i in todo.size():
 		if made[i] is Dictionary:
-			_store[todo[i][0]] = made[i]
+			var mk := str(todo[i][0])
+			_store[mk] = made[i]
+			if not _store_order.has(mk):
+				_store_order.append(mk)
 
 ## The composer call behind one composed() entry, or an invalid Callable
 ## for inputs this version does not know.
@@ -260,9 +268,22 @@ static func _recipe(inputs: Array, loader: Callable) -> Callable:
 	return Callable()
 
 static func end_build() -> void:
-	for k in _store.keys():
-		if not _store_used.has(k):
-			_store.erase(k)
+	if MemoryGuard.level >= MemoryGuard.Level.TIGHT:
+		for k in _store.keys():
+			if not _store_used.has(k):
+				_store.erase(k)
+				_store_order.erase(k)
+	else:
+		var idx := 0
+		while _store.size() > STORE_CAP and idx < _store_order.size():
+			var cand := _store_order[idx]
+			if _store_used.has(cand):
+				idx += 1
+				continue
+			_store.erase(cand)
+			_store_order.remove_at(idx)
+		while _store.size() > STORE_CAP and not _store_order.is_empty():
+			_store.erase(_store_order.pop_front())
 	_store_used.clear()
 
 ## Stockholm's curtain glass (metallic cap, specular cap, roughness floor): the shared 0.6 / 0.7

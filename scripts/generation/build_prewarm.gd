@@ -75,6 +75,7 @@ static func remember() -> void:
 	if f != null:
 		f.store_var({"version": VERSION, "images": images, "textures": textures,
 			"recipes": FacadeTextures.recipes()})
+	SharedTexture.flush()
 
 static func _remembered() -> Dictionary:
 	if not FileAccess.file_exists(REMEMBERED):

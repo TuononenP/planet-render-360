@@ -33,6 +33,7 @@ static var _distant_mats: Dictionary = {}
 static var _distant_roof_mats: Dictionary = {}
 static var _glass_mats: Dictionary = {}
 static var _roof_mats: Dictionary = {}
+static var _last_hi_res := false
 
 ## Drop every per-place cache (and MaterialLibrary's): a session that
 ## visits several places must never render a later city in an earlier
@@ -49,8 +50,10 @@ static func begin_build() -> void:
 	_glass_mats.clear()
 	_roof_mats.clear()
 	BuildingTrim._mats.clear()
-	FacadeComposer.clear_cache()
-	StoreyComposer.clear_cache()
+	if MaterialLibrary.hi_res != _last_hi_res or MemoryGuard.level >= MemoryGuard.Level.TIGHT:
+		FacadeComposer.clear_cache()
+		StoreyComposer.clear_cache()
+		_last_hi_res = MaterialLibrary.hi_res
 	FacadeTextures._store_used.clear()
 	MaterialLibrary.begin_build()
 

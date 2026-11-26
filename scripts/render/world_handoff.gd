@@ -20,7 +20,7 @@ const BUDGET_US := 1500
 
 ## A subtree with more children than this comes back child by child (a
 ## whole building layer entering the tree at once outlasted any budget).
-const SPLIT_CHILDREN := 32
+const SPLIT_CHILDREN := 16
 
 ## The world being staged (hidden, in the tree) and the pieces still to
 ## add back, in their original order (names stay unique): [parent, node,

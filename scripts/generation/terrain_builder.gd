@@ -205,9 +205,9 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			var half := minf(LandmarkSites.clear_m(entry) * 0.5, 45.0) if entry.has("clear_m") else 20.0
 			var hero_y := _hero_y(data, ground, cx, cz, entry, half)
 			var cacheable := not bool(entry.get("deck_ends", false)) \
-				and c_type != "turku_kauppatori" \
-				and c_type not in LandmarkTerrain.RELIEFS \
-				and LandmarkTerrain.outline(c_type).is_empty()
+				and c_type not in ["turku_kauppatori", "fori_ferry"] \
+				and str(entry.get("kind", "")) != "Airport" \
+				and c_type not in LandmarkTerrain.RELIEFS
 			if cacheable:
 				var fast_imp := LandmarkImpostor.build_cached_stripped(c_type, dist_m)
 				if fast_imp != null:
@@ -219,7 +219,8 @@ static func _landmark_candidates(root: Node3D, data: LocationData, ground: Groun
 			var hero := _hero(c_type, entry, ground, Vector2(cx, cz), hero_y)
 			hero.position = Vector3(cx, hero_y, cz)
 			hero.rotation.y = -deg_to_rad(float(c.get("yaw_deg", 0.0)))
-			LandmarkTerrain.stitch(hero, ground, c_type)
+			if dist_m <= LandmarkImpostor.STRIP_REAL_M or not cacheable:
+				LandmarkTerrain.stitch(hero, ground, c_type)
 			var imp_mode := LandmarkImpostor.apply_if_far(hero, dist_m, c_type, cacheable)
 			if imp_mode != "stripped":
 				FountainWater.upgrade(hero, data.quality_preset)

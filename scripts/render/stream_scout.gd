@@ -151,7 +151,7 @@ func pump(v: View360, net_busy: bool) -> void:
 	# time that build lands, and beside a ring fetch (the oldest stops when
 	# the slots are full). The ring waits for the build's data, one at a time.
 	var ll: Vector2 = _ring[0]
-	if ll != plan_ll and (net_busy or not _warms.is_empty()):
+	if net_busy or (ll != plan_ll and not _warms.is_empty()):
 		return
 	_ring.pop_front()
 	if ll in known:

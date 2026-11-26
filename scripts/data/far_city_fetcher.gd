@@ -54,6 +54,40 @@ var _busy := false
 ## features are still placed around the stretch's own centre.
 const COARSE_CELLS := 6
 var coarse := false
+var warm_only := false
+
+const PARSED_CACHE_MAX := 3
+static var _parsed_cache: Array = []  # [{key, lat, lon, bytes, partial, landuse, towers}]
+static var _parsed_mutex := Mutex.new()
+
+static func clear_static_caches() -> void:
+	_parsed_mutex.lock()
+	_parsed_cache.clear()
+	_parsed_mutex.unlock()
+
+static func _lookup_parsed(key: String, mtime: int) -> Dictionary:
+	_parsed_mutex.lock()
+	var found := {}
+	for i in range(_parsed_cache.size() - 1, -1, -1):
+		if str(_parsed_cache[i]["key"]) == key and int(_parsed_cache[i].get("mtime", -2)) == mtime:
+			found = _parsed_cache[i]
+			break
+	_parsed_mutex.unlock()
+	return found
+
+static func _store_parsed(key: String, mtime: int, lat: float, lon: float, bytes: int, partial: bool, parsed: Dictionary) -> void:
+	if key.is_empty() or parsed.is_empty():
+		return
+	_parsed_mutex.lock()
+	for i in range(_parsed_cache.size() - 1, -1, -1):
+		if str(_parsed_cache[i]["key"]) == key:
+			_parsed_cache.remove_at(i)
+			break
+	_parsed_cache.append({"key": key, "mtime": mtime, "lat": lat, "lon": lon, "bytes": bytes, "partial": partial,
+		"landuse": parsed["landuse"], "towers": parsed["towers"]})
+	while _parsed_cache.size() > PARSED_CACHE_MAX:
+		_parsed_cache.pop_front()
+	_parsed_mutex.unlock()
 
 ## Shifts previously loaded far_landuse and far_towers from the live centre
 ## into a new streamed centre's XZ frame (adding `offset` = old centre in new
@@ -219,14 +253,41 @@ func fetch(lat: float, lon: float) -> void:
 	_busy = true
 	_partial = false
 	var snapshot := BundledOsm.entry_for(lat, lon, "far", QUERY_VERSION)
-	var cached := OsmFetcher._read_cache(_cache) if BundledOsm.cache_is_newer(_cache, snapshot) else ""
-	if cached != "" and OverpassRequest.payload_error(cached) == "":
-		_parse_off_thread(cached, true)
+	var disk_newer := BundledOsm.cache_is_newer(_cache, snapshot) and FileAccess.file_exists(_cache)
+	var disk_mtime := int(FileAccess.get_modified_time(_cache)) if disk_newer else -1
+	if disk_newer:
+		var mem := _lookup_parsed(_cache, disk_mtime)
+		if not mem.is_empty():
+			_partial = bool(mem["partial"])
+			if warm_only:
+				_emit_deferred(gen, int(mem["bytes"]), true, {"landuse": [], "towers": []})
+				return
+			_remap_off_thread(gen, mem)
+			return
+		if warm_only:
+			var f := FileAccess.open(_cache, FileAccess.READ)
+			var flen := int(f.get_length()) if f != null else 0
+			if flen > 64:
+				CacheStore.note_read(_cache)
+				_emit_deferred(gen, flen, true, {"landuse": [], "towers": []})
+				return
+		_read_and_parse_off_thread(_cache, disk_mtime, true)
+		return
+	var bundled_mem := _lookup_parsed(_cache + "#bundled", 0)
+	if not bundled_mem.is_empty():
+		_partial = false
+		if warm_only:
+			_emit_deferred(gen, int(bundled_mem["bytes"]), true, {"landuse": [], "towers": []})
+			return
+		_remap_off_thread(gen, bundled_mem)
 		return
 	var bundled := await _reader().read(snapshot)
 	if gen != _gen:
 		return
 	if bundled != "":
+		if warm_only:
+			_emit_deferred(gen, bundled.length(), true, {"landuse": [], "towers": []})
+			return
 		_parse_off_thread(bundled, true, false, true)
 		return
 	_request()
@@ -248,6 +309,9 @@ func _request() -> void:
 
 func _on_answered(text: String) -> void:
 	OsmFetcher._write_cache(_cache, text)
+	if warm_only:
+		_emit(text.length(), false, {"landuse": [], "towers": []})
+		return
 	_parse_off_thread(text, false)
 
 ## Older payloads are usable offline, but never prevent a live refresh of
@@ -273,6 +337,46 @@ static func _usable(text: String) -> bool:
 	return parsed is Dictionary and (parsed as Dictionary).get("elements", null) is Array \
 		and str(parsed.get("remark", "")).strip_edges() == ""
 
+func _emit_deferred(gen: int, bytes: int, cached: bool, parsed: Dictionary) -> void:
+	(func() -> void:
+		if gen == _gen:
+			_emit(bytes, cached, parsed)).call_deferred()
+
+func _remap_off_thread(gen: int, mem: Dictionary) -> void:
+	_join_parse()
+	var c_lat := _c_lat
+	var c_lon := _c_lon
+	_parse_task = WorkerThreadPool.add_task(func() -> void:
+		var base_lat := float(mem["lat"])
+		var base_lon := float(mem["lon"])
+		var out: Dictionary
+		if is_equal_approx(base_lat, c_lat) and is_equal_approx(base_lon, c_lon):
+			out = {"landuse": mem["landuse"], "towers": mem["towers"]}
+		else:
+			var offset := WorldScale.xz_from_latlon(base_lat, base_lon, c_lat, c_lon)
+			out = remap_far(mem["landuse"], mem["towers"], offset)
+		_on_parsed.call_deferred(gen, int(mem["bytes"]), true, out))
+
+func _read_and_parse_off_thread(path: String, mtime: int, cached: bool) -> void:
+	_join_parse()
+	var gen := _gen
+	var base_lat := _lat
+	var base_lon := _lon
+	var c_lat := _c_lat
+	var c_lon := _c_lon
+	_parse_task = WorkerThreadPool.add_task(func() -> void:
+		var text := OsmFetcher._read_cache(path)
+		if text == "" or OverpassRequest.payload_error(text) != "":
+			_on_parsed.call_deferred(gen, 0, cached, {})
+			return
+		var parsed := _parse_single(text, base_lat, base_lon, true)
+		if not parsed.is_empty():
+			_store_parsed(path, mtime, base_lat, base_lon, text.length(), false, parsed)
+			if not (is_equal_approx(base_lat, c_lat) and is_equal_approx(base_lon, c_lon)):
+				parsed = remap_far(parsed["landuse"], parsed["towers"],
+					WorldScale.xz_from_latlon(base_lat, base_lon, c_lat, c_lon))
+		_on_parsed.call_deferred(gen, text.length(), cached, parsed))
+
 ## A city's payload (~10 MB) takes ~0.3 s to check and parse: on a
 ## worker, so the loading screen keeps drawing. A cached payload that is
 ## not usable comes back empty and the network is asked instead. A
@@ -281,10 +385,22 @@ static func _usable(text: String) -> bool:
 func _parse_off_thread(text: String, cached: bool, fallback: bool = false, trusted: bool = false) -> void:
 	_join_parse()
 	var gen := _gen
-	var lat := _c_lat
-	var lon := _c_lon
+	var cache_key := (_cache + "#bundled") if trusted else (_cache if not fallback else "")
+	var mtime := 0 if trusted else (int(FileAccess.get_modified_time(_cache)) if cache_key != "" and FileAccess.file_exists(_cache) else -1)
+	var partial := _partial
+	var base_lat := _lat
+	var base_lon := _lon
+	var c_lat := _c_lat
+	var c_lon := _c_lon
+	var check_remark := cached and not fallback and not trusted
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
-		var parsed := parse(text, lat, lon) if fallback or trusted or not cached or _usable(text) else {}
+		var parsed := _parse_single(text, base_lat, base_lon, check_remark)
+		if not parsed.is_empty():
+			if cache_key != "" and mtime >= 0:
+				_store_parsed(cache_key, mtime, base_lat, base_lon, text.length(), partial, parsed)
+			if not (is_equal_approx(base_lat, c_lat) and is_equal_approx(base_lon, c_lon)):
+				parsed = remap_far(parsed["landuse"], parsed["towers"],
+					WorldScale.xz_from_latlon(base_lat, base_lon, c_lat, c_lon))
 		_on_parsed.call_deferred(gen, text.length(), cached, parsed))
 
 func _join_parse() -> void:
@@ -310,17 +426,31 @@ func _emit(bytes: int, cached: bool, parsed: Dictionary) -> void:
 	_busy = false
 	finished.emit(parsed["landuse"], parsed["towers"])
 
+## Single-pass JSON decode + geometry extraction; returns {} when `check_remark`
+## rejects a damaged/truncated payload, avoiding parsing ~10 MB JSON twice.
+static func _parse_single(text: String, c_lat: float, c_lon: float, check_remark: bool) -> Dictionary:
+	var parsed: Variant = JSON.parse_string(text) if text != "" else null
+	if not (parsed is Dictionary):
+		return {} if check_remark else {"landuse": [], "towers": []}
+	var dict := parsed as Dictionary
+	if check_remark and (not (dict.get("elements", null) is Array) or str(dict.get("remark", "")).strip_edges() != ""):
+		return {}
+	return _parse_dict(dict, c_lat, c_lon)
+
 ## {landuse, towers} in metre XZ around (c_lat, c_lon). Tall outlines
 ## retain their own roofs and their mapped parts, including relation rings.
 static func parse(text: String, c_lat: float, c_lon: float) -> Dictionary:
+	var parsed: Variant = JSON.parse_string(text) if text != "" else null
+	if not (parsed is Dictionary):
+		return {"landuse": [], "towers": []}
+	return _parse_dict(parsed as Dictionary, c_lat, c_lon)
+
+static func _parse_dict(parsed: Dictionary, c_lat: float, c_lon: float) -> Dictionary:
 	var landuse: Array = []
 	var towers: Array = []
 	var part_ways: Array = []
-	var parsed: Variant = JSON.parse_string(text) if text != "" else null
-	if not (parsed is Dictionary):
-		return {"landuse": landuse, "towers": towers}
 	var seen := {}
-	for el in (parsed as Dictionary).get("elements", []):
+	for el in parsed.get("elements", []):
 		if not (el is Dictionary):
 			continue
 		var key := "%s:%d" % [el.get("type", ""), int(el.get("id", 0))]
