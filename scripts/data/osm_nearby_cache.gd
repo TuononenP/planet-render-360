@@ -50,10 +50,22 @@ static func note(path: String) -> void:
 		if _relist_task >= 0:
 			_noted_meanwhile.append(f)
 
+## Starts listing the app's cache directory on a worker thread at startup so
+## the first fallback lookup never blocks the main thread on large caches.
+static func preload_async() -> void:
+	if not CacheStore.dir_override.is_empty():
+		return
+	var dir := CacheStore.base_dir()
+	if _listed_dir == dir or _relist_task >= 0:
+		return
+	_relist_task = WorkerThreadPool.add_task(func() -> void: _relisted = _list(dir),
+		false, "List OSM cache")
+	_hook_exit()
+
 static func _osm_files() -> PackedStringArray:
 	var dir := CacheStore.base_dir()
 	var now := Time.get_ticks_msec()
-	if not CacheStore.dir_override.is_empty() or dir != _listed_dir:
+	if not CacheStore.dir_override.is_empty():
 		_listed = _list(dir)
 		_listed_dir = dir
 		_listed_at = now
@@ -70,6 +82,16 @@ static func _osm_files() -> PackedStringArray:
 				_relisted.append(f)
 		_noted_meanwhile = PackedStringArray()
 		_listed = _relisted
+		_listed_dir = dir
+		_listed_at = now
+	elif dir != _listed_dir:
+		if _relist_task >= 0:
+			WorkerThreadPool.wait_for_task_completion(_relist_task)
+			_relist_task = -1
+			_listed = _relisted
+		else:
+			_listed = _list(dir)
+		_listed_dir = dir
 		_listed_at = now
 	elif _relist_task < 0 and now - _listed_at >= LIST_TTL_MS:
 		_relist_task = WorkerThreadPool.add_task(func() -> void: _relisted = _list(dir),

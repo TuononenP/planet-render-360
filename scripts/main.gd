@@ -115,6 +115,7 @@ func _ready() -> void:
 	# for the next launch and for requests not yet made.
 	RemoteConfig.load_cached()
 	CacheStore.preload_index()
+	OsmNearbyCache.preload_async()
 	_store = CacheStore.new()
 	_store.load_store()
 	_settings = RenderSettings.new()

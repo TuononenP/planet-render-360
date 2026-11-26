@@ -248,15 +248,11 @@ var shore_structures: Array = []
 var bridge_areas: Array = []
 var aeroways: Dictionary = {}
 
-## Abandon any request still in flight. HTTPRequest serves one request at
-## a time and answers ERR_BUSY (44) to a second one; a cancelled or
-## restarted generation left its Overpass request running, so the next
-## fetch burned every retry on 44 and then lost the real response's
-## state. cancel_request() emits no request_completed, so nothing stale
-## reaches the handlers.
+## Abandon any in-flight request so restarted fetches never hit ERR_BUSY or
+## deliver stale callbacks.
 func cancel(keep_omt: bool = false) -> void:
-	# A parse still running off-thread belongs to the abandoned fetch.
 	_parse_gen += 1
+	_retire_parse()
 	_omt_wait = []
 	if _omt != null and not keep_omt:
 		_omt.cancel()
@@ -319,10 +315,7 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	bridge_areas = []
 	aeroways = {}
 	pois = []
-	# Cache key v2 (contract §5): radius suffix keeps preset queries
-	# from colliding; the ring keeps its own _ring marker (a different
-	# query shape, not the detailed query at a larger radius).
-	# Legacy osm3_/osm4_ files are ignored, never migrated (V18).
+	# Cache key v2 (contract §5): radius suffix separates presets; ring uses _ring.
 	_pending_cache = CacheStore.osm_path(lat, lon, radius)
 	_pending_body = "data=" + build_query(lat, lon, radius).uri_encode()
 	_pending_ring_cache = ""
@@ -350,12 +343,8 @@ func fetch(lat: float, lon: float, preset: int = 2, include_pois: bool = true) -
 	var want_ring := ring > radius
 	if want_ring:
 		_pending_ring_cache = CacheStore.osm_ring_path(lat, lon, ring)
-	# Each phase serves from its own cache entry independently; a phase
-	# with no usable cache goes live while the other stays cached.
-	# A cache entry was validated (_payload_has_buildings) before it was
-	# written, so it is not re-parsed here (T7.5: that probe was a second
-	# full parse on the main thread); _on_parsed falls back to the live
-	# query if a damaged entry parses to no buildings.
+	# Each phase serves from cache independently (validated on write; damaged
+	# entries fall back to live in _on_parsed).
 	_detailed_cached = false
 	var snapshot := BundledOsm.entry_for(lat, lon, "detailed", OsmQuery.QUERY_VERSION)
 	var dcached := _read_cache(_pending_cache) if BundledOsm.cache_is_newer(_pending_cache, snapshot) else ""
@@ -466,6 +455,7 @@ var _bridge_pending := false
 var _aeroway: OsmAerowayLayer
 var _ring_pending := false
 var _parse_task := -1
+var _stale_tasks: Array[int] = []
 var _parse_gen := 0
 var _tried := 1
 var _api_tier := 0
@@ -723,7 +713,7 @@ func _on_postpass_done(result: int, code: int, _h: PackedStringArray, body: Pack
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		_postpass_failed("failed (result=%d code=%d)" % [result, code])
 		return
-	_join_parse()
+	_retire_parse()
 	var gen := _parse_gen
 	var lat := _pending_lat
 	var lon := _pending_lon
@@ -745,7 +735,7 @@ static func _with_shores(converted: Dictionary, lat: float, lon: float) -> Dicti
 	return converted
 
 func _on_postpass_converted(gen: int, converted: Dictionary) -> void:
-	_join_parse()
+	_retire_parse()
 	if gen != _parse_gen:
 		return
 	# Nothing mapped (open sea, wilderness, a garbled answer): the OSM API
@@ -882,7 +872,7 @@ func _on_api_done(result: int, code: int, _h: PackedStringArray, body: PackedByt
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		_api_failed("failed (result=%d code=%d)" % [result, code], _api_reason)
 		return
-	_join_parse()
+	_retire_parse()
 	var gen := _parse_gen
 	var lat := _pending_lat
 	var lon := _pending_lon
@@ -891,7 +881,7 @@ func _on_api_done(result: int, code: int, _h: PackedStringArray, body: PackedByt
 			_with_shores(OsmApiFallback.to_overpass_json(body), lat, lon)))
 
 func _on_api_converted(gen: int, converted: Dictionary) -> void:
-	_join_parse()
+	_retire_parse()
 	if gen != _parse_gen:
 		return
 	if int(converted["buildings"]) == 0 and not converted["shores"]:
@@ -914,12 +904,9 @@ func _on_api_converted(gen: int, converted: Dictionary) -> void:
 		_fallback_partial = true
 	_detailed_done()
 
-## Merge the detailed + ring payloads, parse once, and emit both signals:
-## v1 shapes on the frozen 4-arg signal, §2.5/§2.6 extras on succeeded_v2.
-## The parse (seconds on a dense city) runs on a worker thread so the
-## loading screen keeps drawing and cancel stays immediate (T7.5).
+## Merge payloads, parse on a worker thread, and emit succeeded / succeeded_v2.
 func _finish() -> void:
-	_join_parse()
+	_retire_parse()
 	var gen := _parse_gen
 	var lat := _pending_lat
 	var lon := _pending_lon
@@ -954,13 +941,28 @@ func _finish() -> void:
 			OsmParseCache.store(ckey, parsed)
 		_on_parsed.call_deferred(gen, parsed))
 
+func _retire_parse() -> void:
+	if _parse_task >= 0:
+		if WorkerThreadPool.is_task_completed(_parse_task):
+			WorkerThreadPool.wait_for_task_completion(_parse_task)
+		else:
+			_stale_tasks.append(_parse_task)
+		_parse_task = -1
+	for i in range(_stale_tasks.size() - 1, -1, -1):
+		if WorkerThreadPool.is_task_completed(_stale_tasks[i]):
+			WorkerThreadPool.wait_for_task_completion(_stale_tasks[i])
+			_stale_tasks.remove_at(i)
+
 func _join_parse() -> void:
 	if _parse_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_parse_task)
 		_parse_task = -1
+	for tid in _stale_tasks:
+		WorkerThreadPool.wait_for_task_completion(tid)
+	_stale_tasks.clear()
 
 func _on_parsed(gen: int, parsed: Dictionary) -> void:
-	_join_parse()
+	_retire_parse()
 	if gen != _parse_gen:
 		return
 	if _detailed_cached and (parsed["buildings"] as Array).is_empty() and not _has_shore_data(parsed):
