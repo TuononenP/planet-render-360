@@ -58,7 +58,8 @@ func _build_land(ground) -> void:
 		_land_grid_h = maxi(_land_grid_h / 2, 1)
 	_land_grid_origin = mn
 	_land_grid_step = Vector2(span.x / float(_land_grid_w), span.y / float(_land_grid_h))
-	# For each polygon, mark cells its bbox overlaps.
+	# For each polygon, mark cells its bbox overlaps (Array during build, PackedInt32Array after).
+	var tmp_cells := {}
 	for idx in polys.size():
 		var poly: Dictionary = polys[idx]
 		var pts: PackedVector2Array = poly.get("points", PackedVector2Array())
@@ -67,38 +68,20 @@ func _build_land(ground) -> void:
 		var bmin := pts[0]
 		var bmax := pts[0]
 		for p in pts:
-			bmin.x = minf(bmin.x, p.x)
-			bmin.y = minf(bmin.y, p.y)
-			bmax.x = maxf(bmax.x, p.x)
-			bmax.y = maxf(bmax.y, p.y)
+			if p.x < bmin.x: bmin.x = p.x
+			elif p.x > bmax.x: bmax.x = p.x
+			if p.y < bmin.y: bmin.y = p.y
+			elif p.y > bmax.y: bmax.y = p.y
 		var c0 := _cell_of_land(bmin)
 		var c1 := _cell_of_land(bmax)
 		for cy in range(c0.y, c1.y + 1):
 			for cx in range(c0.x, c1.x + 1):
 				var key := cy * _land_grid_w + cx
-				if not _land_cells.has(key):
-					_land_cells[key] = PackedInt32Array()
-				var arr: PackedInt32Array = _land_cells[key]
-				arr.append(idx)
-				_land_cells[key] = arr
-		# Also track polygons whose bbox never hits any cell (degenerate).
-	# Polygons that extend outside the grid bounds are tested via fallback.
-	for idx in polys.size():
-		var poly: Dictionary = polys[idx]
-		var pts2: PackedVector2Array = poly.get("points", PackedVector2Array())
-		if pts2.is_empty():
-			continue
-		var bmin2 := pts2[0]
-		var bmax2 := pts2[0]
-		for p in pts2:
-			bmin2.x = minf(bmin2.x, p.x)
-			bmin2.y = minf(bmin2.y, p.y)
-			bmax2.x = maxf(bmax2.x, p.x)
-			bmax2.y = maxf(bmax2.y, p.y)
-		# If polygon bbox is outside the grid entirely, add to outside list.
-		if bmax2.x < _land_grid_origin.x or bmin2.x > _land_grid_origin.x + span.x \
-				or bmax2.y < _land_grid_origin.y or bmin2.y > _land_grid_origin.y + span.y:
-			_land_outside.append(idx)
+				if not tmp_cells.has(key):
+					tmp_cells[key] = []
+				(tmp_cells[key] as Array).append(idx)
+	for key in tmp_cells:
+		_land_cells[key] = PackedInt32Array(tmp_cells[key])
 
 func _cell_of_land(p: Vector2) -> Vector2i:
 	return Vector2i(

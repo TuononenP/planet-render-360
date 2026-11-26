@@ -171,9 +171,9 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 		return
 	var gauge := float(way.get("gauge_m", 1.435)) * m2u
 	var bed := float(way.get("width_m", 3.3)) * m2u
-	var dense := RoadBuilder._resample(pts, surf.step * 0.34)
 	var cls := str(way.get("class", ""))
 	if bool(way.get("bridge", false)):
+		var dense := RoadBuilder._resample(pts, surf.step * 0.34)
 		if data != null and cls == "tram" and _on_road(pts[pts.size() / 2], data, m2u, road_index):
 			# The carriageway bridge owns the slab; the tram adds rails only.
 			var deck := RoadBuilder.deck_profile(dense, surf, m2u, bed * 0.5)
@@ -188,13 +188,22 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 			_bridge(batches, BridgeLandings.landed(piece, dense, surf, m2u), gauge, bed, surf, m2u, beside, look, cls, layer)
 		return
 	var embedded := bool(way.get("embedded", false))
-	for run in RoadBuilder._dry_runs(dense, surf):
-		var ys := PackedFloat32Array()
+	var runs: Array = surf.native.dry_runs(pts, surf.step * 0.34) if surf.native != null and surf.native.has_method("dry_runs") \
+		else RoadBuilder._dry_runs(RoadBuilder._resample(pts, surf.step * 0.34), surf)
+	var has_native_heights := surf.native != null and surf.native.has_method("heights")
+	var has_native_straight := surf.native != null and surf.native.has_method("straighten")
+	for run in runs:
 		var lift := (STREET_RAIL_LIFT_M if embedded else BED_LIFT_M + RAIL_HEIGHT_M) * m2u
 		if embedded and bool(way.get("cable", false)):
 			lift = (RoadBuilder.lift_for_layer(CABLE_BED_LAYER) + CABLE_RAIL_CLEAR_M) * m2u
-		for p in run:
-			ys.append(surf.height(p.x, p.y) + lift)
+		var ys: PackedFloat32Array
+		if has_native_heights:
+			ys = surf.native.heights(run, lift)
+		else:
+			ys = PackedFloat32Array()
+			ys.resize(run.size())
+			for i in run.size():
+				ys[i] = surf.height(run[i].x, run[i].y) + lift
 		if embedded:
 			# Mapped trams default to embedded, including reservations outside
 			# the road. Give those pieces paving or grass under the rails.
@@ -210,13 +219,17 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 			if bool(way.get("cable", false)):
 				# A concrete track bed in the asphalt, and the cable slot:
 				# two steel slot rails either side of a gap.
+				var straight: PackedVector2Array = surf.native.straighten(run, surf.step) if has_native_straight \
+					else RoadBuilder._straighten(run, surf.step)
 				RoadBuilder._ribbon(RoadBuilder._batch(batches, "cable_bed"),
-					RoadBuilder._straighten(run, surf.step), gauge + CABLE_BED_M * m2u, surf,
+					straight, gauge + CABLE_BED_M * m2u, surf,
 					RoadBuilder.lift_for_layer(CABLE_BED_LAYER) * m2u, Color(0, 0, 0, 1), {}, CABLE_BED_LAYER)
 				_rails(RoadBuilder._batch(batches, "rail"), run, ys, CABLE_SLOT_M * m2u, 0.0, m2u, RAIL_LAYER)
 		else:
+			var straight: PackedVector2Array = surf.native.straighten(run, surf.step) if has_native_straight \
+				else RoadBuilder._straighten(run, surf.step)
 			RoadBuilder._ribbon(RoadBuilder._batch(batches, "ballast"),
-				RoadBuilder._straighten(run, surf.step), bed, surf, BED_LIFT_M * m2u,
+				straight, bed, surf, BED_LIFT_M * m2u,
 				Color(0, 0, 0, 1), {}, BED_LAYER)
 			_rails(RoadBuilder._batch(batches, "rail"), run, ys, gauge,
 				RAIL_HEIGHT_M * m2u, m2u, BED_LAYER + 0.1)
@@ -226,6 +239,7 @@ static func _way(batches: Dictionary, w: Variant, surf: RoadBuilder._Surface,
 ## parapets stood a wall between every pair of tracks.
 static func deck_index(railways: Array, m2u: float) -> Dictionary:
 	var index := {}
+	var inv_cell := 1.0 / (BESIDE_CELL_M * m2u)
 	for w in railways:
 		if not (w is Dictionary) or not bool((w as Dictionary).get("bridge", false)) \
 				or bool((w as Dictionary).get("tunnel", false)):
@@ -234,12 +248,10 @@ static func deck_index(railways: Array, m2u: float) -> Dictionary:
 		if pts.size() < 2:
 			continue
 		for p in RoadBuilder._resample(pts, 2.0 * m2u):
-			var cell := Vector2i((p / (BESIDE_CELL_M * m2u)).floor())
+			var cell := Vector2i(floori(p.x * inv_cell), floori(p.y * inv_cell))
 			if not index.has(cell):
-				index[cell] = PackedVector2Array()
-			var cell_pts: PackedVector2Array = index[cell]
-			cell_pts.append(p)
-			index[cell] = cell_pts
+				index[cell] = []
+			(index[cell] as Array).append(p)
 	return index
 
 ## Whether another bridge track runs within BESIDE_M of `mid` on the
@@ -249,8 +261,10 @@ static func deck_beside(index: Dictionary, mid: Vector2, out: Vector2, m2u: floa
 	var cell := Vector2i((mid / (BESIDE_CELL_M * m2u)).floor())
 	for dz in range(-1, 2):
 		for dx in range(-1, 2):
-			var cell_pts: PackedVector2Array = index.get(cell + Vector2i(dx, dz), PackedVector2Array())
-			for q in cell_pts:
+			var cell_pts: Variant = index.get(cell + Vector2i(dx, dz))
+			if cell_pts == null:
+				continue
+			for q: Vector2 in (cell_pts as Array):
 				var v := q - mid
 				var side := v.dot(out)
 				if side > BESIDE_MIN_M * m2u and side < BESIDE_M * m2u and absf(v.dot(along)) < 3.0 * m2u:

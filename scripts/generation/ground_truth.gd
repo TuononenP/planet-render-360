@@ -101,15 +101,17 @@ func surface(data: LocationData) -> GroundSurface:
 ## tree / building / probe, and a lagoon polygon has tens of thousands
 ## of vertices). WorldCache calls this on a restored ground too, which
 ## never runs _init's build.
-func set_land(polys: Array) -> void:
+func set_land(polys: Array, build_index: bool = true) -> void:
 	_land = polys
 	_land_index.clear()
 	for poly in _land:
 		_land_index.append(PolygonIndex.new(
 			poly.get("points", PackedVector2Array()), poly.get("holes", [])))
-	_rebuild_index()
+	_rebuild_land_native()
+	if build_index:
+		_rebuild_ground_index()
 
-func _rebuild_index() -> void:
+func _rebuild_land_native() -> void:
 	_land_native = null
 	if not ShoreGeometry.force_script and not _land_index.is_empty() and ClassDB.class_exists("ShoreDomainIndex"):
 		_land_native = ClassDB.instantiate("ShoreDomainIndex")
@@ -117,6 +119,8 @@ func _rebuild_index() -> void:
 			_land_native.setup_polygons(_land_index, Rect2(Vector2.ONE * -_half_units, Vector2.ONE * _half_units * 2.0))
 		else:
 			_land_native = null
+
+func _rebuild_ground_index() -> void:
 	if _land.is_empty() and _buildings.is_empty():
 		_index = null
 		return
@@ -124,6 +128,10 @@ func _rebuild_index() -> void:
 	if _size > 0 or not _land.is_empty():
 		var _gi = load("res://scripts/generation/ground_index.gd") as GDScript
 		_index = _gi.new(self)
+
+func _rebuild_index() -> void:
+	_rebuild_land_native()
+	_rebuild_ground_index()
 
 ## Builds the surface synchronously (a pipeline stage with real
 ## progress once the pipeline constructs this in stage 3; until then
@@ -150,7 +158,7 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 			break
 	if not is_equal_approx(data.water_level, -3.0) and has_sea:
 		water_level_m = WaterBuilder.SEA_LEVEL_M
-	set_land(data.land_polygons)
+	set_land(data.land_polygons, false)
 	_buildings = data.buildings
 	_surface.resize(size * size)
 	# T3.1 remap: resample the heights window onto the surface posts
@@ -299,7 +307,7 @@ func _init(data: LocationData, abort: BuildAbort = null) -> void:
 		surface_min = minf(surface_min, h2)
 		surface_max = maxf(surface_max, h2)
 	# Build eager spatial index now that _surface/_level are final (read-only thereafter).
-	_rebuild_index()
+	_rebuild_ground_index()
 	if not shoreline.empty():
 		shoreline.finish(self, abort)
 		if shoreline.ready:

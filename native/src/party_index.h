@@ -3,6 +3,7 @@
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
+#include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 
@@ -27,10 +28,20 @@ class PartyIndex : public RefCounted {
 		Vector2 a, b;
 		double hw;
 	};
+	struct Outline {
+		PackedVector2Array ring;
+		std::vector<PackedVector2Array> holes;
+		int key;
+		double top;
+		int order;
+		Rect2 box;
+	};
 	std::vector<Edge> edges;
 	std::vector<Road> roads;
-	std::unordered_map<int64_t, std::vector<int>> edge_cells, road_cells;
+	std::vector<Outline> outlines;
+	std::unordered_map<int64_t, std::vector<int>> edge_cells, road_cells, outline_cells;
 	std::unordered_map<std::string, int> keys;
+	std::unordered_map<int, int> outline_of;
 	// Wall top per key id (ids are registration order): of two masses
 	// drawing the same wall, the taller (else the first) keeps it.
 	std::vector<double> key_tops;
@@ -45,6 +56,10 @@ protected:
 public:
 	// PartyWalls._add_ring
 	void add_ring(const PackedVector2Array &ring, const String &key, double top, bool hole);
+	// PartyWalls._add_outline
+	void add_outline(const PackedVector2Array &ring, const Array &holes, const String &key, double top);
+	// PartyWalls.enclosed
+	bool enclosed(const PackedVector2Array &ring, const String &key, double roof_h) const;
 	// PartyWalls.build's road segments (hw already in units).
 	void add_road(const Vector2 &a, const Vector2 &b, double hw);
 	// Batch PartyWalls.build road ingestion (one call for all data.roads).

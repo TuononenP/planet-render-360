@@ -247,7 +247,7 @@ static func _pavement_links(out: Plan, data: LocationData, grid: Dictionary, m: 
 				or str(road.get("crossing_style", "")) != "auto":
 			continue
 		var pts := RoadSurface._points(line)
-		if pts.size() >= 2 and _on_road_share(pts, grid, m) < MIN_ON_ROAD:
+		if pts.size() >= 2 and RoadCrossingClip.on_road_share(pts, grid, m) < MIN_ON_ROAD:
 			links[i] = true
 			_paint_plain(out, i, road)
 	return links
@@ -320,36 +320,6 @@ static func _stubs(chains: Array, m: float) -> Dictionary:
 				out[c] = true
 	return out
 
-static func _on_road_share(pts: PackedVector2Array, grid: Dictionary, m: float) -> float:
-	var total := 0
-	var hits := 0
-	var cell := CELL_M * m
-	var reach := ON_ROAD_REACH_M * m
-	var pad := ON_ROAD_PAD_M * m
-	for j in pts.size() - 1:
-		var n := maxi(1, ceili(pts[j].distance_to(pts[j + 1]) / (ON_ROAD_STEP_M * m)))
-		for k in n:
-			var p := pts[j].lerp(pts[j + 1], (float(k) + 0.5) / float(n))
-			total += 1
-			var hit := false
-			for x in range(floori((p.x - reach) / cell), floori((p.x + reach) / cell) + 1):
-				for z in range(floori((p.y - reach) / cell), floori((p.y + reach) / cell) + 1):
-					var bucket: Variant = grid.get(Vector2i(x, z))
-					if bucket == null:
-						continue
-					for seg: Array in (bucket as Array):
-						var lim := float(seg[2]) + pad
-						if RoadCrossingClip._seg_dist_sq(p, seg[0], seg[1]) <= lim * lim:
-							hit = true
-							break
-					if hit:
-						break
-				if hit:
-					break
-			if hit:
-				hits += 1
-	return float(hits) / float(maxi(total, 1))
-
 ## Crossing ways joined where they share an end and run on in line:
 ## [{roads, segs, length, signal, scramble}]; `skip` holds roads to leave out.
 static func _chains(data: LocationData, skip: Dictionary = {}) -> Array:
@@ -386,13 +356,22 @@ static func _chains(data: LocationData, skip: Dictionary = {}) -> Array:
 		var root := _find(parent, i)
 		if not groups.has(root):
 			groups[root] = {"roads": PackedInt32Array(), "segs": [], "length": 0.0,
-				"signal": false, "scramble": false}
+				"signal": false, "scramble": false, "lo": Vector2(INF, INF), "hi": Vector2(-INF, -INF)}
 		var chain: Dictionary = groups[root]
 		var road: Dictionary = data.roads[ways[i]]
 		var members: PackedInt32Array = chain["roads"]
 		members.append(ways[i])
 		chain["roads"] = members
 		var pts := RoadSurface._points(road)
+		var lo: Vector2 = chain["lo"]
+		var hi: Vector2 = chain["hi"]
+		for p in pts:
+			if p.x < lo.x: lo.x = p.x
+			if p.x > hi.x: hi.x = p.x
+			if p.y < lo.y: lo.y = p.y
+			if p.y > hi.y: hi.y = p.y
+		chain["lo"] = lo
+		chain["hi"] = hi
 		for j in pts.size() - 1:
 			(chain["segs"] as Array).append([pts[j], pts[j + 1]])
 			chain["length"] = float(chain["length"]) + pts[j].distance_to(pts[j + 1])
@@ -570,6 +549,11 @@ static func _ring(chains: Array, centre: Vector2, m: float) -> Dictionary:
 	var diagonals: Array = []
 	var reach := RING_REACH_M * m
 	for chain: Dictionary in chains:
+		var lo: Vector2 = chain["lo"]
+		var hi: Vector2 = chain["hi"]
+		if centre.x < lo.x - reach or centre.x > hi.x + reach \
+				or centre.y < lo.y - reach or centre.y > hi.y + reach:
+			continue
 		var nearest := INF
 		var sum := Vector2.ZERO
 		var count := 0
@@ -749,10 +733,15 @@ static func _paint_points(buckets: Dictionary, hull: PackedVector2Array, m: floa
 				pts.append(Vector2(x, z))
 			z += step
 		x += step
+	var tmp := {}
 	for p in pts:
 		var cell := Vector2i(floori(p.x / RoadSurface.JUNCTION_M), floori(p.y / RoadSurface.JUNCTION_M))
+		if not tmp.has(cell):
+			tmp[cell] = []
+		(tmp[cell] as Array).append(p)
+	for cell in tmp:
 		var arr: PackedVector2Array = buckets.get(cell, PackedVector2Array())
-		arr.append(p)
+		arr.append_array(PackedVector2Array(tmp[cell]))
 		buckets[cell] = arr
 
 ## A crossing just beyond the apron on each urban arm with none mapped
@@ -788,9 +777,16 @@ static func _class(line: Variant) -> String:
 	return str((line as Dictionary).get("class", "unclassified")) if line is Dictionary else "unclassified"
 
 static func _mapped_near(grid: Dictionary, p: Vector2, r: float, m: float) -> bool:
-	for seg: Array in _grid_near(grid, p, r, m):
-		if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= r:
-			return true
+	var size := CELL_M * m
+	var r2 := r * r
+	for x in range(floori((p.x - r) / size), floori((p.x + r) / size) + 1):
+		for z in range(floori((p.y - r) / size), floori((p.y + r) / size) + 1):
+			var bucket: Variant = grid.get(Vector2i(x, z))
+			if bucket == null:
+				continue
+			for seg: Array in (bucket as Array):
+				if RoadCrossingClip._seg_dist_sq(p, seg[0], seg[1]) <= r2:
+					return true
 	return false
 
 ## Finish and width of each mapped crossing way.
@@ -971,10 +967,13 @@ static func _cells(a: Vector2, b: Vector2, r: float, m: float) -> Array[Vector2i
 	return out
 
 static func _grid_add(grid: Dictionary, a: Vector2, b: Vector2, value: Variant, m: float) -> void:
-	for k in _cells(a, b, 0.0, m):
-		if not grid.has(k):
-			grid[k] = []
-		(grid[k] as Array).append(value)
+	var size := CELL_M * m
+	for x in range(floori(minf(a.x, b.x) / size), floori(maxf(a.x, b.x) / size) + 1):
+		for z in range(floori(minf(a.y, b.y) / size), floori(maxf(a.y, b.y) / size) + 1):
+			var k := Vector2i(x, z)
+			if not grid.has(k):
+				grid[k] = []
+			(grid[k] as Array).append(value)
 
 static func _grid_near(grid: Dictionary, p: Vector2, r: float, m: float) -> Array:
 	var out: Array = []

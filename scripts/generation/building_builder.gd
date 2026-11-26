@@ -536,8 +536,16 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 	# A plinth a storey tall gets that storey's doors and windows, near only.
 	if with_detail and not distant and float(mass.get("min_m", 0.0)) <= 0.0:
 		BuildingBasement.dress(root, ring, footing, ground, party)
-	var facade := FacadeMaterials.facade_for_building(b, region, storeys,
-		fidelity, distant, seed_v, look)
+	var facade: Material
+	var wall_vt := Color.WHITE
+	if distant and with_detail:
+		var fpair := FacadeMaterials.distant_wall_and_residual(b, region, storeys,
+			fidelity, seed_v, look)
+		facade = fpair[0]
+		wall_vt = fpair[1]
+	else:
+		facade = FacadeMaterials.facade_for_building(b, region, storeys,
+			fidelity, distant, seed_v, look)
 	# Roof sampling spans the ring's AABB. A distant building reads it too: its
 	# roof colour (a residual on the shared roofs) then follows the imagery.
 	var hint := Color(0, 0, 0, 0)
@@ -549,16 +557,22 @@ static func _extrude_polygon(root: Node3D, data: LocationData,
 		hint = MaterialLibrary.sampled_roof_color(data,
 			centre.x, centre.y, bb.size.x, bb.size.y,
 			Callable(TerrainBuilder, "satellite_uv"))
-	var roof_mat := FacadeMaterials.roof_for_building(b, region, shape,
-		hint, fidelity, distant, seed_v, look)
+	var roof_mat: Material
+	var roof_vt := Color.WHITE
+	if distant and with_detail:
+		var rpair := FacadeMaterials.distant_roof_and_residual(b, region, shape,
+			hint, fidelity, seed_v, look)
+		roof_mat = rpair[0]
+		roof_vt = rpair[1]
+	else:
+		roof_mat = FacadeMaterials.roof_for_building(b, region, shape,
+			hint, fidelity, distant, seed_v, look)
 	if bool(b.get("mapped_landmark", false)) and not distant:
 		roof_mat = HeroLook.roof(b, roof_mat)
 	# A distant building keeps its own colour on the shared materials: the
 	# residual against them rides in its vertex tint (an impostor's batch, or
 	# RoofVariety.tint through the build context).
 	if distant and with_detail:
-		var wall_vt := FacadeMaterials.wall_residual(facade, b, look, seed_v)
-		var roof_vt := FacadeMaterials.roof_residual(roof_mat, b, look, hint)
 		if _batch != null:
 			_batch.wall_vt = wall_vt
 			_batch.roof_vt = roof_vt

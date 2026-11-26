@@ -71,6 +71,37 @@ static func _seg_dist_sq(p: Vector2, a: Vector2, b: Vector2) -> float:
 	var t := clampf((p - a).dot(ab) / l2, 0.0, 1.0)
 	return p.distance_squared_to(a + ab * t)
 
+## Share of `pts` sampled every ON_ROAD_STEP_M that lies over a road of `grid`.
+static func on_road_share(pts: PackedVector2Array, grid: Dictionary, m: float) -> float:
+	var total := 0
+	var hits := 0
+	var cell := RoadMarkings.CELL_M * m
+	var reach := RoadMarkings.ON_ROAD_REACH_M * m
+	var pad := RoadMarkings.ON_ROAD_PAD_M * m
+	for j in pts.size() - 1:
+		var n := maxi(1, ceili(pts[j].distance_to(pts[j + 1]) / (RoadMarkings.ON_ROAD_STEP_M * m)))
+		for k in n:
+			var p := pts[j].lerp(pts[j + 1], (float(k) + 0.5) / float(n))
+			total += 1
+			var hit := false
+			for x in range(floori((p.x - reach) / cell), floori((p.x + reach) / cell) + 1):
+				for z in range(floori((p.y - reach) / cell), floori((p.y + reach) / cell) + 1):
+					var bucket: Variant = grid.get(Vector2i(x, z))
+					if bucket == null:
+						continue
+					for seg: Array in (bucket as Array):
+						var lim := float(seg[2]) + pad
+						if _seg_dist_sq(p, seg[0], seg[1]) <= lim * lim:
+							hit = true
+							break
+					if hit:
+						break
+				if hit:
+					break
+			if hit:
+				hits += 1
+	return float(hits) / float(maxi(total, 1))
+
 ## True when `p` is over a road of `grid` or inside an apron.
 static func _on_road(p: Vector2, grid: Dictionary, aprons: Dictionary, m: float, skip_service: bool = false) -> bool:
 	var cell := RoadMarkings.CELL_M * m
@@ -209,16 +240,26 @@ static func dedupe(by_road: Dictionary, m: float) -> void:
 		return float(a[0]) > float(b[0]) if not is_equal_approx(float(a[0]), float(b[0])) else int(a[1]) < int(b[1]))
 	var kept := {}
 	var reach := RoadMarkings.ON_ROAD_REACH_M * m
+	var cell := RoadMarkings.CELL_M * m
 	for item: Array in all:
 		var run: PackedVector2Array = item[2]
 		# A band overlaps where its middle or either edge enters another:
 		# the edges catch two bands meeting side by side at a corner.
 		var side := (run[run.size() - 1] - run[0]).normalized().orthogonal() * float(item[3])
 		var clear := _runs(run, m, func(p: Vector2) -> bool:
-			for band: Array in RoadMarkings._grid_near(kept, p, reach, m):
-				for q: Vector2 in [p, p + side, p - side]:
-					if in_band(q, band[0], band[1], float(band[2])):
-						return false
+			var p1 := p + side
+			var p2 := p - side
+			for x in range(floori((p.x - reach) / cell), floori((p.x + reach) / cell) + 1):
+				for z in range(floori((p.y - reach) / cell), floori((p.y + reach) / cell) + 1):
+					var bucket: Variant = kept.get(Vector2i(x, z))
+					if bucket == null:
+						continue
+					for band: Array in (bucket as Array):
+						var ba: Vector2 = band[0]
+						var bb: Vector2 = band[1]
+						var bh := float(band[2])
+						if in_band(p, ba, bb, bh) or in_band(p1, ba, bb, bh) or in_band(p2, ba, bb, bh):
+							return false
 			return true)
 		# What a cut leaves at a corner is a scrap, not a crossing.
 		if clear.size() != 1 or not is_equal_approx((clear[0] as PackedVector2Array)[0].distance_to(

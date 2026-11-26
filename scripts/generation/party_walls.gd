@@ -104,6 +104,9 @@ func add_mass(m: Dictionary, ground: GroundTruth, sea_y: float = -INF) -> void:
 	_add_outline(ring, m["holes"], str(m["key"]), top)
 
 func _add_outline(ring: PackedVector2Array, holes: Array, key: String, top: float) -> void:
+	if _idx != null and _idx.has_method("add_outline"):
+		_idx.add_outline(ring, holes, key, top)
+		return
 	var box := RingGeometry.aabb(ring)
 	var c := CELL_M * WorldScale.metres_to_units()
 	var rec := [ring, holes, key, top, _outline_of.size(), box]
@@ -121,6 +124,8 @@ func _add_outline(ring: PackedVector2Array, holes: Array, key: String, top: floa
 ## lie in the plane of the other's (z-fighting). Of two equal masses on
 ## one outline the first registered is kept.
 func enclosed(ring: PackedVector2Array, key: String, roof_h: float = 0.0) -> bool:
+	if _idx != null and _idx.has_method("enclosed"):
+		return _idx.enclosed(ring, key, roof_h)
 	if not _outline_of.has(key):
 		return false
 	var tol := SAME_TOL_M * WorldScale.metres_to_units()

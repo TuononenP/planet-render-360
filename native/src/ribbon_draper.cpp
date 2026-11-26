@@ -621,11 +621,24 @@ Array RibbonDraper::ribbon_junc(const PackedVector2Array &pts, double width, dou
 	return build(pts, width, lift, attr, jf, layer, m2u, base, false);
 }
 
+PackedFloat32Array RibbonDraper::heights(const PackedVector2Array &pts, double lift) const {
+	const int64_t n = pts.size();
+	PackedFloat32Array out;
+	out.resize(n);
+	const Vector2 *pp = pts.ptr();
+	float *op = out.ptrw();
+	for (int64_t i = 0; i < n; ++i) {
+		op[i] = (float)(height((double)pp[i].x, (double)pp[i].y) + lift);
+	}
+	return out;
+}
+
 void RibbonDraper::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "surface", "g_size", "g_step", "water_level", "size", "step",
 								 "mesh_size", "mesh_step"),
 			&RibbonDraper::setup);
 	ClassDB::bind_method(D_METHOD("height", "x", "z"), &RibbonDraper::height);
+	ClassDB::bind_method(D_METHOD("heights", "pts", "lift"), &RibbonDraper::heights);
 	ClassDB::bind_method(D_METHOD("normal", "x", "z"), &RibbonDraper::normal);
 	ClassDB::bind_method(D_METHOD("set_shore_sampler", "sampler"), &RibbonDraper::set_shore_sampler);
 	ClassDB::bind_method(D_METHOD("set_water_context", "domains", "bounds", "empty", "body_levels", "level", "half_u"),

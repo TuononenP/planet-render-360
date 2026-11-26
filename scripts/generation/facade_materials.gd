@@ -295,6 +295,45 @@ static func roof_residual(m: Material, b: Dictionary, style: Dictionary,
 	var want := _roof_target(m, b, style, hint)
 	return residual(m, want) if want.a > 0.0 else Color.WHITE
 
+## Distant facade material + its per-building residual in one pass (avoids
+## computing _wall_target twice per distant building).
+static func distant_wall_and_residual(b: Dictionary, region: String, storeys: int,
+		fidelity: int, seed_v: float, style: Dictionary) -> Array:
+	if style.has("curtain"):
+		var m := FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1, style)
+		return [m, wall_residual(m, b, style, seed_v)]
+	var mat_tag := str(b.get("material", "")).strip_edges().to_lower()
+	var mapped_set := str(MaterialLibrary.MATERIAL_TAGS.get(mat_tag, ""))
+	if mapped_set == "glass" or (mapped_set == "" and str(style.get("wall_set", "")) == "glass"):
+		var m := FacadeTextures.curtain_distant(0 if fidelity <= 1 else 1,
+			{"city": "stockholm"} if str(style.get("city", "")) == "stockholm" else {})
+		return [m, wall_residual(m, b, style, seed_v)]
+	if mapped_set != "" or str(style.get("era", "")).begins_with("nyc_"):
+		var m := facade_for_building(b, region, storeys, mini(fidelity, 2), false, seed_v, style)
+		return [m, wall_residual(m, b, style, seed_v)]
+	var dfs := distant_facades(fidelity, str(style.get("era", region)))
+	var want := _wall_target(dfs[0] as Material, b, style, seed_v)
+	if want.a > 0.0 and dfs[0] is StandardMaterial3D:
+		var m: Material = dfs[_nearest(dfs, want)]
+		return [m, residual(m, want)]
+	var fallback: Material = dfs[absi(hash(str(seed_v))) % dfs.size()]
+	return [fallback, Color.WHITE]
+
+## Distant roof material + its per-building residual in one pass (avoids
+## computing _roof_target twice per distant building).
+static func distant_roof_and_residual(b: Dictionary, region: String, shape: String,
+		colour_hint: Color, fidelity: int, seed_v: float, style: Dictionary) -> Array:
+	if str(b.get("roof_material", "")).strip_edges().to_lower() != "copper":
+		var drs := distant_roofs(region, fidelity)
+		var want := _roof_target(drs[0] as Material, b, style, colour_hint)
+		if want.a > 0.0 and drs[0] is StandardMaterial3D:
+			var m: Material = drs[_nearest(drs, want)]
+			return [m, residual(m, want)]
+		var fallback: Material = drs[absi(hash(str(seed_v))) % drs.size()]
+		return [fallback, Color.WHITE]
+	var m := roof_for_building(b, region, shape, colour_hint, fidelity, true, seed_v, style)
+	return [m, roof_residual(m, b, style, colour_hint)]
+
 static func _wall_set(b: Dictionary, style: Dictionary, region: String) -> String:
 	if style.has("tower_look"):
 		return str(style["wall_set"])  # already read the mapped material

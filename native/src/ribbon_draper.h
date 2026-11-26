@@ -63,6 +63,7 @@ public:
 			int size, double step, int mesh_size, double mesh_step);
 	// _Surface.height / normal
 	double height(double x, double z) const;
+	PackedFloat32Array heights(const PackedVector2Array &pts, double lift) const;
 	Vector3 normal(double x, double z) const;
 	void set_shore_sampler(const Ref<ShoreSampler> &sampler);
 	void set_water_context(const Ref<ShoreDomainIndex> &domains, const Rect2 &bounds, bool empty,
