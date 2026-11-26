@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## Drone mode: godot --headless --script tests/drone_test.gd
-## The steering, roam edge, hover bob, stick and readout maths, then a
+## The steering, roam edge, stick and readout maths, then a
 ## real View360: G takes off, the sticks fly and climb, the drone keeps
 ## over the ground and under its ceiling, taps don't walk, and G lands
 ## back inside the walking area. Offline: the view's fetchers never reach
@@ -88,13 +88,6 @@ func _maths() -> void:
 		"pressing out along the edge keeps gliding round it: %s" % at)
 	_check(not ViewDrone.can_roam(Vector2(0, 1500), ground) and not ViewDrone.can_roam(Vector2.ZERO, null),
 		"no roaming off the ground or without one")
-
-	var was := UiPrefs.reduce_motion
-	UiPrefs.reduce_motion = false
-	_check(absf(ViewDrone.bob(0.25 / ViewDrone.BOB_HZ) - ViewDrone.BOB_M) < 0.001, "the hover bobs")
-	UiPrefs.reduce_motion = true
-	_check(ViewDrone.bob(0.25 / ViewDrone.BOB_HZ) == 0.0, "but not under Reduce motion")
-	UiPrefs.reduce_motion = was
 
 	_check(DroneSticks.deflection(Vector2(3, 0), 38.0) == Vector2.ZERO, "a stick barely off centre is centred")
 	_check(DroneSticks.deflection(Vector2(0, -38), 38.0).is_equal_approx(Vector2(0, -1)), "full up is -1")
@@ -236,7 +229,7 @@ func _flight() -> void:
 	for i in 30 * 80:
 		view._drone.process(view, dt)
 	var agl := view._rig.position.y - view._ground.height_at_world(view._rig.position.x, view._rig.position.z)
-	_check(agl <= ViewDrone.AGL_MAX_M + ViewDrone.BOB_M + 0.5 and agl > ViewDrone.AGL_MAX_M - 5.0,
+	_check(agl <= ViewDrone.AGL_MAX_M + 0.5 and agl > ViewDrone.AGL_MAX_M - 5.0,
 		"the climb stops at the ceiling: %s" % agl)
 	view._drone.stick_aux = Vector2(0, 1)
 	for i in 30 * 80:
@@ -466,10 +459,16 @@ func _flight() -> void:
 	_check(view._drone.on and view._drone.panel.visible, "with start_flying a new place opens in the drone")
 	_check(ViewHint.text(view).begins_with("Left stick flies" if DroneSticks.wanted() else "W A S D to fly"),
 		"and the opening hint says how to fly")
-	# Takeoff starts 100 m up: the drone rises there and hovers.
+	# Takeoff starts 100 m up: the drone rises there and hovers steadily without bobbing.
 	for i in 90:
 		view._drone.process(view, 1.0 / 30.0)
 	var start_agl := view._rig.position.y - view._ground.height_at_world(view._rig.position.x, view._rig.position.z)
 	_check(absf(start_agl - ViewDrone.START_AGL_M) < 2.0, "the drone starts 100 m up: %.1f" % start_agl)
+	var hover_y := view._rig.position.y
+	var max_drift := 0.0
+	for i in 90:
+		view._drone.process(view, 1.0 / 30.0)
+		max_drift = maxf(max_drift, absf(view._rig.position.y - hover_y))
+	_check(max_drift < 0.02, "hovering in open air stays steady without bobbing: %.3f m" % max_drift)
 	view.queue_free()
 	await process_frame
