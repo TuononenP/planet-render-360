@@ -234,13 +234,18 @@ func _run() -> void:
 				worst = maxf(worst, over)
 				if over > 0.0:
 					buried += 1
-	var mon := stair.get_node_or_null("Model/Monument") as Node3D
-	_check(mon != null, "Helsinki Cathedral must build its Alexander II monument as its own node")
-	if mon != null:
-		var mw := mon.global_transform.origin if mon.is_inside_tree() else \
-			(stair.transform * (stair.get_node("Model") as Node3D).transform * mon.position)
-		_check(absf(mw.y - (cg.height_at_world(mw.x, mw.z) - 0.3)) < 0.01,
-			"the monument must stand on the square under it, not on the stair's datum")
+	var mon := stair.get_node_or_null("Model/Monument")
+	_check(mon == null, "Alexander II no longer rides inside the stair model")
+	# Alexander II is a first-class standalone landmark now: it builds on
+	# its own and stands on the square under it, not on the stair's datum.
+	var ad := _data("alexander_ii_monument", 10.0, -10.0)
+	var ag := GroundTruth.new(ad)
+	var solo := TerrainBuilder._landmark(ad, ag)
+	_check(solo.get_node_or_null("Model") != null, "Alexander II builds as its own landmark")
+	var my: float = solo.position.y
+	_check(absf(my - (ag.height_at_world(0.0, 0.0) - 0.3)) < 0.01,
+		"the standalone monument stands on the square under it: %.2f" % my)
+	solo.free()
 	_check(buried == 0, "the ground must stay under every Helsinki Cathedral tread, %d buried, worst %.2f m over" % [buried, worst])
 	_check(cg.height_at_world(0.0, 20.0) > stair.position.y + 10.4 + 2.0,
 		"the stair cut must leave the hill under the terrace alone")
@@ -260,11 +265,16 @@ func _run() -> void:
 		for x in 49:
 			md.heights[z * 49 + x] += 4.0 * float(x)
 	var mg := GroundTruth.new(md)
+	var mall := TerrainBuilder._landmark(md, mg)
+	# The outline lives in the model's yawed frame (itis turns 39.5° onto
+	# its mapped front): sample the ground where the builder does,
+	# through the built transforms, not at the raw outline points.
+	var to_world: Transform3D = mall.transform * (mall.get_node("Model") as Node3D).transform
 	var lows: Array[float] = []
 	for p in LandmarkTerrain.outline("itis_shopping_centre"):
-		lows.append(mg.height_at_world(p.x, p.y))
+		var w: Vector3 = to_world * Vector3(p.x, 0.0, p.y)
+		lows.append(mg.height_at_world(w.x, w.z))
 	lows.sort()
-	var mall := TerrainBuilder._landmark(md, mg)
 	_check(mall.position.y > lows[0] + 5.0 and mall.position.y < lows[-1] - 5.0,
 		"a sloped mall must sit between its outline's lowest and highest ground, got %.1f in %.1f..%.1f" % [mall.position.y, lows[0], lows[-1]])
 	var plinth := mall.get_node_or_null("Model/Plinth") as MeshInstance3D
