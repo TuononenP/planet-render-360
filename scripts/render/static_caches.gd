@@ -125,6 +125,17 @@ static func release_all() -> void:
 	RailDecks._last = null
 	RailDecks._last_ground = null
 	RailDecks._last_rails = []
+	BridgeLandings._idx_surf = null
+	BridgeLandings._idx_ends.clear()
+	BridgeLandings._idx_segs.clear()
+	TramModel._meshes.clear()
+	TramModel._materials.clear()
+	TramBoards._materials.clear()
+	FarSurface._shader = null
+	ShoreRailings._white_mat = null
+	RealityMeshKit._cache.clear()
+	LandmarkSfAlcatrazSurface._material = null
+	HarbourTraffic._plan_cached.clear()
 	BuildingMasses.end_build()
 	OsmParseCache.clear()
 	ClimateFetcher.clear_static_caches()

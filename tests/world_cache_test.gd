@@ -79,6 +79,7 @@ func _run() -> void:
 	root.add_child(main)
 	main.capture_mode = true
 	await process_frame
+	main._settings.preset = RenderSettings.Preset.HIGH
 	main._store.entries.clear()
 	await create_timer(1.0).timeout
 	# First visit: build, then the background save.

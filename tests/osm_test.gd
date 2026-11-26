@@ -965,8 +965,8 @@ func _building_tag_checks(failures: Array[String]) -> void:
 			or int(d["start_year"]) != 0 or bool(d["heritage"]) \
 			or str(d["architecture"]) != "" or not (d["holes"] as Array).is_empty():
 		failures.append("absent tags should default to 0/false/empty: %s" % [d])
-	if int(OsmTags._building_entry({"roof:levels": "40"}, ring, box)["roof_levels"]) != 10:
-		failures.append("roof_levels should clamp to 10")
+	if int(OsmTags._building_entry({"roof:levels": "40"}, ring, box)["roof_levels"]) != 30:
+		failures.append("roof_levels should clamp to 30")
 	for row in [["1890", 1890], ["1890-05-01", 1890], ["~1890", 1890],
 			["C19", 1850], ["c18", 1750], ["1890s", 1890], ["before 1900", 1900],
 			["", 0], ["unknown", 0], ["12345", 0], ["C99", 0]]:

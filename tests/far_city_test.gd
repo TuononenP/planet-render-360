@@ -14,7 +14,7 @@ extends SceneTree
 const ZOOM := 13
 
 func _init() -> void:
-	_run()
+	_run.call_deferred()
 
 func _px_hash(x: int, y: int) -> float:
 	return fposmod(sin(float(x) * 12.9898 + float(y) * 78.233) * 43758.5453, 1.0)
@@ -22,8 +22,11 @@ func _px_hash(x: int, y: int) -> float:
 func _data(preset: int = 2) -> LocationData:
 	var data := LocationData.new()
 	RenderSettings.apply_preset(data, preset)
-	data.latitude = 48.8566
-	data.longitude = 2.3522
+	# Use a city outside FAR_DISTRICT_CITIES (e.g. Berlin) so the synthetic
+	# roofscape tests generic regional fabric + full native CityKernels parity
+	# without Paris's La Défense high-rise district overlay.
+	data.latitude = 52.5200
+	data.longitude = 13.4050
 	data.seed_value = 5
 	var n := data.grid_size
 	data.heights.resize(n * n)
@@ -190,6 +193,7 @@ func _run() -> void:
 	_parse_checks(failures)
 	await _offline_cache_checks(failures)
 	_infill_checks(failures)
+	StaticCaches.release_all()
 	if failures.is_empty():
 		print("FAR CITY OK: settlement map, real-data far city (no field/forest/water), towers only from OSM, preset-invariant, far bands ranged, absence-only matched infill")
 		quit(0)
