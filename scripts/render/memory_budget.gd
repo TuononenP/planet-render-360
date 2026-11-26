@@ -23,8 +23,9 @@ const ANDROID_RESERVE := 300 * MB
 const DESKTOP_SHARE := 0.75
 const DESKTOP_MAX_LIMIT := 12 * 1024 * MB
 ## Desktop VRAM ceiling (bytes) so MemoryGuard engages on video-memory growth
-## even when system RAM has ample headroom.
-const DESKTOP_VRAM_LIMIT := 4608 * MB
+## even when system RAM has ample headroom. Sized so a single Ultra city build
+## (~4.7 GiB peak) finishes and saves cleanly while multi-world roaming sheds.
+const DESKTOP_VRAM_LIMIT := 6144 * MB
 ## Never plan on less than this, whatever a misread counter says.
 const MIN_LIMIT := 1024 * MB
 const ENV_LIMIT := "PR360_MEMORY_LIMIT_MB"
