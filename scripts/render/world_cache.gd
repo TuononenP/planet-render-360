@@ -90,6 +90,8 @@ static func key(data: LocationData) -> String:
 		# A streamed world's far city stands on its origin (grid and hashes)
 		# and its near detail on its reach: a world built on others is not it.
 		fp.append(str([data.origin_m, data.detail_reach]))
+	if str(data.dem_source.get("ground_model", "")) == "mml":
+		fp.append(GroundModelFetcher.MML_CACHE_VERSION)
 	return "world_%d_%d_p%d_s%d_%08x" % [CacheStore.quant(data.latitude),
 		CacheStore.quant(data.longitude), data.quality_preset, data.season,
 		hash(str(fp)) & 0xffffffff]
