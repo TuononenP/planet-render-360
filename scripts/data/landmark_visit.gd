@@ -30,16 +30,93 @@ static func site(name: String, lat: float, lon: float, description: String = "",
 		"height_m": height_m, "description": description,
 		"wiki_lang": "", "wiki_title": "", "source": source}
 
-## Curated registry entry (LocationData.landmarks()) -> site.
+## Curated registry entry (LocationData.landmarks()) -> site. The
+## category comes from the entry's `kind` (registry_kind_icon), so the
+## map, the list rows and the 360 callouts each draw their own icon
+## instead of every curated landmark sharing one.
 static func from_registry(entry: Dictionary) -> Dictionary:
+	var k := registry_kind_icon(str(entry.get("kind", "")), str(entry["name"]))
 	var s := site(str(entry["name"]), float(entry["lat"]), float(entry["lon"]),
 		"Landmark", "curated", float(entry.get("height_m", 0.0)))
 	s["id"] = "curated:" + str(entry["type"])
-	s["kind"] = "Landmark"
-	s["icon"] = "landmark"
+	s["kind"] = k[0]
+	s["icon"] = k[1]
 	s["wiki_lang"] = "en"
 	s["wiki_title"] = str(entry.get("wiki_title", entry["name"]))
 	return s
+
+## [kind label, Lucide icon] for a curated registry entry: its `kind`
+## field first (Temple, Station, Bridge...), falling back to kind_for()
+## on the name for the core icons that carry no kind (Eiffel Tower ->
+## Building) and for kinds with no dedicated glyph. Labels stay within
+## kind_for's vocabulary plus Station, Airport, Terminal, Theatre,
+## Statue, Memorial, Bridge, Market and Hotel; Peak and Water keep
+## their wide standoffs. statue.svg is project-drawn in the Lucide
+## outline style (Lucide ships no statue glyph).
+static func registry_kind_icon(kind: String, entry_name: String) -> Array:
+	var m := _category_for(kind.strip_edges().to_lower())
+	if m.is_empty():
+		m = _category_for(entry_name.to_lower())
+	if m.is_empty():
+		m = ["Landmark", "landmark"]
+	return m
+
+## [kind label, Lucide icon] for already-lowered text, {} when nothing
+## matches. One table serves the entry's `kind` and, for the core icons
+## that carry no kind, its name (Eiffel Tower -> Building).
+static func _category_for(t: String) -> Array:
+	for w in ["cathedral", "church", "basilica", "chapel", "abbey", "mosque",
+			"temple", "synagogue", "shrine", "pagoda", "stupa", "gurdwara",
+			"monastery", "minster", "duomo"]:
+		if t.contains(w):
+			return ["Place of worship", "church"]
+	for w in ["palace", "castle", "fortress", "citadel", "manor", "kremlin",
+			"chateau", "château", "residence"]:
+		if t.contains(w):
+			return ["Castle", "castle"]
+	if t.contains("fort") and not t.contains("effort"):
+		return ["Castle", "castle"]
+	if t.contains("station") and not t.contains("power"):
+		return ["Station", "train-front"]
+	if t.contains("airport"):
+		return ["Airport", "plane"]
+	for w in ["ferry", "cruise", "harbour", "harbor", "terminal", "quay"]:
+		if t.contains(w):
+			return ["Terminal", "ship"]
+	for w in ["museum", "gallery", "arts centre", "science centre",
+			"exhibition", "museo"]:
+		if t.contains(w):
+			return ["Museum", "school"]
+	for w in ["opera", "theatre", "theater", "concert hall"]:
+		if t.contains(w):
+			return ["Theatre", "drama"]
+	if t.contains("statue") or t == "moai":
+		return ["Statue", "statue"]
+	for w in ["memorial", "monument", "tomb", "mausoleum", "obelisk",
+			"arch", "column", "stela", "cenotaph"]:
+		if t.contains(w):
+			return ["Memorial", "landmark"]
+	if t.contains("bridge"):
+		return ["Bridge", "bridge"]
+	for w in ["market", "shopping", "department store", "store", "bazaar", "mall"]:
+		if t.contains(w):
+			return ["Market", "store"]
+	if t.contains("hotel") or t.contains("hostel"):
+		return ["Hotel", "hotel"]
+	for w in ["tower", "lighthouse", "skyscraper", "stadium", "arena",
+			"office", "commercial", "headquarters", "casino", "apartment"]:
+		if t.contains(w):
+			return ["Building", "building-2"]
+	for w in ["garden", "piazza", "square", "park", "plaza"]:
+		if t.contains(w):
+			return ["Park", "leaf"]
+	for w in ["mountain", "peak", "summit", "volcano", "massif", "glacier", "hill"]:
+		if t.contains(w):
+			return ["Peak", "mountain"]
+	for w in ["lake", "island", "waterfall", "beach", "bay"]:
+		if t.contains(w):
+			return ["Water", "landmark"]
+	return []
 
 ## [kind label, Lucide icon] from a short description or archetype.
 static func kind_for(text: String) -> Array:
@@ -56,7 +133,7 @@ static func kind_for(text: String) -> Array:
 			return ["Place of worship", "landmark"]
 	for w in ["museum", "gallery", "opera", "theatre", "theater"]:
 		if t.contains(w):
-			return ["Museum", "building-2"]
+			return ["Museum", "school"]
 	for w in ["park", "garden", "square", "plaza"]:
 		if t.contains(w):
 			return ["Park", "leaf"]

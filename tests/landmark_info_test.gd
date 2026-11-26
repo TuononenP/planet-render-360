@@ -39,13 +39,14 @@ func _run() -> void:
 	_parsers()
 	_visit_math()
 	_view_aim()
+	_registry_icons()
 	await _map_markers()
 	await _card_states()
 	_osm_tag()
 	await _callout_icon_tap()
 	DirAccess.remove_absolute(CACHE)
 	if failures.is_empty():
-		print("LANDMARK INFO OK: parsers, standoff, aim, map markers, card states, OSM tag")
+		print("LANDMARK INFO OK: parsers, standoff, aim, registry icons, map markers, card states, OSM tag")
 		quit(0)
 	else:
 		for f in failures:
@@ -108,6 +109,51 @@ func _visit_math() -> void:
 	_check(vp.y < float(eiffel["lon"]) and vp.x < float(eiffel["lat"]), "north of the equator the viewer stands WSW")
 	var off := WorldScale.xz_from_latlon(vp.x, vp.y, float(eiffel["lat"]), float(eiffel["lon"]))
 	_check(absf(LandmarkVisit.bearing_of(off) - 250.0) < 1.0, "bearing of the viewpoint: %.1f" % LandmarkVisit.bearing_of(off))
+
+## Curated landmarks carry a category icon, not one shared glyph:
+## registry_kind_icon maps the entry's kind (name fallback for the core
+## icons that carry none), and every mapped icon ships as an SVG.
+func _registry_icons() -> void:
+	var cases := [
+		["Cathedral", "Turku Cathedral", "Place of worship", "church"],
+		["Temple", "Wat Arun", "Place of worship", "church"],
+		["Palace", "Palais de Chaillot", "Castle", "castle"],
+		["Castle", "Turku Castle", "Castle", "castle"],
+		["Station", "Gare du Nord", "Station", "train-front"],
+		["Airport", "Helsinki Airport", "Airport", "plane"],
+		["Ferry terminal", "Ferry Building", "Terminal", "ship"],
+		["Terminal", "Ferry Building", "Terminal", "ship"],
+		["Museum", "Ateneum", "Museum", "school"],
+		["Opera house", "Sydney Opera House", "Theatre", "drama"],
+		["Statue", "Statue of Liberty", "Statue", "statue"],
+		["Market", "Old Market Hall", "Market", "store"],
+		["Hotel", "Banff Springs Hotel", "Hotel", "hotel"],
+		["Monument", "Grande Arche", "Memorial", "landmark"],
+		["Bridge", "Tower Bridge", "Bridge", "bridge"],
+		["Tower", "Eiffel Tower", "Building", "building-2"],
+		["Skyscraper", "Empire State Building", "Building", "building-2"],
+		["Piazza", "Piazza San Marco", "Park", "leaf"],
+		["", "Eiffel Tower", "Building", "building-2"],
+		["", "Turku Cathedral", "Place of worship", "church"],
+		["", "Statue of Liberty", "Statue", "statue"],
+		["Power station", "Battersea Power Station", "Landmark", "landmark"],
+		["Casino", "Monte Carlo Casino", "Building", "building-2"],
+	]
+	for c in cases:
+		var got := LandmarkVisit.registry_kind_icon(str(c[0]), str(c[1]))
+		_check(got == [c[2], c[3]], "kind '%s' / '%s' -> %s, got %s" % [c[0], c[1], [c[2], c[3]], got])
+	var eiffel := LandmarkVisit.from_registry(LocationData.entry_for_type("eiffel"))
+	_check(eiffel["kind"] == "Building" and eiffel["icon"] == "building-2", "a kind-less core icon falls back to its name")
+	var turku := LandmarkVisit.from_registry(LocationData.entry_for_type("turku_cathedral"))
+	_check(turku["kind"] == "Place of worship" and turku["icon"] == "church", "a kind-less cathedral falls back to its name")
+	var nord := LandmarkVisit.from_registry(LocationData.entry_for_type("gare_du_nord"))
+	_check(nord["kind"] == "Station" and nord["icon"] == "train-front", "a registry station keeps its category")
+	var bridge := LandmarkVisit.from_registry(LocationData.entry_for_type("tower_bridge"))
+	_check(bridge["kind"] == "Bridge" and bridge["icon"] == "bridge", "a registry bridge keeps its category")
+	for icon in ["church", "castle", "train-front", "plane", "ship",
+			"statue", "school", "drama", "store", "hotel", "bridge",
+			"building-2", "landmark", "mountain", "leaf"]:
+		_check(FileAccess.file_exists("res://assets/icons/%s.svg" % icon), "icon ships: " + icon)
 
 func _view_aim() -> void:
 	var data := LocationData.new()
