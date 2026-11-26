@@ -26,7 +26,18 @@ const VERSION := 1
 
 ## Runs on a WorkerThreadPool thread; every cache it touches is locked.
 static func run(preset: int) -> void:
-	TerrainTextures.arrays(TerrainTextures.size_for(preset))
+	# Overlap independent prewarm work (terrain texture arrays, PBR maps,
+	# and Ultra car meshes) so BuildPrewarm finishes before GroundTruth starts.
+	var terrain_task := WorkerThreadPool.add_task(func() -> void:
+		TerrainTextures.arrays(TerrainTextures.size_for(preset)), true, "TerrainTexPrewarm")
+	var car_group := -1
+	if RenderQuality.ultra_desktop(preset):
+		var car_kinds := CarSpecs.KINDS.keys()
+		car_group = WorkerThreadPool.add_group_task(func(i: int) -> void:
+			var k := str(car_kinds[i])
+			CarModel.mesh(k, false)
+			CarModel.mesh(k, true)
+			CarModel.glass_shadow_mesh(k), car_kinds.size(), -1, false, "CarModelPrewarm")
 	# Fast keeps its prewarm small (albedo only); other maps load on demand.
 	var maps: Array[String] = ["diff"]
 	if preset > RenderSettings.Preset.FAST:
@@ -58,14 +69,9 @@ static func run(preset: int) -> void:
 		FacadeTextures.prewarm(last.get("recipes", PackedStringArray()),
 			func(set_name: String, map_name: String) -> Image:
 				return PbrTextures._set_image(set_name, map_name, hi_res))
-	if RenderQuality.ultra_desktop(preset):
-		var car_kinds := CarSpecs.KINDS.keys()
-		var cg := WorkerThreadPool.add_group_task(func(i: int) -> void:
-			var k := str(car_kinds[i])
-			CarModel.mesh(k, false)
-			CarModel.mesh(k, true)
-			CarModel.glass_shadow_mesh(k), car_kinds.size(), -1, false, "CarModelPrewarm")
-		WorkerThreadPool.wait_for_group_task_completion(cg)
+	WorkerThreadPool.wait_for_task_completion(terrain_task)
+	if car_group >= 0:
+		WorkerThreadPool.wait_for_group_task_completion(car_group)
 
 ## Records what the build that just finished read, for the next launch.
 ## Not in headless runs (tests, tools), which keep no built world either.

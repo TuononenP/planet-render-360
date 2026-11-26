@@ -952,7 +952,7 @@ func _finish() -> void:
 		poi = merge_payloads(poi, aero_text)
 	var store_in_cache := cache_parsed
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
-		var parsed := parse_features(merge_payloads(merge_payloads(detailed, ring), poi), lat, lon)
+		var parsed := OsmParseCache.load_or_parse(ckey, func() -> Dictionary: return parse_features(merge_payloads(merge_payloads(detailed, ring), poi), lat, lon))
 		if store_in_cache:
 			OsmParseCache.store(ckey, parsed)
 		_on_parsed.call_deferred(gen, parsed))

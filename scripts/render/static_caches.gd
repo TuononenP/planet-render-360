@@ -116,7 +116,8 @@ static func release_all() -> void:
 	AmbientLife._smoke_mat = null
 	AmbientLife._bird_geo = null
 	AmbientLife._smoke_quad = null
-	PlaceThumb._textures.clear()
+	# UI / non-builder caches (PlaceThumb, MapPack, GodrayShader) are cleared
+	# from main.gd on exit so StaticCaches stays independent of SOURCE_SKIP.
 	UiIcon._cache.clear()
 	Brand._cache.clear()
 	UiTheme._font_cache.clear()
@@ -173,8 +174,6 @@ static func release_all() -> void:
 	TukTukModel._meshes.clear()
 	WaterWakes._wake_mat = null
 	WaterWakes._collar_mat = null
-	GodrayShader._rays_shader = null
-	GodrayShader._overlay_shader = null
 	Precipitation._drift_shader = null
 	SharedShader._by_code.clear()
 	PrivacyHero._disc = null
@@ -201,7 +200,6 @@ static func release_all() -> void:
 	CogFetcher._tile_order.clear()
 	CogFetcher._metadata.clear()
 	CogFetcher._meta_loading.clear()
-	MapPack._shared.clear()
 	SkyKit._mats.clear()
 	FtSuomenJoutsen._nameplate_mat = null
 	ArchitectureStyle._profile_cache.clear()

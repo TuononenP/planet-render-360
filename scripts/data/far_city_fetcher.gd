@@ -357,6 +357,38 @@ func _remap_off_thread(gen: int, mem: Dictionary) -> void:
 			out = remap_far(mem["landuse"], mem["towers"], offset)
 		_on_parsed.call_deferred(gen, int(mem["bytes"]), true, out))
 
+static func _read_parsed_disk(path: String, mtime: int, base_lat: float, base_lon: float) -> Dictionary:
+	var ppath := path + ".parsed"
+	if not FileAccess.file_exists(ppath):
+		return {}
+	var f := FileAccess.open(ppath, FileAccess.READ)
+	if f == null:
+		return {}
+	var raw: Variant = f.get_var(false)
+	f.close()
+	if not (raw is Dictionary):
+		return {}
+	var d: Dictionary = raw
+	if int(d.get("mtime", -1)) != mtime or int(d.get("ver", -1)) != QUERY_VERSION \
+			or not is_equal_approx(float(d.get("lat", NAN)), base_lat) \
+			or not is_equal_approx(float(d.get("lon", NAN)), base_lon):
+		return {}
+	if not (d.get("landuse") is Array) or not (d.get("towers") is Array):
+		return {}
+	return d
+
+static func _write_parsed_disk(path: String, mtime: int, base_lat: float, base_lon: float,
+		bytes: int, parsed: Dictionary) -> void:
+	var ppath := path + ".parsed"
+	var tmp := "%s.tmp.%d" % [ppath, OS.get_thread_caller_id()]
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_var({"mtime": mtime, "ver": QUERY_VERSION, "lat": base_lat, "lon": base_lon,
+		"bytes": bytes, "landuse": parsed["landuse"], "towers": parsed["towers"]}, false)
+	f.close()
+	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(ppath))
+
 func _read_and_parse_off_thread(path: String, mtime: int, cached: bool) -> void:
 	_join_parse()
 	var gen := _gen
@@ -365,6 +397,16 @@ func _read_and_parse_off_thread(path: String, mtime: int, cached: bool) -> void:
 	var c_lat := _c_lat
 	var c_lon := _c_lon
 	_parse_task = WorkerThreadPool.add_task(func() -> void:
+		var disk := _read_parsed_disk(path, mtime, base_lat, base_lon)
+		if not disk.is_empty():
+			var d_bytes := int(disk.get("bytes", 0))
+			var parsed := {"landuse": disk["landuse"], "towers": disk["towers"]}
+			_store_parsed(path, mtime, base_lat, base_lon, d_bytes, false, parsed)
+			if not (is_equal_approx(base_lat, c_lat) and is_equal_approx(base_lon, c_lon)):
+				parsed = remap_far(parsed["landuse"], parsed["towers"],
+					WorldScale.xz_from_latlon(base_lat, base_lon, c_lat, c_lon))
+			_on_parsed.call_deferred(gen, d_bytes, cached, parsed)
+			return
 		var text := OsmFetcher._read_cache(path)
 		if text == "" or OverpassRequest.payload_error(text) != "":
 			_on_parsed.call_deferred(gen, 0, cached, {})
@@ -372,6 +414,7 @@ func _read_and_parse_off_thread(path: String, mtime: int, cached: bool) -> void:
 		var parsed := _parse_single(text, base_lat, base_lon, true)
 		if not parsed.is_empty():
 			_store_parsed(path, mtime, base_lat, base_lon, text.length(), false, parsed)
+			_write_parsed_disk(path, mtime, base_lat, base_lon, text.length(), parsed)
 			if not (is_equal_approx(base_lat, c_lat) and is_equal_approx(base_lon, c_lon)):
 				parsed = remap_far(parsed["landuse"], parsed["towers"],
 					WorldScale.xz_from_latlon(base_lat, base_lon, c_lat, c_lon))

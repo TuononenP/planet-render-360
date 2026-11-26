@@ -373,6 +373,10 @@ func _request_exit() -> void:
 	if _build_abort != null:
 		_build_abort.requested = true
 	_view._reach.abort_build()
+	PlaceThumb._textures.clear()
+	MapPack._shared.clear()
+	GodrayShader._rays_shader = null
+	GodrayShader._overlay_shader = null
 	# Cache scans stop early; the index still gets its last write.
 	CacheStore.stop_scans = true
 	if _view.has_running_threads():
