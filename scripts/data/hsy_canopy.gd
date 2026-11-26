@@ -50,9 +50,13 @@ static func layer_url(layer: String, lat: float, lon: float, size: int) -> Strin
 ## L8 canopy heights from the four band images (any format, `size` a
 ## side, alpha = canopy) and an optional CHM (L8 metres, 255 no data).
 ## null when a band is missing or the wrong size.
+static var _native := ClassDB.class_exists("ImageKernels")
+
 static func compose(bands: Array, chm: Image, size: int) -> Image:
 	if bands.size() != LAYERS.size():
 		return null
+	if _native:
+		return ClassDB.class_call_static("ImageKernels", "hsy_canopy_compose", bands, chm, size) as Image
 	var alpha: Array = []
 	for b in bands:
 		if not (b is Image) or (b as Image).get_size() != Vector2i(size, size):

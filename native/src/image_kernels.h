@@ -3,6 +3,7 @@
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/variant/array.hpp>
 
 namespace godot {
 
@@ -20,6 +21,10 @@ public:
 	// first in row order. Texels with no solid one near are skipped
 	// whole, and the rest stop at their first hit, nearest first.
 	static void fix_alpha_edges(const Ref<Image> &image);
+	// HsyCanopy.compose: L8 canopy heights from 4 RGBA band images + optional L8 CHM.
+	static Ref<Image> hsy_canopy_compose(const Array &bands, const Ref<Image> &chm, int size);
+	// HsyCover.overlay: R8 class overlay with optional replacement mask.
+	static Ref<Image> r8_overlay(const Ref<Image> &base, const Ref<Image> &top, const Array &replace);
 };
 
 } // namespace godot

@@ -48,6 +48,48 @@ static func _beside_path(s: BridgeStructures.Structure, index: RoadBridgeDecks.I
 				path = str(index.lines[li]["cls"]) in RoadBridgeDecks.PATH_CLASSES
 	return path
 
+## Builds all structures of `plan` in parallel into `batches` (joined in
+## structure order for deterministic AC-12 output).
+static func build_all(batches: Dictionary, plan: BridgeStructures.Plan, index: RoadBridgeDecks.Index,
+		surf: RoadBuilder._Surface, m2u: float, roads: Dictionary) -> void:
+	var active: Array[BridgeStructures.Structure] = []
+	for s: BridgeStructures.Structure in plan.structures:
+		if surf.inside(s.bounds.get_center()):
+			active.append(s)
+	var n := active.size()
+	if n == 0:
+		return
+	var wbg = load("res://scripts/generation/world_build_graph.gd") as GDScript
+	var chunks := mini(n, 4 if OS.is_debug_build() else 8)
+	if chunks <= 1 or wbg.force_serial:
+		for s in active:
+			_build_one(batches, s, index, surf, m2u, roads)
+		return
+	var parts: Array = []
+	parts.resize(n)
+	var group := WorkerThreadPool.add_group_task(func(c: int) -> void:
+		for i in range(n * c / chunks, n * (c + 1) / chunks):
+			var own := {}
+			_build_one(own, active[i], index, surf, m2u, roads)
+			parts[i] = own, chunks, -1, false, "BridgeStructures")
+	WorkerThreadPool.wait_for_group_task_completion(group)
+	for own in parts:
+		if own is Dictionary:
+			for finish in (own as Dictionary):
+				RoadBuilder._batch(batches, finish).join(own[finish])
+
+static func _build_one(batches: Dictionary, s: BridgeStructures.Structure, index: RoadBridgeDecks.Index,
+		surf: RoadBuilder._Surface, m2u: float, roads: Dictionary) -> void:
+	var opens := BridgeStructures._openings(s, index, surf, m2u)
+	_slab(batches, s, surf, m2u)
+	_edges(batches, s, opens, index, surf, m2u, roads)
+	if s.arched and s.wet and s.spine.size() >= 2:
+		BridgeArches.add(RoadBuilder._batch(batches, "deck"), s.spine, s.dist, s.heights,
+			BridgeStructures._outline_half(s), s.depth, surf.ground, m2u)
+	BridgeApproaches.span_end_walls(RoadBuilder._batch(batches, "deck"), s, surf, m2u)
+	for li in s.members:
+		BridgeStructureMembers.lay(batches, s, index.lines[li], surf, m2u, li)
+
 ## The outline's top and underside, cut in cells about SLICE_M square
 ## (_slices) so the slab follows the deck top (BridgeStructures.Structure.surface_at).
 static func _slab(batches: Dictionary, s: BridgeStructures.Structure, surf: RoadBuilder._Surface, m2u: float) -> void:

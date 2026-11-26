@@ -73,8 +73,124 @@ void ImageKernels::fix_alpha_edges(const Ref<Image> &image) {
 	if (changed) image->set_data(w, h, image->has_mipmaps(), Image::FORMAT_RGBA8, data);
 }
 
+Ref<Image> ImageKernels::hsy_canopy_compose(const Array &bands, const Ref<Image> &chm, int size) {
+	constexpr int NBANDS = 4;
+	constexpr uint8_t BAND_LO[NBANDS] = { 2, 10, 15, 20 };
+	constexpr uint8_t BAND_HI[NBANDS] = { 10, 15, 20, 32 };
+	constexpr uint8_t BAND_MID[NBANDS] = { 6, 12, 17, 24 };
+	constexpr uint8_t NO_DATA = 255;
+	if (size <= 0 || bands.size() != NBANDS) {
+		return Ref<Image>();
+	}
+	PackedByteArray alpha_bufs[NBANDS];
+	const uint8_t *alpha_ptrs[NBANDS] = {};
+	for (int i = 0; i < NBANDS; ++i) {
+		Ref<Image> b = bands[i];
+		if (b.is_null() || b->get_width() != size || b->get_height() != size) {
+			return Ref<Image>();
+		}
+		if (b->get_format() == Image::FORMAT_RGBA8) {
+			alpha_bufs[i] = b->get_data();
+		} else {
+			Ref<Image> dup = b->duplicate();
+			dup->convert(Image::FORMAT_RGBA8);
+			alpha_bufs[i] = dup->get_data();
+		}
+		if (alpha_bufs[i].size() < (int64_t)size * size * 4) {
+			return Ref<Image>();
+		}
+		alpha_ptrs[i] = alpha_bufs[i].ptr();
+	}
+	PackedByteArray refine_buf;
+	const uint8_t *refine = nullptr;
+	if (chm.is_valid() && chm->get_width() == size && chm->get_height() == size &&
+			chm->get_format() == Image::FORMAT_L8) {
+		refine_buf = chm->get_data();
+		if (refine_buf.size() >= (int64_t)size * size) {
+			refine = refine_buf.ptr();
+		}
+	}
+	const int64_t total = (int64_t)size * size;
+	PackedByteArray out;
+	out.resize(total);
+	uint8_t *op = out.ptrw();
+	for (int64_t p = 0; p < total; ++p) {
+		const int64_t aidx = p * 4 + 3;
+		int band = -1;
+		for (int i = NBANDS - 1; i >= 0; --i) {
+			if (alpha_ptrs[i][aidx] > 127) {
+				band = i;
+				break;
+			}
+		}
+		if (band < 0) {
+			op[p] = 0;
+			continue;
+		}
+		uint8_t h = BAND_MID[band];
+		if (refine != nullptr) {
+			const uint8_t r = refine[p];
+			if (r != NO_DATA && r > 0) {
+				h = std::clamp(r, BAND_LO[band], BAND_HI[band]);
+			}
+		}
+		op[p] = h;
+	}
+	return Image::create_from_data(size, size, false, Image::FORMAT_L8, out);
+}
+
+Ref<Image> ImageKernels::r8_overlay(const Ref<Image> &base, const Ref<Image> &top, const Array &replace) {
+	if (base.is_null() || top.is_null()) {
+		return base;
+	}
+	const int w = base->get_width(), h = base->get_height();
+	const int tw = top->get_width(), th = top->get_height();
+	PackedByteArray out = base->get_data();
+	const PackedByteArray src_buf = top->get_data();
+	if (out.size() < (int64_t)w * h || src_buf.size() < (int64_t)tw * th) {
+		return base;
+	}
+	uint8_t mask[256] = {};
+	const int64_t rn = replace.size();
+	for (int64_t i = 0; i < rn; ++i) {
+		const int id = (int)replace[i];
+		if (id >= 0 && id < 256) {
+			mask[id] = 1;
+		}
+	}
+	const bool any = (rn == 0);
+	uint8_t *op = out.ptrw();
+	const uint8_t *sp = src_buf.ptr();
+	if (tw == w && th == h) {
+		const int64_t total = (int64_t)w * h;
+		for (int64_t i = 0; i < total; ++i) {
+			const uint8_t v = sp[i];
+			if (v != 0 && (any || mask[op[i]] == 1)) {
+				op[i] = v;
+			}
+		}
+	} else {
+		for (int y = 0; y < h; ++y) {
+			const int sy = std::min((int)(((double)y + 0.5) * (double)th / (double)h), th - 1) * tw;
+			const int row = y * w;
+			for (int x = 0; x < w; ++x) {
+				const int sx = std::min((int)(((double)x + 0.5) * (double)tw / (double)w), tw - 1);
+				const uint8_t v = sp[sy + sx];
+				if (v != 0 && (any || mask[op[row + x]] == 1)) {
+					op[row + x] = v;
+				}
+			}
+		}
+	}
+	return Image::create_from_data(w, h, false, Image::FORMAT_R8, out);
+}
+
 void ImageKernels::_bind_methods() {
 	ClassDB::bind_static_method("ImageKernels", D_METHOD("fix_alpha_edges", "image"), &ImageKernels::fix_alpha_edges);
+	ClassDB::bind_static_method("ImageKernels", D_METHOD("hsy_canopy_compose", "bands", "chm", "size"),
+			&ImageKernels::hsy_canopy_compose);
+	ClassDB::bind_static_method("ImageKernels", D_METHOD("r8_overlay", "base", "top", "replace"),
+			&ImageKernels::r8_overlay);
 }
 
 } // namespace godot

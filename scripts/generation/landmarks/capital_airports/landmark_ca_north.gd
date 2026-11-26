@@ -21,7 +21,7 @@ static func reykjavik(model: Node3D) -> void:
 	K.buildings(lm, d, [], {"Gamli Flugturninn": 12.0})
 	K.terminal_set(lm, d, {"_big": [7.5, 2, 0.8], "_small": [5.0, 1]})
 	K.park(lm, d, [["turboprop", "#0B3560"], ["turboprop", "#0B3560"], ["light", "#B3262C"]], 4)
-	lm.commit(model)
+	lm.commit(model, "", true)
 
 ## Tallinn's Lennart Meri Airport: one 3,070 m runway (08/26) beside a single
 ## three-storey, 21 m terminal under a flat white roof, its long glazed front
@@ -35,7 +35,7 @@ static func tallinn(model: Node3D) -> void:
 	K.terminal_set(lm, d, {"Lennart Meri Tallinna lennujaam": [21.0, 3, 1.2], "_big": [12.0, 2], "_small": [5.0, 1]})
 	K.towers(lm, d, 30.0)
 	K.park(lm, d, [["narrow", "#1E4D9B"], ["narrow", "#1E4D9B"], ["turboprop", "#C8102E"], ["narrow", "#073590"]], 10)
-	lm.commit(model)
+	lm.commit(model, "", true)
 
 ## Stockholm Bromma, Paul Hedqvist's 1936 functionalist airport: the pale
 ## rendered terminal of three storeys with its ribbon windows and the white
@@ -50,7 +50,7 @@ static func stockholm(model: Node3D) -> void:
 	K.terminal_set(lm, d, {"Bromma flygplats": [14.0, 3, 0.9], "_big": [10.0, 2], "_small": [5.0, 1]})
 	K.towers(lm, d, 26.0, 2.6, 4.0, 3.0)
 	K.park(lm, d, [["narrow", "#0B2D6B"], ["turboprop", "#C8102E"], ["narrow", "#0B2D6B"], ["turboprop", "#1B6FB8"]], 10)
-	lm.commit(model)
+	lm.commit(model, "", true)
 
 ## Vilnius Airport: the 1980 terminal's long glazed concourse and the
 ## departures block, one 2,500 m runway (02/20) running past it, with
@@ -64,7 +64,7 @@ static func vilnius(model: Node3D) -> void:
 	K.terminal_set(lm, d, {"VNO išvykimo terminalas": [12.0, 3, 1.0], "_big": [13.0, 3, 1.0], "_small": [5.0, 1]})
 	K.towers(lm, d, 36.0)
 	K.park(lm, d, [["narrow", "#073590"], ["narrow", "#C6007E"], ["narrow", "#1E4D9B"], ["turboprop", "#C8102E"]], 8)
-	lm.commit(model)
+	lm.commit(model, "", true)
 
 ## Copenhagen Airport on Amager, the largest airfield of the batch: two
 ## parallel 3,300-3,500 m runways (04L/22R, 04R/22L) crossed by 12/30, the
@@ -95,7 +95,7 @@ static func copenhagen(model: Node3D) -> void:
 	K.park(lm, d, [["narrow", "#0B2D6B"], ["narrow", "#D81939"], ["narrow", "#0B2D6B"], ["wide", "#0B2D6B"],
 		["narrow", "#FF6600"], ["narrow", "#D81939"], ["narrow", "#073590"], ["narrow", "#0B2D6B"]], 48,
 		Vector2.ZERO, 2500.0, true)
-	lm.commit(model)
+	lm.commit(model, "", true)
 
 ## Helsinki-Vantaa (EFHK), 16 km north of the centre in Vantaa: three
 ## runways (04L/22R, 04R/22L, 15/33), the merged Terminal complex under one
@@ -154,7 +154,7 @@ static func vantaa(model: Node3D) -> void:
 		["wide", "#0B2D6B"], ["narrow", "#0A2E73"], ["turboprop", "#0B2D6B"],
 		["narrow", "#0D234A"],
 	], 26, Vector2.ZERO, 750.0, true, clean_term_rings)
-	lm.commit(model)
+	lm.commit(model, "", true)
 
 ## Removes narrow jet-bridge finger protrusions (width < 2 * margin_m) from a
 ## terminal outline via morphological opening (erode then dilate).

@@ -70,7 +70,11 @@ static func applies(data: LocationData) -> bool:
 ## `top` (R8, any size over the same extent, 0 = nothing) laid over
 ## `base`: with `replace` empty everywhere `top` has a class, else only on
 ## base texels whose class is in `replace`. Nearest sampling.
+static var _native := ClassDB.class_exists("ImageKernels")
+
 static func overlay(base: Image, top: Image, replace: Array) -> Image:
+	if _native:
+		return ClassDB.class_call_static("ImageKernels", "r8_overlay", base, top, replace) as Image
 	var w := base.get_width()
 	var h := base.get_height()
 	var tw := top.get_width()

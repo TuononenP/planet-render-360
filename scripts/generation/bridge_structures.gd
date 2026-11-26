@@ -825,18 +825,7 @@ static func build(batches: Dictionary, surf: RoadBuilder._Surface, m2u: float) -
 	plan.prepare(surf, m2u)
 	# The roads on the ground: no parapet stands across one going on.
 	var roads := StreetProps._road_grid(surf.place, m2u) if surf.place != null else {}
-	for s: Structure in plan.structures:
-		if not surf.inside(s.bounds.get_center()):
-			continue
-		var opens := _openings(s, index, surf, m2u)
-		BridgeStructureSlab._slab(batches, s, surf, m2u)
-		BridgeStructureSlab._edges(batches, s, opens, index, surf, m2u, roads)
-		if s.arched and s.wet and s.spine.size() >= 2:
-			BridgeArches.add(RoadBuilder._batch(batches, "deck"), s.spine, s.dist, s.heights,
-				_outline_half(s), s.depth, surf.ground, m2u)
-		BridgeApproaches.span_end_walls(RoadBuilder._batch(batches, "deck"), s, surf, m2u)
-		for li in s.members:
-			BridgeStructureMembers.lay(batches, s, index.lines[li], surf, m2u, li)
+	BridgeStructureSlab.build_all(batches, plan, index, surf, m2u, roads)
 
 ## Half the outline's width across its spine: the arches' spandrel walls
 ## stand at its edges, not at the widest road's.

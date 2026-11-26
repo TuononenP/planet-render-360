@@ -115,8 +115,11 @@ func fetch(lat: float, lon: float) -> void:
 			finished.emit.call_deferred(parsed)
 			return
 	var cell := cell_of(lat, lon)
-	if _cell_cache.has(cell):
-		var mem_hit: Dictionary = (_cell_cache[cell] as Dictionary).duplicate()
+	var mem_src: Dictionary = _cell_cache.get(cell, {})
+	if mem_src.is_empty():
+		mem_src = _lookup_near_cell(cell, lat)
+	if not mem_src.is_empty():
+		var mem_hit: Dictionary = mem_src.duplicate()
 		_store(mem_hit)
 		timings = {"ms": Time.get_ticks_msec() - _t0, "cached": true}
 		finished.emit.call_deferred(mem_hit)
@@ -149,6 +152,28 @@ func fetch(lat: float, lon: float) -> void:
 		if gen == _gen and _pending > 0:
 			cancel(false)
 			_fetch_fallback())
+
+## Reuse a cached CHELSA cell within ~5 km during flight: CHELSA V2.1
+## climatology varies smoothly over multi-km distances, avoiding 6 remote
+## range requests on every 800 m streamed step.
+const NEAR_CELL_KM := 5.0
+
+static func _lookup_near_cell(cell: Vector2i, lat: float) -> Dictionary:
+	if _cell_cache.is_empty():
+		return {}
+	var cos_lat := maxf(cos(deg_to_rad(lat)), 0.1)
+	var km_per_y := STEP_DEG * 111.0
+	var km_per_x := km_per_y * cos_lat
+	var best_d2 := NEAR_CELL_KM * NEAR_CELL_KM
+	var best := {}
+	for k: Vector2i in _cell_cache:
+		var dx := float(k.x - cell.x) * km_per_x
+		var dy := float(k.y - cell.y) * km_per_y
+		var d2 := dx * dx + dy * dy
+		if d2 <= best_d2:
+			best_d2 = d2
+			best = _cell_cache[k]
+	return best
 
 ## The credit line for a fetched climate Dictionary.
 static func credit_for(climate: Dictionary) -> String:

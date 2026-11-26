@@ -72,6 +72,7 @@ class Index extends RefCounted:
 	func _init(roads: Array = [], skipped: Dictionary = {}) -> void:
 		var m := WorldScale.metres_to_units()
 		_cell = CELL_M * m
+		var tmp_grid := {}
 		for ri in roads.size():
 			if skipped.has(ri):
 				continue
@@ -97,12 +98,13 @@ class Index extends RefCounted:
 				for cx in range(floori(lo.x / _cell), floori(hi.x / _cell) + 1):
 					for cz in range(floori(lo.y / _cell), floori(hi.y / _cell) + 1):
 						var key := Vector2i(cx, cz)
-						if not _grid.has(key):
-							_grid[key] = PackedInt32Array()
-						var cell: PackedInt32Array = _grid[key]
+						if not tmp_grid.has(key):
+							tmp_grid[key] = []
+						var cell: Array = tmp_grid[key]
 						cell.append(li)
 						cell.append(j)
-						_grid[key] = cell
+		for key in tmp_grid:
+			_grid[key] = PackedInt32Array(tmp_grid[key])
 
 	## Segments ([line, segment] pairs, flattened) in the cells within
 	## `reach` of `p`, each once.
@@ -111,7 +113,10 @@ class Index extends RefCounted:
 		var seen := {}
 		for cx in range(floori((p.x - reach) / _cell), floori((p.x + reach) / _cell) + 1):
 			for cz in range(floori((p.y - reach) / _cell), floori((p.y + reach) / _cell) + 1):
-				var cell: PackedInt32Array = _grid.get(Vector2i(cx, cz), PackedInt32Array())
+				var bucket: Variant = _grid.get(Vector2i(cx, cz))
+				if bucket == null:
+					continue
+				var cell: PackedInt32Array = bucket
 				for k in range(0, cell.size(), 2):
 					var key := cell[k] * 65536 + cell[k + 1]
 					if not seen.has(key):

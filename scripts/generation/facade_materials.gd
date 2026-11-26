@@ -50,7 +50,7 @@ static func begin_build() -> void:
 	_glass_mats.clear()
 	_roof_mats.clear()
 	BuildingTrim._mats.clear()
-	if MaterialLibrary.hi_res != _last_hi_res or MemoryGuard.level >= MemoryGuard.Level.TIGHT:
+	if MaterialLibrary.hi_res != _last_hi_res or MemoryGuard.level >= MemoryGuard.Level.CRITICAL:
 		FacadeComposer.clear_cache()
 		StoreyComposer.clear_cache()
 		_last_hi_res = MaterialLibrary.hi_res

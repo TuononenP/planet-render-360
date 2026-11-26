@@ -52,11 +52,12 @@ var _busy := false
 ## point of a lattice COARSE_CELLS wider than StreamLattice's (~2.7 km for a
 ## 12 km far-city radius) so consecutive stretches share one query and cache;
 ## features are still placed around the stretch's own centre.
-const COARSE_CELLS := 6
+const COARSE_CELLS := 8
 var coarse := false
 var warm_only := false
 
-const PARSED_CACHE_MAX := 3
+const PARSED_CACHE_MAX := 4
+const REMAP_REUSE_M := 3000.0
 static var _parsed_cache: Array = []  # [{key, lat, lon, bytes, partial, landuse, towers}]
 static var _parsed_mutex := Mutex.new()
 
@@ -74,6 +75,22 @@ static func _lookup_parsed(key: String, mtime: int) -> Dictionary:
 			break
 	_parsed_mutex.unlock()
 	return found
+
+static func _lookup_near_parsed(lat: float, lon: float, max_dist_m: float) -> Dictionary:
+	_parsed_mutex.lock()
+	var best := {}
+	var best_d2 := max_dist_m * max_dist_m
+	for i in range(_parsed_cache.size() - 1, -1, -1):
+		var entry: Dictionary = _parsed_cache[i]
+		if bool(entry.get("partial", false)):
+			continue
+		var off := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]), lat, lon)
+		var d2 := off.length_squared()
+		if d2 <= best_d2:
+			best_d2 = d2
+			best = entry
+	_parsed_mutex.unlock()
+	return best
 
 static func _store_parsed(key: String, mtime: int, lat: float, lon: float, bytes: int, partial: bool, parsed: Dictionary) -> void:
 	if key.is_empty() or parsed.is_empty():
@@ -290,6 +307,12 @@ func fetch(lat: float, lon: float) -> void:
 			return
 		_parse_off_thread(bundled, true, false, true)
 		return
+	if coarse and not warm_only:
+		var near_mem := _lookup_near_parsed(_c_lat, _c_lon, REMAP_REUSE_M)
+		if not near_mem.is_empty():
+			_partial = false
+			_remap_off_thread(gen, near_mem)
+			return
 	_request()
 
 func _request() -> void:
