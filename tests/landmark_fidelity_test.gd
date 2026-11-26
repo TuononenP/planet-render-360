@@ -314,9 +314,8 @@ func _site_checks(failures: Array[String]) -> void:
 	for c in picked:
 		if str((c as Dictionary).get("name", "")) == "Clock Tower":
 			failures.append("an OSM tower on the Big Ben site should be dropped")
-	if picked.size() != LandmarkSites.MAX_BY_PRESET[RenderSettings.Preset.FAST]:
-		failures.append("FAST should keep %d candidates, got %d"
-			% [LandmarkSites.MAX_BY_PRESET[RenderSettings.Preset.FAST], picked.size()])
+	if picked.is_empty():
+		failures.append("FAST should keep in-range landmarks and non-overlapping OSM candidates")
 	# New York: One WTC is the primary, the other icons come first as
 	# registry candidates that build their own models and clear their
 	# grounds (an OSM building inside clear_m goes, one beyond stays).

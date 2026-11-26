@@ -128,6 +128,9 @@ func _ready() -> void:
 	get_window().size_changed.connect(_fit_content_scale)
 	_fit_content_scale()
 	_safe_seen = Responsive.safe_insets(self)
+	if not OS.has_feature("mobile") and DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+		Engine.max_fps = 0
 	if OS.has_feature("mobile"):
 		var safe_poll := Timer.new()
 		safe_poll.wait_time = SAFE_POLL_S

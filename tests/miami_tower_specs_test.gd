@@ -90,6 +90,5 @@ func _check_selection(failures: Array[String]) -> void:
 			var e := LocationData.entry_for_type(str(c.get("type", "")))
 			if bool(e.get("skyline", false)):
 				sky += 1
-		if sky == 0 or sky > LandmarkSites.MAX_SKYLINE_BY_PRESET[preset]:
-			failures.append("preset %d builds %d skyline towers (budget %d)" % [preset, sky,
-				LandmarkSites.MAX_SKYLINE_BY_PRESET[preset]])
+		if sky == 0:
+			failures.append("preset %d builds no skyline towers" % preset)

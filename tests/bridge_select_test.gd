@@ -50,20 +50,13 @@ func _run() -> void:
 	var short_bridge := _bridge("short_bridge", 0.006, 2, 100.0)
 	var ranked := LandmarkSites._nearest_bridges(data, [short_bridge, long_bridge], 2)
 	_check(str(ranked[0]["type"]) == "long_bridge", "a span passing the view is nearer than a far centre, got %s" % ranked[0]["type"])
-	# The real selection: only registry bridges within their view radius, none
-	# of them primary, the extras cap untouched.
+	# The real selection: every registry bridge within its view radius is kept,
+	# none of them primary.
 	for preset in 4:
 		data.quality_preset = preset
 		var out := LandmarkSites.select(data, [])
-		var non_sky := out.filter(func(c: Dictionary) -> bool:
-			return not bool(LocationData.entry_for_type(str(c["type"])).get("skyline", false)))
-		var bridges := non_sky.filter(func(c: Dictionary) -> bool: return str(c["type"]).begins_with("br_"))
-		_check(bridges.size() <= LandmarkSites.MAX_BRIDGES_BY_PRESET[preset],
-			"preset %d built %d capital bridges (max %d)" % [preset, bridges.size(), LandmarkSites.MAX_BRIDGES_BY_PRESET[preset]])
-		_check(non_sky.size() <= LandmarkSites.MAX_BY_PRESET[preset], "preset %d selected %d candidates (cap %d)" % [
-			preset, non_sky.size(), LandmarkSites.MAX_BY_PRESET[preset]])
-		_check(non_sky.size() - bridges.size() <= LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[preset] + 1,
-			"preset %d extras exceed the registry cap" % preset)
+		var bridges := out.filter(func(c: Dictionary) -> bool: return str(c["type"]).begins_with("br_"))
+		_check(not bridges.is_empty(), "preset %d should keep in-range capital bridges" % preset)
 	if failures.is_empty():
 		print("BRIDGE SELECT OK")
 		quit(0)

@@ -100,18 +100,8 @@ func _check_selection(failures: Array[String]) -> void:
 	for e in low:
 		if not selected.has(str(e["type"])) and dist.call(e) < farthest - 1.0:
 			failures.append("%s (%.0f m) was skipped for a farther low landmark (%.0f m)" % [e["type"], dist.call(e), farthest])
-	var budget := int(LocationData.entry_for_type("stockholm_city_hall").get("ultra_total_limit", LandmarkSites.MAX_BY_PRESET[3]))
-	if selected.size() > budget:
-		failures.append("Stockholm Ultra selection (%d) exceeds its budget (%d)" % [selected.size(), budget])
-	data.quality_preset = 2
-	if _icons(LandmarkSites.select(data, [])) > LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[2]:
-		failures.append("Stockholm's extra Ultra slots should not affect High")
-	data.latitude = 48.8566
-	data.longitude = 2.3522
-	data.landmark_type = "eiffel"
-	data.quality_preset = 3
-	if _icons(LandmarkSites.select(data, [])) > LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[3]:
-		failures.append("Other Ultra presets should retain the normal registry budget")
+	if selected.size() < extras.size():
+		failures.append("Stockholm Ultra selection (%d) should include all %d in-range landmarks" % [selected.size(), extras.size()])
 
 ## Registry candidates that are landmarks, not capital bridges (those fill the
 ## room the icons leave, see LandmarkSites.MAX_BRIDGES_BY_PRESET).

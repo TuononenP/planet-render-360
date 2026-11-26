@@ -51,24 +51,10 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 			return ap > bp
 		return LocationData.distance_m(data.latitude, data.longitude, float(a["lat"]), float(a["lon"])) \
 			< LocationData.distance_m(data.latitude, data.longitude, float(b["lat"]), float(b["lon"])))
-	var preset := clampi(data.quality_preset, 0, MAX_BY_PRESET.size() - 1)
-	var registry_limit := MAX_REGISTRY_EXTRAS_BY_PRESET[preset]
-	var total_limit := MAX_BY_PRESET[preset]
-	# A dense primary skyline can use more Ultra slots, but never more
-	# than the preset's total candidate budget. A hero city with dozens of
-	# hand-built landmarks (Stockholm) raises that budget itself with the
-	# primary's `ultra_total_limit`.
-	if preset == MAX_BY_PRESET.size() - 1:
-		var primary := LocationData.entry_for_type(data.landmark_type)
-		total_limit = maxi(total_limit, int(primary.get("ultra_total_limit", total_limit)))
-		registry_limit = clampi(int(primary.get("ultra_registry_limit", registry_limit)), registry_limit, total_limit)
-	var skyline := _skyline(data, extras.filter(func(e: Dictionary) -> bool: return bool(e.get("skyline", false))),
-		MAX_SKYLINE_BY_PRESET[preset])
+	var skyline := _skyline(data, extras.filter(func(e: Dictionary) -> bool: return bool(e.get("skyline", false))))
 	var icons: Array = extras.filter(func(e: Dictionary) -> bool:
-		return not _is_capital_bridge(e) and not bool(e.get("skyline", false))).slice(0, registry_limit)
-	# Bridges fill only the room the icons leave under the preset's candidate cap.
-	var bridges := _nearest_bridges(data, extras,
-		mini(MAX_BRIDGES_BY_PRESET[preset], maxi(total_limit - icons.size(), 0)))
+		return not _is_capital_bridge(e) and not bool(e.get("skyline", false)))
+	var bridges := _nearest_bridges(data, extras)
 	for e in icons + bridges + skyline:
 		var entry := e as Dictionary
 		var p := WorldScale.xz_from_latlon(float(entry["lat"]), float(entry["lon"]),
@@ -85,10 +71,7 @@ static func select(data: LocationData, ranked_osm: Array) -> Array:
 				var candidate: Dictionary = out.back()
 				candidate[key] = entry[key]
 		clear.append([p, entry])
-	var cap: int = total_limit + skyline.size()
 	for c in ranked_osm:
-		if out.size() >= cap:
-			break
 		if str(c.get("archetype", "")) == "station" and not major_station(c):
 			continue
 		var at := Vector2(float(c.get("x", 0.0)), float(c.get("z", 0.0)))
@@ -110,7 +93,7 @@ static func major_station(c: Dictionary) -> bool:
 ## The `limit` skyline towers among `towers` to build: priority first, then
 ## the tallest for its distance from the view (nearer than SKYLINE_NEAR_M
 ## counts as that far).
-static func _skyline(data: LocationData, towers: Array, limit: int) -> Array:
+static func _skyline(data: LocationData, towers: Array, limit: int = -1) -> Array:
 	var score := func(e: Dictionary) -> float:
 		return float(e.get("height_m", 0.0)) / maxf(SKYLINE_NEAR_M,
 			LocationData.distance_m(data.latitude, data.longitude, float(e["lat"]), float(e["lon"])))
@@ -120,17 +103,17 @@ static func _skyline(data: LocationData, towers: Array, limit: int) -> Array:
 		if ap != bp:
 			return ap > bp
 		return score.call(a) > score.call(b))
-	return towers.slice(0, limit)
+	return towers.slice(0, limit) if limit >= 0 else towers
 
 ## A capital bridge: a secondary bridge entry (BridgeSpec.to_entry).
 static func _is_capital_bridge(entry: Dictionary) -> bool:
 	return bool(entry.get("secondary", false)) and str(entry.get("kind", "")) == "Bridge"
 
 ## The capital bridges among `extras` to build: the most important tier
-## first, then those whose span passes nearest the view centre, at most
-## `limit`. The viewpoint need not be at a bridge's centre, so the distance
+## first, then those whose span passes nearest the view centre.
+## The viewpoint need not be at a bridge's centre, so the distance
 ## is to the span itself.
-static func _nearest_bridges(data: LocationData, extras: Array, limit: int) -> Array:
+static func _nearest_bridges(data: LocationData, extras: Array, limit: int = -1) -> Array:
 	var found: Array = extras.filter(func(e: Dictionary) -> bool: return _is_capital_bridge(e))
 	var view := Vector2.ZERO
 	var dist := func(e: Dictionary) -> float:
@@ -142,7 +125,7 @@ static func _nearest_bridges(data: LocationData, extras: Array, limit: int) -> A
 		if at != bt:
 			return at < bt
 		return dist.call(a) < dist.call(b))
-	return found.slice(0, limit)
+	return found.slice(0, limit) if limit >= 0 else found
 
 ## A registry entry's clearance (its `clear_m`, else REGISTRY_CLEAR_M).
 static func clear_m(entry: Dictionary) -> float:

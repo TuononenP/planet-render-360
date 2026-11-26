@@ -96,11 +96,7 @@ func _check_selection(failures: Array[String]) -> void:
 				sky += 1
 			elif not bool(e.get("secondary", false)):
 				icons += 1
-		if sky == 0 or sky > LandmarkSites.MAX_SKYLINE_BY_PRESET[preset]:
-			failures.append("preset %d builds %d skyline towers (budget %d)" % [preset, sky,
-				LandmarkSites.MAX_SKYLINE_BY_PRESET[preset]])
-		var budget := LandmarkSites.MAX_REGISTRY_EXTRAS_BY_PRESET[preset]
-		if preset == LandmarkSites.MAX_BY_PRESET.size() - 1:
-			budget = 24
-		if icons < mini(budget, 20):
+		if sky == 0:
+			failures.append("preset %d builds no skyline towers" % preset)
+		if icons < 20:
 			failures.append("preset %d builds only %d icons beside the skyline" % [preset, icons])

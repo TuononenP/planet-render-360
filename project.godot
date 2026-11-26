@@ -47,6 +47,11 @@ window/size/window_height_override=820
 window/handheld/orientation=6
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+; Uncap desktop frame rate (VSYNC_DISABLED = 0) so frames are not capped at
+; 60 Hz or halved from 60 to 30 by double-buffered VSync. Keep VSync enabled
+; on mobile for battery and thermal budgets.
+window/vsync/vsync_mode=0
+window/vsync/vsync_mode.mobile=1
 
 [input_devices]
 
