@@ -242,8 +242,6 @@ static func plan_helipads(data: LocationData, ground: GroundTruth, m2u: float) -
 		if out.size() >= MAX_HELIS:
 			break
 		var p := Vector2(float(pad["x"]), float(pad["z"]))
-		if _in_capital_airport(p, cap_rects):
-			continue
 		var dup_lm := false
 		for lp in lm_pts:
 			if lp.distance_to(p) < 80.0 * m2u:

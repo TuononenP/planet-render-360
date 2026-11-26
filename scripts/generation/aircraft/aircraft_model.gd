@@ -13,13 +13,14 @@ static var _mesh_cache: Dictionary = {}  # key -> ArrayMesh
 static var _mat_cache: Dictionary = {}   # key -> Material
 static var _shadow_cache: Dictionary = {}
 static var _disc_mesh: ArrayMesh
+static var _prop_disc_meshes: Dictionary = {}
 static var _cabin_texs: Dictionary = {}
 static var _mutex := Mutex.new()
 
 ## Instantiates a ready-to-place aircraft Node3D in true metres (+X nose,
 ## +Y up, +Z right wing, wheels/skids on y = 0). When `active` is true,
-## landing lights glow brighter at night and helicopters include a translucent
-## spinning rotor disc node (`RotorDisc`).
+## landing lights glow brighter at night and helicopters/props include
+## translucent spinning rotor/propeller blur discs.
 static func instantiate(kind: String, livery: Dictionary, active: bool = false,
 		with_shadow: bool = true) -> Node3D:
 	var root := Node3D.new()
@@ -45,6 +46,16 @@ static func instantiate(kind: String, livery: Dictionary, active: bool = false,
 		disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		disc.visible = false
 		root.add_child(disc)
+	if active:
+		for prop_name: String in ["PropLeft", "PropRight", "PropMain"]:
+			if parts.has(prop_name):
+				var pdisc := MeshInstance3D.new()
+				pdisc.name = prop_name.replace("Prop", "PropDisc")
+				var r := 0.94 if prop_name == "PropMain" else 1.95
+				pdisc.mesh = _prop_disc_mesh(r)
+				pdisc.position = (parts[prop_name] as Dictionary)["offset"]
+				pdisc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				root.add_child(pdisc)
 	if with_shadow:
 		var sh := MeshInstance3D.new()
 		sh.name = "Shadow"
@@ -55,17 +66,24 @@ static func instantiate(kind: String, livery: Dictionary, active: bool = false,
 	return root
 
 ## Merges the upgraded GLB geometry into a `LandmarkMesh` (used by
-## `LandmarkAircraft` on the 13 hand-built capital airports).
+## `LandmarkAircraft` on the 14 hand-built capital airports). All aircraft
+## material keys begin with "Ac" so `LandmarkAirfieldKit.conform()` drapes
+## every aircraft surface together without detaching cockpit/cabin glass.
 static func merge_into_landmark(lm: LandmarkMesh, kind: String, tail_hex: String,
 		xform: Transform3D) -> bool:
 	var parts := _load_glb(kind)
 	if parts.is_empty():
 		return false
 	var tail_key := "AcTail" + tail_hex.trim_prefix("#")
-	lm.use(tail_key, LandmarkMaterials.paint(tail_hex, 0.35, 0.12))
-	lm.use("AcBelly", LandmarkMaterials.paint("#CFD5DC", 0.42, 0.22))
-	lm.use("AcEngine", LandmarkMaterials.paint("#EAECEF", 0.32, 0.30))
-	lm.use("AcDark", LandmarkMaterials.paint("#22252A", 0.55, 0.55))
+	lm.use(tail_key, LandmarkMaterials.paint(tail_hex, 0.30, 0.14))
+	lm.use("AcBelly", LandmarkMaterials.paint("#CFD5DC", 0.36, 0.26))
+	lm.use("AcEngine", LandmarkMaterials.paint("#EAECEF", 0.28, 0.32))
+	lm.use("AcDark", LandmarkMaterials.paint("#1E2024", 0.50, 0.65))
+	lm.use("AcChrome", LandmarkMaterials.paint("#D2D7DC", 0.18, 0.88))
+	lm.use("AcStrut", LandmarkMaterials.paint("#BCC2C8", 0.40, 0.40))
+	lm.use("AcTire", LandmarkMaterials.paint("#1C1E22", 0.86, 0.04))
+	lm.use("AcGlass", LandmarkMaterials.glass("#142230"))
+	lm.use("AcCabinGlass", _slot_material("CabinGlass", {"id": "lm"}, false))
 	for part_name: String in parts:
 		var pinfo: Dictionary = parts[part_name]
 		var pxf := xform * Transform3D(Basis.IDENTITY, pinfo["offset"])
@@ -75,6 +93,7 @@ static func merge_into_landmark(lm: LandmarkMesh, kind: String, tail_hex: String
 			var arr: Array = surf["arrays"]
 			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
 			var norms: PackedVector3Array = arr[Mesh.ARRAY_NORMAL] if arr[Mesh.ARRAY_NORMAL] != null else PackedVector3Array()
+			var uvs: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV] if arr[Mesh.ARRAY_TEX_UV] != null else PackedVector2Array()
 			var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
 			var count := idx.size() if not idx.is_empty() else verts.size()
 			for i in range(0, count - 2, 3):
@@ -87,7 +106,10 @@ static func merge_into_landmark(lm: LandmarkMesh, kind: String, tail_hex: String
 				var n0 := (rot * norms[i0]).normalized() if i0 < norms.size() else Vector3.UP
 				var n1 := (rot * norms[i1]).normalized() if i1 < norms.size() else Vector3.UP
 				var n2 := (rot * norms[i2]).normalized() if i2 < norms.size() else Vector3.UP
-				lm.tri(mkey, v0, v1, v2, n0, n1, n2, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO)
+				var uv0 := uvs[i0] if i0 < uvs.size() else Vector2.ZERO
+				var uv1 := uvs[i1] if i1 < uvs.size() else Vector2.ZERO
+				var uv2 := uvs[i2] if i2 < uvs.size() else Vector2.ZERO
+				lm.tri(mkey, v0, v1, v2, n0, n1, n2, uv0, uv1, uv2)
 	return true
 
 static func _landmark_mat_key(slot: String, tail_key: String) -> String:
@@ -98,10 +120,18 @@ static func _landmark_mat_key(slot: String, tail_key: String) -> String:
 			return "AcBelly"
 		"Engine":
 			return "AcEngine"
-		"EngineDark":
+		"EngineDark", "PropBlade":
 			return "AcDark"
-		"Glass", "CabinGlass":
-			return "Glass"
+		"Chrome":
+			return "AcChrome"
+		"Strut":
+			return "AcStrut"
+		"Tire":
+			return "AcTire"
+		"Glass":
+			return "AcGlass"
+		"CabinGlass":
+			return "AcCabinGlass"
 		"Gear":
 			return "AcGear"
 		_:
@@ -176,29 +206,90 @@ static func _rotor_disc_mesh() -> ArrayMesh:
 		return hit
 	_mutex.unlock()
 
-	var r := 5.1
-	var segs := 24
+	var r := 5.15
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i in segs:
-		var a0 := TAU * float(i) / float(segs)
-		var a1 := TAU * float(i + 1) / float(segs)
-		st.set_normal(Vector3.UP)
-		st.add_vertex(Vector3.ZERO)
-		st.add_vertex(Vector3(cos(a0) * r, 0.0, sin(a0) * r))
-		st.add_vertex(Vector3(cos(a1) * r, 0.0, sin(a1) * r))
+	st.set_normal(Vector3.UP)
+	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(Vector3(-r, 0.0, -r))
+	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(Vector3( r, 0.0, -r))
+	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(Vector3( r, 0.0,  r))
+	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(Vector3(-r, 0.0, -r))
+	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(Vector3( r, 0.0,  r))
+	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(Vector3(-r, 0.0,  r))
 	var mesh := st.commit()
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.14, 0.16, 0.18, 0.22)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mesh.surface_set_material(0, mat)
+	mesh.surface_set_material(0, _blur_disc_material(true))
 
 	_mutex.lock()
 	_disc_mesh = mesh
 	_mutex.unlock()
 	return mesh
+
+static func _prop_disc_mesh(r: float) -> ArrayMesh:
+	var key := "%.2f" % r
+	_mutex.lock()
+	if _prop_disc_meshes.has(key):
+		var hit: ArrayMesh = _prop_disc_meshes[key]
+		_mutex.unlock()
+		return hit
+	_mutex.unlock()
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.RIGHT)
+	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(Vector3(0.0, -r, -r))
+	st.set_uv(Vector2(1.0, 0.0)); st.add_vertex(Vector3(0.0, -r,  r))
+	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(Vector3(0.0,  r,  r))
+	st.set_uv(Vector2(0.0, 0.0)); st.add_vertex(Vector3(0.0, -r, -r))
+	st.set_uv(Vector2(1.0, 1.0)); st.add_vertex(Vector3(0.0,  r,  r))
+	st.set_uv(Vector2(0.0, 1.0)); st.add_vertex(Vector3(0.0,  r, -r))
+	var mesh := st.commit()
+	mesh.surface_set_material(0, _blur_disc_material(false))
+
+	_mutex.lock()
+	_prop_disc_meshes[key] = mesh
+	_mutex.unlock()
+	return mesh
+
+static func _blur_disc_material(is_rotor: bool) -> StandardMaterial3D:
+	var key := "__rotor_disc" if is_rotor else "__prop_disc"
+	_mutex.lock()
+	if _mat_cache.has(key):
+		var hit: StandardMaterial3D = _mat_cache[key]
+		_mutex.unlock()
+		return hit
+	_mutex.unlock()
+
+	var sz := 128
+	var img := Image.create(sz, sz, false, Image.FORMAT_RGBA8)
+	var lobes := 4.0 if is_rotor else 6.0
+	for y in sz:
+		var ny := (float(y) / float(sz - 1)) * 2.0 - 1.0
+		for x in sz:
+			var nx := (float(x) / float(sz - 1)) * 2.0 - 1.0
+			var rr := sqrt(nx * nx + ny * ny)
+			if rr > 1.0 or rr < 0.09:
+				img.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.0))
+				continue
+			var ang := atan2(ny, nx)
+			var streak := 0.72 + 0.28 * pow(0.5 + 0.5 * cos(ang * lobes), 2.0)
+			var edge := smoothstep(1.0, 0.88, rr) * smoothstep(0.09, 0.16, rr)
+			var tip_ring := exp(-pow((rr - 0.92) / 0.045, 2.0))
+			var base_a := (0.24 if is_rotor else 0.20) * (1.0 - 0.35 * rr) * streak
+			var a := clampf((base_a + tip_ring * 0.16) * edge, 0.0, 0.42)
+			var col := Color(0.14, 0.16, 0.18).lerp(Color(0.88, 0.78, 0.22), tip_ring * 0.65)
+			img.set_pixel(x, y, Color(col.r, col.g, col.b, a))
+	var tex := ImageTexture.create_from_image(img)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+
+	_mutex.lock()
+	_mat_cache[key] = mat
+	_mutex.unlock()
+	return mat
 
 static func _load_glb(kind: String) -> Dictionary:
 	_mutex.lock()
@@ -234,7 +325,7 @@ static func _extract_parts(node: Node, parent_xf: Transform3D, out: Dictionary) 
 		var mesh := (node as MeshInstance3D).mesh
 		if mesh != null:
 			var part_name := str(node.name)
-			var keep_offset := part_name in ["MainRotor", "TailRotor"]
+			var keep_offset := part_name in ["MainRotor", "TailRotor", "PropLeft", "PropRight", "PropMain"]
 			var offset := xf.origin if keep_offset else Vector3.ZERO
 			var bake_xf := Transform3D(xf.basis, Vector3.ZERO) if keep_offset else xf
 			var rot := bake_xf.basis.orthonormalized()
@@ -256,13 +347,15 @@ static func _extract_parts(node: Node, parent_xf: Transform3D, out: Dictionary) 
 					for i in sn.size():
 						tn[i] = (rot * sn[i]).normalized()
 					arr[Mesh.ARRAY_NORMAL] = tn
-				# Synthesize planar metre UVs for CabinGlass night-window tiling
+				# Preserve Blender-exported CabinGlass UVs; only synthesize fallback if missing
 				if mname == "CabinGlass":
-					var uvs := PackedVector2Array()
-					uvs.resize(tv.size())
-					for i in tv.size():
-						uvs[i] = Vector2(tv[i].x * 0.55, tv[i].y * 0.55)
-					arr[Mesh.ARRAY_TEX_UV] = uvs
+					var existing_uv = arr[Mesh.ARRAY_TEX_UV]
+					if existing_uv == null or (existing_uv as PackedVector2Array).is_empty():
+						var uvs := PackedVector2Array()
+						uvs.resize(tv.size())
+						for i in tv.size():
+							uvs[i] = Vector2(tv[i].x * 0.55, tv[i].y * 0.55)
+						arr[Mesh.ARRAY_TEX_UV] = uvs
 				surfaces.append({"arrays": arr, "mat_name": mname})
 			out[part_name] = {"surfaces": surfaces, "offset": offset}
 	for c in node.get_children():
@@ -321,23 +414,39 @@ static func _slot_material(slot: String, livery: Dictionary, active: bool) -> St
 			m.roughness = 0.28
 			m.metallic = 0.34
 		"EngineDark":
-			m.albedo_color = Color("#1E2024")
-			m.roughness = 0.55
-			m.metallic = 0.65
+			m.albedo_color = Color("#1A1C20")
+			m.roughness = 0.50
+			m.metallic = 0.68
+		"Chrome":
+			m.albedo_color = Color("#D6DBE0")
+			m.roughness = 0.16
+			m.metallic = 0.88
+		"Strut":
+			m.albedo_color = Color("#C2C8CE")
+			m.roughness = 0.38
+			m.metallic = 0.42
+		"Tire":
+			m.albedo_color = Color("#1B1D21")
+			m.roughness = 0.88
+			m.metallic = 0.03
+		"PropBlade":
+			m.albedo_color = Color("#202328")
+			m.roughness = 0.42
+			m.metallic = 0.24
 		"Gear":
 			m.albedo_color = Color("#24262A")
-			m.roughness = 0.80
-			m.metallic = 0.15
+			m.roughness = 0.78
+			m.metallic = 0.18
 		"Glass":
-			m.albedo_color = Color("#1E2B36")
-			m.roughness = 0.10
-			m.metallic = 0.25
+			m.albedo_color = Color("#101B26")
+			m.roughness = 0.06
+			m.metallic = 0.35
 		"CabinGlass":
 			var texs := _cabin_window_textures()
 			m.albedo_color = Color.WHITE
 			m.albedo_texture = texs["albedo"]
-			m.roughness = 0.14
-			m.metallic = 0.20
+			m.roughness = 0.16
+			m.metallic = 0.18
 			CityLights.mark(m, texs["emit"])
 		"NavRed":
 			m = _glow_lamp(Color(1.0, 0.10, 0.06), 3.2 if active else 1.4)
@@ -373,21 +482,43 @@ static func _cabin_window_textures() -> Dictionary:
 		return hit
 	_mutex.unlock()
 
-	var w := 128
-	var h := 16
+	var w := 512
+	var h := 64
 	var alb := Image.create(w, h, false, Image.FORMAT_RGB8)
 	var em := Image.create(w, h, false, Image.FORMAT_RGB8)
-	alb.fill(Color("#E6EAEE"))
+	var hull_col := Color("#F2F4F7")
+	var frame_col := Color("#C5CCD4")
+	alb.fill(hull_col)
 	em.fill(Color.BLACK)
-	# Row of crisp oval-like cabin windows along U
-	for i in 16:
-		var x0 := i * 8 + 2
+	# 16 crisp anti-aliased oval passenger windows along U with metallic frames
+	var n_win := 16
+	var cell := float(w) / float(n_win)
+	for i in n_win:
+		var cx := (float(i) + 0.5) * cell
+		var cy := float(h) * 0.5
+		var rx := cell * 0.24
+		var ry := float(h) * 0.30
 		var lit := ((i * 7 + 3) % 5) != 0
-		for y in range(4, 12):
-			for x in range(x0, x0 + 4):
-				alb.set_pixel(x, y, Color("#24323F"))
-				if lit:
-					em.set_pixel(x, y, Color(1.0, 0.86, 0.62))
+		var x0 := maxi(0, int(floor(cx - rx - 3.0)))
+		var x1 := mini(w - 1, int(ceil(cx + rx + 3.0)))
+		var y0 := maxi(0, int(floor(cy - ry - 3.0)))
+		var y1 := mini(h - 1, int(ceil(cy + ry + 3.0)))
+		for y in range(y0, y1 + 1):
+			var dy := (float(y) - cy) / ry
+			for x in range(x0, x1 + 1):
+				var dx := (float(x) - cx) / rx
+				# Superellipse (n=3.5) for authentic rounded-rectangle airliner windows
+				var d := pow(absf(dx), 3.5) + pow(absf(dy), 3.5)
+				if d <= 1.0:
+					# Subtle top-to-bottom interior reflection gradient
+					var shade := lerpf(0.75, 1.15, clampf((dy + 1.0) * 0.5, 0.0, 1.0))
+					alb.set_pixel(x, y, Color(0.11 * shade, 0.16 * shade, 0.22 * shade))
+					if lit:
+						var glow := clampf(1.0 - d * 0.35, 0.45, 1.0)
+						em.set_pixel(x, y, Color(1.0 * glow, 0.85 * glow, 0.60 * glow))
+				elif d <= 1.42:
+					var t := smoothstep(1.42, 1.0, d)
+					alb.set_pixel(x, y, hull_col.lerp(frame_col, t))
 	var out := {
 		"albedo": ImageTexture.create_from_image(alb),
 		"emit": ImageTexture.create_from_image(em),

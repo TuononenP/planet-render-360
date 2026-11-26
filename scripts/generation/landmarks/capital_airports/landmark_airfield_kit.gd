@@ -13,13 +13,14 @@ extends RefCounted
 const GROUND := 0.3
 ## The paved layers sit flush over the conformed terrain surface (no thick
 ## raised viaduct slabs); `conform()` drapes their vertices to GroundTruth.
-const LIFT := 0.06
+const LIFT := 0.16
 const SKIRT_Y := -1.5
-const APRON_TOP := GROUND + LIFT + 0.02
-const TAXI_TOP := GROUND + LIFT + 0.05
-const RUNWAY_TOP := GROUND + LIFT + 0.08
-const LINE_LIFT := 0.03
-const DRAPE_STEP_M := 40.0
+const APRON_TOP := GROUND + LIFT + 0.04
+const TAXI_TOP := GROUND + LIFT + 0.11
+const RUNWAY_TOP := GROUND + LIFT + 0.18
+const LINE_LIFT := 0.05
+const DRAPE_STEP_M := 28.0
+const APRON_GRID_M := 36.0
 const MIN_RING_M := 1.0
 const GATE_GAP_M := 9.0
 
@@ -46,7 +47,7 @@ static func mats(lm: LandmarkMesh, wall_set: String, wall: String, roof_set: Str
 ## `conform()` drapes them flush onto the terrain without raised slab skirts.
 static func surfaces(lm: LandmarkMesh, data: Dictionary) -> void:
 	for ring in data["aprons"]:
-		cap(lm, "Apron", _poly(ring), APRON_TOP)
+		_cap_draped(lm, "Apron", _poly(ring), APRON_TOP, APRON_GRID_M)
 	for t in data["taxiways"]:
 		var line := _subdivide(_poly(t["pts"]), DRAPE_STEP_M)
 		for p in Geometry2D.offset_polyline(line, float(t["w"]) * 0.5, Geometry2D.JOIN_ROUND, Geometry2D.END_ROUND):
@@ -235,15 +236,24 @@ static func jet_bridge(lm: LandmarkMesh, a: Vector3, b: Vector3) -> void:
 ## never overlaps a building or another aircraft. With `bridges`, a boarding
 ## bridge joins the wall to its door.
 static func park(lm: LandmarkMesh, data: Dictionary, fleet: Array, limit: int, near: Vector2 = Vector2.ZERO,
-		reach_m: float = 500.0, bridges: bool = false) -> void:
+		reach_m: float = 500.0, bridges: bool = false, term_rings_override: Array[PackedVector2Array] = []) -> void:
 	var rings: Array[PackedVector2Array] = []
-	for i in terminals(data):
-		rings.append(_poly(data["buildings"][i]["ring"]))
+	if not term_rings_override.is_empty():
+		rings = term_rings_override
+	else:
+		for i in terminals(data):
+			rings.append(_poly(data["buildings"][i]["ring"]))
 	var blocks: Array[PackedVector2Array] = []
 	for b in data["buildings"]:
+		if not term_rings_override.is_empty() and str(b["kind"]) == "terminal" and absf(_area(_poly(b["ring"]))) >= 20000.0:
+			continue
 		var ring := _poly(b["ring"])
 		if ring.size() >= 3:
 			for g in Geometry2D.offset_polygon(ring, 3.0, Geometry2D.JOIN_MITER):
+				blocks.append(g)
+	for tr in term_rings_override:
+		if tr.size() >= 3:
+			for g in Geometry2D.offset_polygon(tr, 3.0, Geometry2D.JOIN_MITER):
 				blocks.append(g)
 	var cands: Array = []
 	for s in data["stands"]:
@@ -370,6 +380,32 @@ static func cap(lm: LandmarkMesh, key: String, ring: PackedVector2Array, y: floa
 		var c := ring[idx[t + 2]]
 		lm.tri(key, Vector3(a.x, y, a.y), Vector3(b.x, y, b.y), Vector3(c.x, y, c.y),
 			Vector3.UP, Vector3.UP, Vector3.UP, a, b, c)
+
+## Grid-subdivided top face of a large apron polygon so `conform()` drapes its
+## interior smoothly over undulating terrain without terrain chords poking through.
+static func _cap_draped(lm: LandmarkMesh, key: String, ring: PackedVector2Array, y: float, step: float) -> void:
+	if ring.size() < 3:
+		return
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for v in ring:
+		lo = lo.min(v)
+		hi = hi.max(v)
+	if hi.x - lo.x <= step * 1.25 and hi.y - lo.y <= step * 1.25:
+		cap(lm, key, ring, y)
+		return
+	var x := lo.x
+	while x < hi.x:
+		var x1 := minf(x + step, hi.x)
+		var z := lo.y
+		while z < hi.y:
+			var z1 := minf(z + step, hi.y)
+			var cell := PackedVector2Array([Vector2(x, z), Vector2(x1, z), Vector2(x1, z1), Vector2(x, z1)])
+			for piece in Geometry2D.intersect_polygons(ring, cell):
+				if piece.size() >= 3:
+					cap(lm, key, piece, y)
+			z = z1
+		x = x1
 
 ## A layout outline as a polygon without repeated points.
 static func _poly(pts: Array) -> PackedVector2Array:

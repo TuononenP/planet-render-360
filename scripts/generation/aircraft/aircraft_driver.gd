@@ -142,6 +142,9 @@ func _step_flight(f: Dictionary, dt: float) -> void:
 	if mode == "helicopter":
 		_step_helicopter(f, dt)
 		return
+	var st_cur := str(f.get("state", ""))
+	if st_cur != "DWELL":
+		f["prop_ang"] = fmod(float(f.get("prop_ang", 0.0)) + 28.0 * dt, TAU)
 	var fid := int(f["id"])
 	var rwy_id := int(f["runway_id"])
 	var sp := AircraftSpecs.spec(str(f["kind"]))
@@ -377,7 +380,17 @@ func _apply_pose(f: Dictionary) -> void:
 			tr.rotation.z = ang * 3.5
 		var disc := node.get_node_or_null("RotorDisc") as Node3D
 		if disc != null:
-			disc.visible = rpm > 0.65
+			disc.visible = rpm > 0.55
+	else:
+		var pang := float(f.get("prop_ang", 0.0))
+		var running := str(f.get("state", "")) != "DWELL"
+		for pname: String in ["PropLeft", "PropRight", "PropMain"]:
+			var pr := node.get_node_or_null(pname) as Node3D
+			if pr != null:
+				pr.rotation.x = pang
+			var pd := node.get_node_or_null(pname.replace("Prop", "PropDisc")) as Node3D
+			if pd != null:
+				pd.visible = running
 
 static func _poly_len(pts: PackedVector2Array) -> float:
 	var s := 0.0

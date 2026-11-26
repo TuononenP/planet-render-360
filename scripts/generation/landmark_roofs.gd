@@ -16,7 +16,7 @@ extends RefCounted
 ## its mapped one (LandmarkSites.outside_spans). A clock tower's height is
 ## its spire: Big Ben's clearance covers the Palace of Westminster, and a
 ## mapped footbridge by Old Palace Yard rose 96 m into the sky.
-const NOT_ROOFS := ["Skyscraper", "Bridge", "Clock tower"]
+const NOT_ROOFS := ["Skyscraper", "Bridge", "Clock tower", "Airport"]
 static func collect(data: LocationData) -> Array:
 	var out: Array = []
 	for c: Variant in data.landmark_candidates:

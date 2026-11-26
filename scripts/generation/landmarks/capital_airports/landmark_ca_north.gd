@@ -109,29 +109,69 @@ static func copenhagen(model: Node3D) -> void:
 static func vantaa(model: Node3D) -> void:
 	var d: Dictionary = CaLayoutVantaa.DATA
 	var lm := LandmarkMesh.new()
-	K.mats(lm, "render", "#D9D6D0", "membrane", "#7E8387")
+	K.mats(lm, "render", "#E2DFD9", "membrane", "#7C8288", "#4A6072", "#D5D4CE")
 	K.surfaces(lm, d)
 	var sheds_skip := _named_index(d, "Avia Pilot") + _named_index(d, "Hilton Helsinki Airport") \
 		+ _named_index(d, "Clarion Hotel Helsinki Airport") + _named_index(d, "Comfort Hotel Helsinki Airport") \
 		+ _named_index(d, "Forenom Hostel Vantaa Airport") + _named_index(d, "Avia College") \
 		+ _named_index(d, "P1/P2") + _named_index(d, "P3A") + _named_index(d, "P3B") + _named_index(d, "P5")
 	K.buildings(lm, d, sheds_skip)
-	K.terminal_set(lm, d, {"Terminaali": [15.0, 3, 1.0], "FinnHems": [7.2, 2],
-		"_big": [10.0, 2], "_small": [5.0, 1]})
+	# Build Terminaali with narrow jet-bridge spikes morphologically opened away
+	# (so boarding bridges aren't extruded as 15 m solid walls) and skip the two
+	# duplicate unnamed terminal rings that overlapped Terminaali.
+	var clean_term_rings: Array[PackedVector2Array] = []
+	for i in K.terminals(d):
+		var b: Dictionary = d["buildings"][i]
+		var bname := str(b["name"])
+		if bname == "Terminaali":
+			for opened in _strip_thin_fingers(K._poly(b["ring"]), 3.8):
+				var pts := []
+				for v in opened:
+					pts.append([v.x, v.y])
+				K.terminal(lm, pts, 15.0, 3, 1.1, 2.6, 1.0)
+				clean_term_rings.append(opened)
+		elif bname == "FinnHems":
+			K.terminal(lm, b["ring"], 7.2, 2, 1.0, 2.4, 0.4)
+		elif bname != "" or absf(K._area(K._poly(b["ring"]))) < 20000.0:
+			var h := float(b["h"])
+			if h <= 0.0:
+				h = 5.0 if absf(K._area(K._poly(b["ring"]))) < 400.0 else 10.0
+			K.terminal(lm, b["ring"], h, maxi(1, roundi(h / 4.5)))
 	_avia_pilot(lm, d)
 	# Landside hotels and offices read glazed, not as flat sheds: mapped heights.
 	for hotel in ["Hilton Helsinki Airport", "Clarion Hotel Helsinki Airport",
 			"Comfort Hotel Helsinki Airport", "Forenom Hostel Vantaa Airport", "Avia College"]:
 		_glazed_block(lm, d, hotel)
-	# The multi-storey car parks are open decks, not solid blocks.
+	# The multi-storey car parks are open decks with solid recessed interior cores.
 	for garage in ["P1/P2", "P3A", "P3B", "P5"]:
 		_garage(lm, d, garage)
-	K.tower(lm, Vector2(-150.0, -230.0), 17.6, 3.0, 5.2, 3.4, 5.0)
-	lm.box("Walls", Vector3(-150.0, 4.0, -222.0), Vector3(14.0, 8.0, 10.0))
-	K.park(lm, d, [["narrow", "#0B2D6B"], ["narrow", "#0B2D6B"], ["narrow", "#0B2D6B"],
-		["wide", "#0B2D6B"], ["turboprop", "#0B2D6B"], ["narrow", "#0B2D6B"],
-		["narrow", "#0B2D6B"]], 10)
+	# EFHK control tower near the north-west terminal edge (clear of apron lanes).
+	K.tower(lm, Vector2(-135.0, -75.0), 18.6, 3.0, 5.2, 3.4, 5.0)
+	lm.box("Walls", Vector3(-135.0, 4.0, -68.0), Vector3(14.0, 8.0, 10.0))
+	K.park(lm, d, [
+		["narrow", "#0B2D6B"], ["narrow", "#0B2D6B"], ["wide", "#0B2D6B"],
+		["turboprop", "#0B2D6B"], ["narrow", "#C8102E"], ["narrow", "#0B2D6B"],
+		["wide", "#0B2D6B"], ["narrow", "#0A2E73"], ["turboprop", "#0B2D6B"],
+		["narrow", "#0D234A"],
+	], 26, Vector2.ZERO, 750.0, true, clean_term_rings)
 	lm.commit(model)
+
+## Removes narrow jet-bridge finger protrusions (width < 2 * margin_m) from a
+## terminal outline via morphological opening (erode then dilate).
+static func _strip_thin_fingers(ring: PackedVector2Array, margin_m: float) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	if ring.size() < 3:
+		return out
+	var eroded := Geometry2D.offset_polygon(ring, -margin_m, Geometry2D.JOIN_MITER)
+	for er in eroded:
+		if absf(K._area(er)) < 80.0:
+			continue
+		for dilated in Geometry2D.offset_polygon(er, margin_m, Geometry2D.JOIN_MITER):
+			if dilated.size() >= 3:
+				out.append(dilated)
+	if out.is_empty():
+		out.append(ring)
+	return out
 
 ## Indices of the layout's buildings called `wanted` (for K.buildings skip).
 static func _named_index(d: Dictionary, wanted: String) -> Array:
@@ -175,8 +215,8 @@ static func _glazed_block(lm: LandmarkMesh, d: Dictionary, wanted: String) -> vo
 		var h := maxf(float(b["h"]), 9.0)
 		K.terminal(lm, b["ring"], h, maxi(2, roundi(h / 3.5)), 1.0, 2.5, 1.0)
 
-## An open-deck car park on its measured ring: a slab and a parapet per
-## deck on columns, roofed at the top. Shared materials only.
+## An open-deck car park on its measured ring: a recessed dark interior core
+## behind concrete deck slabs, parapets and perimeter columns, roofed at the top.
 static func _garage(lm: LandmarkMesh, d: Dictionary, wanted: String) -> void:
 	for b in d["buildings"]:
 		if str(b["name"]) != wanted:
@@ -188,15 +228,19 @@ static func _garage(lm: LandmarkMesh, d: Dictionary, wanted: String) -> void:
 			continue
 		var dh := 3.2
 		var n := maxi(2, roundi(maxf(float(b["h"]), 9.0) / dh))
+		var top := float(n) * dh
+		# Recessed interior core so open decks don't read as hollow wireframes
+		for inner in Geometry2D.offset_polygon(ring, -1.8, Geometry2D.JOIN_MITER):
+			if inner.size() >= 3:
+				lm.poly_prism("Glass", inner, 0.0, top, false)
 		for k in range(1, n + 1):
 			var y := float(k) * dh
 			K.cap(lm, "Trim", ring, y)
-			K.band(lm, "Trim", ring, y, y + 1.1)
-		var top := float(n) * dh
+			K.band(lm, "Trim", ring, y, y + 1.15)
 		K.cap(lm, "Roof", ring, top + 0.3)
 		K.band(lm, "Trim", ring, top + 0.3, top + 1.4)
 		var last := ring[ring.size() - 1]
 		for p in ring:
 			if p.distance_to(last) >= 8.0:
-				lm.beam("Trim", Vector3(p.x, 0.0, p.y), Vector3(p.x, top, p.y), 0.5, 0.5)
+				lm.beam("Trim", Vector3(p.x, 0.0, p.y), Vector3(p.x, top, p.y), 0.55, 0.55)
 				last = p
