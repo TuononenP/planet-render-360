@@ -39,16 +39,16 @@ static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask =
 		if hung or bool(road.get("trolley_wire", false)):
 			lines.append([road, bool(road.get("trolley_wire", false)), hung])
 	var bridges := LandmarkSites.bridge_spans(data)
-	var tracks := _track_grid(lines, m)
-	var roads := _road_grid(data, m)
+	var tracks := _track_grid(lines, m, centre)
+	var roads := _road_grid(data, m, centre)
 	var crossings := StreetProps.crossing_grid(data, marking_plan, m)
 	var aprons := StreetProps.apron_grid(marking_plan, m)
 	var keepout := {"tracks": tracks, "roads": roads, "crossings": crossings, "aprons": aprons,
 		"ground": ground, "mask": mask}
 	var centres := _centre_grid(data, 35.0 * m)
 	var replaced := _replaced(data)
-	var rings := _ring_grid(data, 12.0 * m, replaced, false)
-	var models := _ring_grid(data, 12.0 * m, replaced, true)
+	var rings := _ring_grid(data, 12.0 * m, replaced, false, centre)
+	var models := _ring_grid(data, 12.0 * m, replaced, true, centre)
 	var poles := {}
 	# Every candidate span first, nearest the eye first, so the cap drops
 	# the far ones rather than whichever ways the data lists last.
@@ -111,14 +111,19 @@ static func _on_bridge_model(p: Vector2, bridges: Array) -> bool:
 
 ## Segments of the wired tracks bucketed by cell, so a pole can stay off
 ## a neighbouring track bed (a terminus loop holds a dozen ways).
-static func _track_grid(lines: Array, m: float) -> Dictionary:
+static func _track_grid(lines: Array, m: float, centre: Vector2 = Vector2.INF) -> Dictionary:
 	var grid := {}
 	var cell := _CELL_M * m
+	var reach := (RADIUS_M + 80.0) * m
+	var clip := centre.is_finite()
 	for entry in lines:
 		if not bool(entry[1]):
 			continue
 		var pts: PackedVector2Array = (entry[0] as Dictionary).get("points", PackedVector2Array())
 		for i in pts.size() - 1:
+			if clip and maxf(absf(pts[i].x - centre.x), absf(pts[i].y - centre.y)) > reach \
+					and maxf(absf(pts[i + 1].x - centre.x), absf(pts[i + 1].y - centre.y)) > reach:
+				continue
 			# Every cell a long straight run passes through, walked at half
 			# a cell; _on_track's 3×3 search covers the clearance.
 			var steps := ceili(pts[i].distance_to(pts[i + 1]) / (cell * 0.5))
@@ -137,17 +142,23 @@ static func _track_grid(lines: Array, m: float) -> Dictionary:
 static func _on_track(p: Vector2, grid: Dictionary, m: float) -> bool:
 	var cell := _CELL_M * m
 	var c := Vector2i(floori(p.x / cell), floori(p.y / cell))
+	var lim2 := (TRACK_CLEAR_M * m) * (TRACK_CLEAR_M * m)
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
-			for seg in grid.get(Vector2i(c.x + dx, c.y + dz), []):
-				if p.distance_to(Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])) < TRACK_CLEAR_M * m:
+			var bucket: Variant = grid.get(Vector2i(c.x + dx, c.y + dz))
+			if bucket == null:
+				continue
+			for seg in (bucket as Array):
+				if RoadCrossingClip._seg_dist_sq(p, seg[0], seg[1]) < lim2:
 					return true
 	return false
 
 ## Drivable road carriageways bucketed by cell so span poles never stand in traffic lanes.
-static func _road_grid(data: LocationData, m: float) -> Dictionary:
+static func _road_grid(data: LocationData, m: float, centre: Vector2 = Vector2.INF) -> Dictionary:
 	var grid := {}
 	var cell := _CELL_M * m
+	var reach := (RADIUS_M + 80.0) * m
+	var clip := centre.is_finite()
 	for raw in data.roads:
 		if not (raw is Dictionary) or not RoadMarkings._drivable(raw):
 			continue
@@ -157,6 +168,9 @@ static func _road_grid(data: LocationData, m: float) -> Dictionary:
 		var pts: PackedVector2Array = rd.get("points", PackedVector2Array())
 		var clear := (float(rd.get("width_m", 6.0)) * 0.5 + 0.65) * m
 		for i in pts.size() - 1:
+			if clip and maxf(absf(pts[i].x - centre.x), absf(pts[i].y - centre.y)) > reach \
+					and maxf(absf(pts[i + 1].x - centre.x), absf(pts[i + 1].y - centre.y)) > reach:
+				continue
 			var steps := ceili(pts[i].distance_to(pts[i + 1]) / (cell * 0.5))
 			var seen := {}
 			for k in steps + 1:
@@ -175,8 +189,12 @@ static func _on_road(p: Vector2, grid: Dictionary, m: float) -> bool:
 	var c := Vector2i(floori(p.x / cell), floori(p.y / cell))
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
-			for seg in grid.get(Vector2i(c.x + dx, c.y + dz), []):
-				if p.distance_to(Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])) < float(seg[2]):
+			var bucket: Variant = grid.get(Vector2i(c.x + dx, c.y + dz))
+			if bucket == null:
+				continue
+			for seg in (bucket as Array):
+				var lim := float(seg[2])
+				if RoadCrossingClip._seg_dist_sq(p, seg[0], seg[1]) < lim * lim:
 					return true
 	return false
 
@@ -271,10 +289,15 @@ static func _replaced(data: LocationData) -> PackedByteArray:
 ## buildings whose `replaced` flag (_replaced; none when empty) matches
 ## `models` are listed.
 static func _ring_grid(data: LocationData, radius: float, replaced := PackedByteArray(),
-		models := false) -> Dictionary:
+		models := false, centre: Vector2 = Vector2.INF) -> Dictionary:
 	var grid := {}
+	var clip := centre.is_finite()
+	var reach := (RADIUS_M + 100.0) * WorldScale.metres_to_units()
 	for i in data.buildings.size():
-		var ring: PackedVector2Array = data.buildings[i].get("footprint", PackedVector2Array())
+		var b: Dictionary = data.buildings[i]
+		if clip and (absf(float(b.get("x", 0.0)) - centre.x) > reach or absf(float(b.get("z", 0.0)) - centre.y) > reach):
+			continue
+		var ring: PackedVector2Array = b.get("footprint", PackedVector2Array())
 		var is_model := not replaced.is_empty() and replaced[i] == 1
 		if ring.is_empty() or is_model != models:
 			continue
@@ -307,7 +330,10 @@ static func _anchor(p: Vector2, data: LocationData, rings: Dictionary, radius: f
 	var seen := {}
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
-			for i: int in rings.get(Vector2i(floori(p.x / radius) + dx, floori(p.y / radius) + dz), []):
+			var bucket: Variant = rings.get(Vector2i(floori(p.x / radius) + dx, floori(p.y / radius) + dz))
+			if bucket == null:
+				continue
+			for i: int in (bucket as Array):
 				if seen.has(i):
 					continue
 				seen[i] = true
@@ -315,8 +341,13 @@ static func _anchor(p: Vector2, data: LocationData, rings: Dictionary, radius: f
 				if float(b.get("height", 0.0)) < CONTACT_M + 1.0:
 					continue
 				var ring: PackedVector2Array = b.get("footprint", PackedVector2Array())
-				for j in ring.size():
-					var q := Geometry2D.get_closest_point_to_segment(p, ring[j], ring[(j + 1) % ring.size()])
+				var rn := ring.size()
+				for j in rn:
+					var ra := ring[j]
+					var rb := ring[(j + 1) % rn]
+					var ab := rb - ra
+					var l2 := ab.length_squared()
+					var q := ra if l2 <= 1e-12 else ra + ab * clampf((p - ra).dot(ab) / l2, 0.0, 1.0)
 					if min_proj > -INF and (q - a).dot(out) < min_proj:
 						continue
 					var d := p.distance_to(q)

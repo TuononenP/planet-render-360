@@ -19,6 +19,11 @@ void VegetationMaskNative::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("cover_at", "x", "z"), &VegetationMaskNative::cover_at);
 	ClassDB::bind_method(D_METHOD("cover_at_cell", "cx", "cz"), &VegetationMaskNative::cover_at_cell);
 	ClassDB::bind_method(D_METHOD("built_fraction", "x", "z"), &VegetationMaskNative::built_fraction);
+	ClassDB::bind_method(D_METHOD("forest_areas", "is_forest", "stride", "mid_u", "cell_m2"), &VegetationMaskNative::forest_areas);
+	ClassDB::bind_method(D_METHOD("scan_band", "spacing_m", "m2u", "r_in", "r_out", "skip_gid", "synthetic_bits", "margin_m"), &VegetationMaskNative::scan_band);
+	ClassDB::bind_method(D_METHOD("scan_canopy", "pixels", "w", "h", "has_canopy", "fallback_pixels", "fw", "fh",
+								 "mapped_trees", "is_grass", "p_half", "seed", "spacing_m", "excl_m", "mask_bits", "margin_m", "m2u"),
+			&VegetationMaskNative::scan_canopy);
 }
 
 void VegetationMaskNative::setup(int p_n, float p_half, float p_cell, int p_block, int p_nb, float p_bucket) {
@@ -296,6 +301,189 @@ float VegetationMaskNative::built_fraction(float x, float z) const {
 		}
 	}
 	return static_cast<float>(total) / static_cast<float>(std::max(cells, 1));
+}
+
+static inline double veg_hash(double x, double z, double salt) {
+	const double v = std::sin(x * 12.9898 + z * 78.233 + salt * 37.719) * 43758.5453;
+	return v - std::floor(v);
+}
+
+Vector2 VegetationMaskNative::forest_areas(const PackedByteArray &is_forest, int stride, float mid_u, float cell_m2) const {
+	double near_a = 0.0;
+	double far_a = 0.0;
+	const uint8_t *fp = is_forest.ptr();
+	const int64_t fn = is_forest.size();
+	const double add = (double)cell_m2 * (double)stride * (double)stride;
+	const double mid2 = (double)mid_u * (double)mid_u;
+	for (int cz = 0; cz < n; cz += stride) {
+		const double z = ((double)cz + 0.5) * (double)cell - (double)half;
+		const double z2 = z * z;
+		const size_t row = static_cast<size_t>(cz) * static_cast<size_t>(n);
+		for (int cx = 0; cx < n; cx += stride) {
+			const int gid = cover[row + static_cast<size_t>(cx)] - 1;
+			if (gid < 0 || gid >= fn || fp[gid] == 0) {
+				continue;
+			}
+			const double x = ((double)cx + 0.5) * (double)cell - (double)half;
+			if (x * x + z2 <= mid2) {
+				near_a += add;
+			} else {
+				far_a += add;
+			}
+		}
+	}
+	return Vector2((real_t)near_a, (real_t)far_a);
+}
+
+Array VegetationMaskNative::scan_band(float spacing_m, float m2u, float r_in, float r_out,
+		const PackedByteArray &skip_gid, int synthetic_bits, float margin_m) const {
+	const double s = (double)spacing_m * (double)m2u;
+	const double lim = std::min((double)r_out, (double)half * 1.42);
+	const int steps = (int)std::ceil(std::min(lim, (double)half) / s);
+	const uint8_t *sp = skip_gid.ptr();
+	const int64_t sn = skip_gid.size();
+	std::vector<Vector2> pts;
+	std::vector<int32_t> gids;
+	for (int gz = -steps; gz <= steps; ++gz) {
+		for (int gx = -steps; gx <= steps; ++gx) {
+			const double x = ((double)gx + (veg_hash((double)gx, (double)gz, 1.0) - 0.5) * 0.8) * s;
+			const double z = ((double)gz + (veg_hash((double)gx, (double)gz, 2.0) - 0.5) * 0.8) * s;
+			const double d = std::hypot(x, z);
+			if (d < (double)r_in || d > (double)r_out) {
+				continue;
+			}
+			const int gid = cover_at((float)x, (float)z);
+			if (gid < 0) {
+				continue;
+			}
+			if (gid < sn && sp[gid] != 0) {
+				continue;
+			}
+			if (blocked((float)x, (float)z, synthetic_bits, margin_m, m2u)) {
+				continue;
+			}
+			pts.push_back(Vector2((real_t)x, (real_t)z));
+			gids.push_back(gid);
+		}
+	}
+	PackedVector2Array p_arr;
+	PackedInt32Array g_arr;
+	p_arr.resize((int64_t)pts.size());
+	g_arr.resize((int64_t)gids.size());
+	if (!pts.empty()) {
+		std::memcpy(p_arr.ptrw(), pts.data(), pts.size() * sizeof(Vector2));
+		std::memcpy(g_arr.ptrw(), gids.data(), gids.size() * sizeof(int32_t));
+	}
+	Array out;
+	out.push_back(p_arr);
+	out.push_back(g_arr);
+	return out;
+}
+
+Array VegetationMaskNative::scan_canopy(const PackedByteArray &pixels, int w, int h, bool has_canopy,
+		const PackedByteArray &fallback_pixels, int fw, int fh,
+		const PackedVector2Array &mapped_trees, const PackedByteArray &is_grass,
+		float p_half, double seed, float spacing_m, float excl_m,
+		int mask_bits, float margin_m, float m2u) const {
+	std::unordered_map<int64_t, std::vector<Vector2>> tree_buckets;
+	const Vector2 *tp = mapped_trees.ptr();
+	const int64_t tn = mapped_trees.size();
+	tree_buckets.reserve((size_t)tn);
+	for (int64_t i = 0; i < tn; ++i) {
+		const int bx = (int)std::floor((double)tp[i].x / (double)excl_m);
+		const int bz = (int)std::floor((double)tp[i].y / (double)excl_m);
+		tree_buckets[bucket_key(bx, bz)].push_back(tp[i]);
+	}
+	const float excl2 = excl_m * excl_m;
+	auto near_tree = [&](float x, float z) -> bool {
+		if (tree_buckets.empty()) {
+			return false;
+		}
+		const int cx = (int)std::floor((double)x / (double)excl_m);
+		const int cz = (int)std::floor((double)z / (double)excl_m);
+		for (int dz = -1; dz <= 1; ++dz) {
+			for (int dx = -1; dx <= 1; ++dx) {
+				auto it = tree_buckets.find(bucket_key(cx + dx, cz + dz));
+				if (it == tree_buckets.end()) {
+					continue;
+				}
+				for (const Vector2 &q : it->second) {
+					const float ddx = x - q.x;
+					const float ddz = z - q.y;
+					if (ddx * ddx + ddz * ddz <= excl2) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	};
+	const uint8_t *px_ptr = pixels.ptr();
+	const uint8_t *fb_ptr = fallback_pixels.ptr();
+	const bool has_fb = !fallback_pixels.is_empty() && fw > 0 && fh > 0;
+	const uint8_t *gp = is_grass.ptr();
+	const int64_t gn = is_grass.size();
+	const double bands[5] = { 0.0, 200.0, 450.0, 800.0, (double)p_half * 1.42 };
+	const double inv_span = 1.0 / ((double)p_half * 2.0);
+	std::vector<Vector2> out_pts;
+	std::vector<int32_t> out_vals;
+	std::vector<uint8_t> out_flags;
+	for (int b = 0; b < 4; ++b) {
+		const double in2 = bands[b] * bands[b];
+		const double out2 = bands[b + 1] * bands[b + 1];
+		const int steps = (int)std::ceil(std::min(bands[b + 1], (double)p_half) / (double)spacing_m);
+		for (int iz = -steps; iz <= steps; ++iz) {
+			for (int ix = -steps; ix <= steps; ++ix) {
+				const double x = ((double)ix + (veg_hash((double)ix, (double)iz, seed + 41.0) - 0.5) * 0.7) * (double)spacing_m;
+				const double z = ((double)iz + (veg_hash((double)ix, (double)iz, seed + 42.0) - 0.5) * 0.7) * (double)spacing_m;
+				const double d2 = x * x + z * z;
+				if (d2 < in2 || d2 >= out2 || std::fabs(x) >= (double)p_half || std::fabs(z) >= (double)p_half) {
+					continue;
+				}
+				const int px = std::clamp((int)((x * inv_span + 0.5) * (double)w), 0, w - 1);
+				const int py = std::clamp((int)((z * inv_span + 0.5) * (double)h), 0, h - 1);
+				int val = (int)px_ptr[py * w + px];
+				const bool measured = has_canopy && val != 255;
+				if (has_canopy && val == 255 && has_fb) {
+					const int fx = std::clamp((int)((x * inv_span + 0.5) * (double)fw), 0, fw - 1);
+					const int fz = std::clamp((int)((z * inv_span + 0.5) * (double)fh), 0, fh - 1);
+					val = (int)fb_ptr[fz * fw + fx];
+				}
+				if ((measured && val < 3) || (!measured && val != 10 && val != 95)) {
+					continue;
+				}
+				const int cov = cover_at((float)x, (float)z);
+				if (cov >= 0 && (cov >= gn || gp[cov] == 0)) {
+					continue;
+				}
+				if (near_tree((float)x, (float)z)) {
+					continue;
+				}
+				if (blocked((float)x, (float)z, mask_bits, margin_m, m2u)) {
+					continue;
+				}
+				out_pts.push_back(Vector2((real_t)x, (real_t)z));
+				out_vals.push_back(val);
+				out_flags.push_back((uint8_t)((measured ? 1 : 0) | (cov >= 0 ? 2 : 0)));
+			}
+		}
+	}
+	PackedVector2Array pa;
+	PackedInt32Array va;
+	PackedByteArray fa;
+	pa.resize((int64_t)out_pts.size());
+	va.resize((int64_t)out_vals.size());
+	fa.resize((int64_t)out_flags.size());
+	if (!out_pts.empty()) {
+		std::memcpy(pa.ptrw(), out_pts.data(), out_pts.size() * sizeof(Vector2));
+		std::memcpy(va.ptrw(), out_vals.data(), out_vals.size() * sizeof(int32_t));
+		std::memcpy(fa.ptrw(), out_flags.data(), out_flags.size());
+	}
+	Array out;
+	out.push_back(pa);
+	out.push_back(va);
+	out.push_back(fa);
+	return out;
 }
 
 } // namespace godot

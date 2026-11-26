@@ -44,6 +44,65 @@ static func add(plan: Dictionary, data: LocationData, ground: GroundTruth,
 		fallback_pixels = fallback.get_data()
 		fallback_width = fallback.get_width()
 		fallback_height = fallback.get_height()
+	var limit := int(ctx["budget"]) * VegetationBuilder.IMPOSTOR_FACTOR
+	var added := 0
+	var half := WorldScale.detailed_extent_units() * 0.5
+	var seed := float(data.seed_value)
+	if mask._native != null and mask._native.has_method("scan_canopy"):
+		var mapped := PackedVector2Array()
+		for tree in data.trees:
+			if tree is Dictionary and tree.has("x") and tree.has("z"):
+				mapped.append(Vector2(float(tree["x"]), float(tree["z"])))
+		var is_grass := PackedByteArray()
+		is_grass.resize(mask.green.size())
+		for i in mask.green.size():
+			is_grass[i] = 1 if str(mask.green[i]["class"]) == "grass" else 0
+		var scanned: Array = mask._native.scan_canopy(pixels, width, height, canopy,
+			fallback_pixels, fallback_width, fallback_height, mapped, is_grass,
+			half, seed, SPACING_M, TREE_EXCLUSION_M,
+			VegetationMask.BUILDING | VegetationMask.ROAD_EDGE | VegetationMask.WATER, 0.8, float(ctx["m2u"]))
+		var pts: PackedVector2Array = scanned[0]
+		var vals: PackedInt32Array = scanned[1]
+		var flgs: PackedByteArray = scanned[2]
+		var sl: Array = ctx.get("sightline", [])
+		for i in pts.size():
+			if abort != null and abort.requested:
+				return added
+			if (plan["pos"] as Array).size() >= limit:
+				return added
+			var x := pts[i].x
+			var z := pts[i].y
+			if VegetationBuilder.in_sanam_luang(x, z, ctx, true) \
+					or ground.water_at(x, z) > 0.0 \
+					or LandmarkSites.tree_cleared(Vector2(x, z), ctx["tree_clears"]) \
+					or (mask.surface != null and mask.surface.hard_at(x, z, 0.0, GroundSurface.NO_TREES)):
+				continue
+			if not sl.is_empty():
+				var a: Vector2 = sl[0]
+				var b: Vector2 = sl[1]
+				var pv := Vector2(x, z)
+				var t := clampf((pv - a).dot(b - a) / maxf((b - a).length_squared(), 1.0), 0.0, 1.0)
+				if pv.distance_to(a.lerp(b, t)) < lerpf(float(sl[2]), float(sl[3]), t):
+					continue
+			if ground.asl_y(ground.height_at_world(x, z)) > float(ctx["treeline"]):
+				continue
+			var jitter := 1.0
+			if bool(ctx.get("zone", false)):
+				var keep := float(VegetationBuilder.zone_rule(x, z, ctx).get("tree_keep", 1.0))
+				if VegetationBuilder._hash(x, z, seed + 43.0) >= keep:
+					continue
+				jitter = 0.7 + 0.6 * VegetationBuilder._hash(x, z, seed + 44.0)
+			var measured_canopy := (flgs[i] & 1) != 0
+			var in_park := (flgs[i] & 2) != 0
+			var pick := VegetationBuilder._species_at(x, z, "park" if in_park else "forest", ground, ctx)
+			var species := str(pick[0])
+			var measured := float(vals[i]) if measured_canopy else 12.0
+			var size := clampf(measured / float(TreeSpecies.spec(species).get("h", 15.0)), 0.2, 2.5)
+			if jitter != 1.0:
+				size = clampf((size if measured_canopy else 1.0) * jitter, 0.2, 2.5)
+			VegetationBuilder._add(plan, x, z, ground, species, size, 1.0, false)
+			added += 1
+		return added
 	var buckets := {}
 	for tree in data.trees:
 		if not (tree is Dictionary) or not tree.has("x") or not tree.has("z"):
@@ -53,10 +112,6 @@ static func add(plan: Dictionary, data: LocationData, ground: GroundTruth,
 		if not buckets.has(key):
 			buckets[key] = []
 		buckets[key].append(p)
-	var limit := int(ctx["budget"]) * VegetationBuilder.IMPOSTOR_FACTOR
-	var added := 0
-	var half := WorldScale.detailed_extent_units() * 0.5
-	var seed := float(data.seed_value)
 	var bands := [0.0, 200.0, 450.0, 800.0, half * 1.42]
 	for band in bands.size() - 1:
 		var inside: float = bands[band]

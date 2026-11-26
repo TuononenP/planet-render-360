@@ -305,17 +305,26 @@ static func _fill_cover(plan: Dictionary, data: LocationData, ground: GroundTrut
 	var near_a := 0.0
 	var far_a := 0.0
 	var stride := 2
-	for cz in range(0, mask.n, stride):
-		for cx in range(0, mask.n, stride):
-			var gid := mask.cover_at_cell(cx, cz)
-			if gid < 0 or str(mask.green[gid]["class"]) != "forest":
-				continue
-			var x := (float(cx) + 0.5) * mask.cell - mask.half
-			var z := (float(cz) + 0.5) * mask.cell - mask.half
-			if Vector2(x, z).length() <= mid_u:
-				near_a += cell_m2 * stride * stride
-			else:
-				far_a += cell_m2 * stride * stride
+	if mask._native != null and mask._native.has_method("forest_areas"):
+		var is_forest := PackedByteArray()
+		is_forest.resize(mask.green.size())
+		for i in mask.green.size():
+			is_forest[i] = 1 if str(mask.green[i]["class"]) == "forest" else 0
+		var areas: Vector2 = mask._native.forest_areas(is_forest, stride, mid_u, cell_m2)
+		near_a = areas.x
+		far_a = areas.y
+	else:
+		for cz in range(0, mask.n, stride):
+			for cx in range(0, mask.n, stride):
+				var gid := mask.cover_at_cell(cx, cz)
+				if gid < 0 or str(mask.green[gid]["class"]) != "forest":
+					continue
+				var x := (float(cx) + 0.5) * mask.cell - mask.half
+				var z := (float(cz) + 0.5) * mask.cell - mask.half
+				if Vector2(x, z).length() <= mid_u:
+					near_a += cell_m2 * stride * stride
+				else:
+					far_a += cell_m2 * stride * stride
 	var budget: int = ctx["budget"]
 	var real_n := (plan["pos"] as Array).size()
 	var near_cap := maxf(float(budget - real_n) * 0.8, float(budget) * 0.3)
@@ -336,6 +345,69 @@ static func _fill_band(plan: Dictionary, ground: GroundTruth, mask: VegetationMa
 	var crown := clampf(spacing_m / FOREST_SPACING_M, 1.0, 2.0)
 	var dens_scale := (spacing_m / FOREST_SPACING_M) * (spacing_m / FOREST_SPACING_M)
 	var noise: FastNoiseLite = ctx["noise"]
+	if mask._native != null and mask._native.has_method("scan_band"):
+		var canopy_on := bool(ctx.get("canopy_present", false))
+		var skip_gid := PackedByteArray()
+		skip_gid.resize(mask.green.size())
+		for i in mask.green.size():
+			var gg: Dictionary = mask.green[i]
+			if str(gg["class"]) == "grass":
+				if canopy_on or float(gg["real_trees"]) / (maxf(float(gg["cells"]), 1.0) * 2.25) > 1.0 / 2500.0:
+					skip_gid[i] = 1
+		var scanned: Array = mask._native.scan_band(spacing_m, m2u, r_in, r_out, skip_gid, SYNTHETIC_BITS, 0.8)
+		var pts: PackedVector2Array = scanned[0]
+		var gids: PackedInt32Array = scanned[1]
+		for i in pts.size():
+			if abort != null and abort.requested:
+				break
+			var x := pts[i].x
+			var z := pts[i].y
+			var g: Dictionary = mask.green[gids[i]]
+			var cls := str(g["class"])
+			var p := 1.0
+			var setting := "forest"
+			var size := 1.0
+			var spread := crown
+			match cls:
+				"forest":
+					p = 0.92 * float(zone_rule(x, z, ctx).get("tree_keep", 1.0))
+				"orchard":
+					p = 0.55; size = 0.4; spread = 1.0; setting = "orchard"
+				"cemetery":
+					p = 0.07 * dens_scale; setting = "park"
+				"wetland":
+					p = 0.04 * dens_scale; setting = "rural"
+				_:
+					var town := mask.built_fraction(x, z) > 0.03
+					setting = "park" if town else "rural"
+					var grove := noise.get_noise_2d(x * 1.7, z * 1.7)
+					p = (0.32 if grove > 0.25 else 0.025) if town else (0.2 if grove > 0.45 else 0.006)
+					p *= dens_scale
+					spread = 1.0
+			if _hash(x, z, 9.0) > p or in_sanam_luang(x, z, ctx, true):
+				continue
+			if ground.water_at(x, z) > 0.0 or LandmarkSites.tree_cleared(Vector2(x, z), ctx["tree_clears"]):
+				continue
+			var sl: Array = ctx.get("sightline", [])
+			if not sl.is_empty():
+				var a: Vector2 = sl[0]
+				var b: Vector2 = sl[1]
+				var pv := Vector2(x, z)
+				var t := clampf((pv - a).dot(b - a) / maxf((b - a).length_squared(), 1.0), 0.0, 1.0)
+				if pv.distance_to(a.lerp(b, t)) < lerpf(float(sl[2]), float(sl[3]), t):
+					continue
+			if ground.slope_at(x, z) > 1.25:
+				continue
+			var pick := _species_at(x, z, setting if setting != "orchard" else "rural", ground, ctx,
+				str(g.get("leaf_type", "")))
+			var sp: String = pick[0]
+			if setting == "orchard":
+				sp = "olive" if str(ctx["biome"]) in ["mediterranean", "arid"] else "oak"
+			if ground.asl_y(ground.height_at_world(x, z)) > float(ctx["treeline"]):
+				continue
+			_add(plan, x, z, ground, sp, size * float(pick[1]) * pow(spread, 0.35),
+				pow(spread, 0.65), false)
+		return
 	for gz in range(-steps, steps + 1):
 		if abort != null and abort.requested:
 			break

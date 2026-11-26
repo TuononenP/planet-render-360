@@ -2,6 +2,8 @@
 
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
+#include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/vector3.hpp>
@@ -58,6 +60,14 @@ public:
 	int cover_at(float x, float z) const;
 	int cover_at_cell(int cx, int cz) const;
 	float built_fraction(float x, float z) const;
+	Vector2 forest_areas(const PackedByteArray &is_forest, int stride, float mid_u, float cell_m2) const;
+	Array scan_band(float spacing_m, float m2u, float r_in, float r_out,
+			const PackedByteArray &skip_gid, int synthetic_bits, float margin_m) const;
+	Array scan_canopy(const PackedByteArray &pixels, int w, int h, bool has_canopy,
+			const PackedByteArray &fallback_pixels, int fw, int fh,
+			const PackedVector2Array &mapped_trees, const PackedByteArray &is_grass,
+			float p_half, double seed, float spacing_m, float excl_m,
+			int mask_bits, float margin_m, float m2u) const;
 };
 
 } // namespace godot
