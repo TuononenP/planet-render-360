@@ -223,7 +223,8 @@ void fragment() {
 		vec2 prev = uv + delta;
 		float after = d - cur;
 		float before = (1.0 - textureGrad(depth_tex, prev, gx, gy).r) - cur + step_d;
-		uv = mix(uv, prev, after / (after - before));
+		float denom = after - before;
+		uv = mix(uv, prev, abs(denom) > 1e-5 ? clamp(after / denom, 0.0, 1.0) : 0.0);
 	}
 	// The building's vertex tint colours the wall under its paint, as in
 	// FacadeLiteShader: painted frames and balconies keep their own colour.

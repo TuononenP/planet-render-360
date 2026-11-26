@@ -134,6 +134,18 @@ func _init() -> void:
 	rig.set_city_glow(0.0)
 	rig.set_weather(-1, AtmosphereRig.DEFAULT_COVER)
 
+	# View probe: shadows stay off to avoid Forward+/Metal cubemap NaNs,
+	# and _requeue_probe toggles max_distance without drifting.
+	if rig.probe.enable_shadows:
+		failures.append("view reflection probe should have shadows off")
+	var d0 := rig.probe.max_distance
+	rig._requeue_probe(rig.probe)
+	var d1 := rig.probe.max_distance
+	rig._requeue_probe(rig.probe)
+	var d2 := rig.probe.max_distance
+	if is_equal_approx(d0, d1) or not is_equal_approx(d0, d2) or not is_equal_approx(rig.probe.intensity, 1.0):
+		failures.append("view probe requeue should toggle max_distance cleanly: %f -> %f -> %f (intensity %f)" % [d0, d1, d2, rig.probe.intensity])
+
 	# Desktop Ultra's street probes: none off it, box-projected round the eye.
 	if not rig._street_probes.is_empty():
 		failures.append("street reflection probes are desktop Ultra only")
@@ -163,9 +175,11 @@ func _init() -> void:
 	if top_sp.visible or absf(top_sp.origin_offset.y) > top_sp.size.y * 0.5:
 		failures.append("a high eye should hide street probes and keep each capture inside its box")
 	# The view probe: a high eye captures where it is; a walker's eye
-	# captures VIEW_CAPTURE_AGL_M over its ground, above trees and walls.
+	# captures VIEW_CAPTURE_AGL_M over its ground, lifting position.y while
+	# keeping origin_offset zero (non-zero origin_offset on the 60 km probe
+	# corrupts Forward+/Metal cubemaps).
 	if not rig.probe.origin_offset.is_zero_approx():
-		failures.append("a high eye should capture the view probe where it is: %s" % rig.probe.origin_offset)
+		failures.append("a high eye should keep view probe origin_offset zero: %s" % rig.probe.origin_offset)
 	rig.set_probe_origin(Vector3(10.0, 1.0 + 1.7, 0.0) * um)
 	if not rig._street_probes[0].visible:
 		failures.append("street probes should reappear when the eye returns to street level")
@@ -173,8 +187,8 @@ func _init() -> void:
 	if absf(view_capture - (1.0 + AtmosphereRig.VIEW_CAPTURE_AGL_M) * um) > 0.01 * um:
 		failures.append("a walker's view probe should capture %.0f m over the ground, at %f" % [
 			AtmosphereRig.VIEW_CAPTURE_AGL_M, view_capture / um])
-	if not is_equal_approx(rig.probe.position.y, 2.7 * um):
-		failures.append("the view probe's box should stay centred on the eye")
+	if not rig.probe.origin_offset.is_zero_approx():
+		failures.append("a walker's view probe should keep origin_offset zero: %s" % rig.probe.origin_offset)
 	rig.ground_at = Callable()
 	rig._set_street_probes(false)
 	if not rig._street_probes.is_empty():

@@ -236,11 +236,15 @@ func _process(delta: float) -> void:
 ## captures from at least VIEW_CAPTURE_AGL_M over the ground: taken at a
 ## walker's eye among trees and walls, its horizon was that near wall,
 ## and sea, glass and copper reflected it, dark, until the next capture.
+## Lift `probe.position.y` directly and keep `origin_offset = Vector3.ZERO`:
+## a non-zero `origin_offset` on the 60 km probe corrupts its Forward+/Metal
+## cubemap into pitch-black patches, while `box_projection` is false and the
+## 8 km box still covers the whole scene.
 func set_probe_origin(pos: Vector3) -> void:
-	probe.position = pos
-	var lift := _ground_y(pos.x, pos.z, pos.y) + VIEW_CAPTURE_AGL_M * units_per_metre - pos.y
-	probe.origin_offset = Vector3(0.0, maxf(lift, 0.0), 0.0)
-	_place_street_probes()
+	var capture_y := maxf(pos.y, _ground_y(pos.x, pos.z, pos.y) + VIEW_CAPTURE_AGL_M * units_per_metre)
+	probe.position = Vector3(pos.x, capture_y, pos.z)
+	probe.origin_offset = Vector3.ZERO
+	_place_street_probes(pos)
 	lightning.centre = pos
 	_refresh_probe()
 
@@ -453,11 +457,14 @@ var _probe_due := 0.0
 var _probe_queue: Array = []
 const PROBE_DEBOUNCE_S := 0.4
 
-## Re-queues one UPDATE_ONCE capture (a tiny intensity change).
+## Re-queues one UPDATE_ONCE capture by toggling a capture-affecting
+## property (max_distance by 0.5 m): Godot 4's intensity setter updates
+## only the instance uniform and does not mark the reflection atlas dirty.
 func _requeue_probe(p: ReflectionProbe) -> void:
 	if p == null or not is_instance_valid(p):
 		return
-	p.intensity = 1.0 if p.intensity < 1.0 else 0.9999
+	var base := floorf(p.max_distance)
+	p.max_distance = base + (0.5 if p.max_distance - base < 0.25 else 0.0)
 ## Lowest capture height of the view probe over the ground: over the
 ## trees and low roofs, so its horizon is the far scenery and sky.
 const VIEW_CAPTURE_AGL_M := 30.0
@@ -471,7 +478,10 @@ func _build_probe() -> void:
 	probe.size = Vector3(60000.0, 8000.0, 60000.0) * units_per_metre
 	probe.max_distance = 30000.0 * units_per_metre
 	probe.box_projection = false
-	probe.enable_shadows = true
+	# Probe shadow passes on Forward+/Metal can emit NaNs into the radiance
+	# cubemap, which GGX prefiltering smears into black patches on roofs,
+	# facades and paving.
+	probe.enable_shadows = false
 	probe.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
 	probe.mesh_lod_threshold = 4.0
 	add_child(probe)
@@ -499,6 +509,7 @@ const STREET_EYE_M := 30.0
 ## the dark sea and ground below the horizon as dark smears on the water.
 const STREET_PROBE_MAX_AGL_M := 50.0
 var _street_probes: Array[ReflectionProbe] = []
+var _street_eye := Vector3.ZERO
 ## Ground height (render Y) at (x, z), set by the view once its ground is
 ## known: each street box stands on the street under it.
 var ground_at: Callable
@@ -526,15 +537,15 @@ func _set_street_probes(on: bool) -> void:
 		sp.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
 		add_child(sp)
 		_street_probes.append(sp)
-	_place_street_probes()
+	_place_street_probes(_street_eye)
 
 ## Each street box stands on the street under it (STREET_BELOW_M into
 ## the ground), and captures from the eye's height over its own street,
 ## kept inside the box: box projection then lines the reflections up
 ## with the street the glass and paving face.
-func _place_street_probes() -> void:
+func _place_street_probes(eye: Vector3 = _street_eye) -> void:
+	_street_eye = eye
 	var m := units_per_metre
-	var eye := probe.position
 	var eye_ground := _ground_y(eye.x, eye.z, eye.y - STREET_EYE_M * m)
 	var aerial := eye.y - eye_ground > STREET_PROBE_MAX_AGL_M * m
 	for i in _street_probes.size():
