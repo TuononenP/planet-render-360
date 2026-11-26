@@ -211,12 +211,17 @@ static func width_m(kind: String) -> float:
 		return TukTukModel.WIDTH_M
 	return float((KINDS.get(kind, {}) as Dictionary).get("wid", BASE["wid"]))
 
+static var _specs_mutex := Mutex.new()
+
 static func spec(kind: String) -> Dictionary:
+	_specs_mutex.lock()
 	if not _specs.has(kind):
 		var p: Dictionary = BASE.duplicate()
 		p.merge(KINDS.get(kind, {}), true)
 		_specs[kind] = _expand(p)
-	return _specs[kind]
+	var out: Dictionary = _specs[kind]
+	_specs_mutex.unlock()
+	return out
 
 static func _expand(p: Dictionary) -> Dictionary:
 	var s: Dictionary = p.duplicate()

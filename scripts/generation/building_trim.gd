@@ -52,11 +52,26 @@ static func deck(top: float, trim: int) -> float:
 ## the sunk deck needs its inner face there), with a coping flush to the
 ## wall. `wall_set` dresses a cornice
 ## in the wall's own stone.
+static var _native_trim := ClassDB.class_exists("RoofKernels")
+
 static func add(root: Node3D, ring: PackedVector2Array, top: float, trim: int,
 		party: PackedByteArray = PackedByteArray(), wall_set: String = "") -> void:
 	if trim == NONE or ring.size() < 3 or BuildingBuilder._batch != null:
 		return
 	var m := WorldScale.metres_to_units()
+	if _native_trim:
+		var res: Array = ClassDB.class_call_static("RoofKernels", "trim_arrays", ring, top, trim, party, m)
+		if res.is_empty():
+			return
+		var arrays: Array = []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = res[0]
+		arrays[Mesh.ARRAY_NORMAL] = res[1]
+		arrays[Mesh.ARRAY_TEX_UV] = res[2]
+		arrays[Mesh.ARRAY_TANGENT] = res[3]
+		arrays[Mesh.ARRAY_INDEX] = res[4]
+		TerrainBuilder._add(root, MeshArrays.mesh(arrays), _material(trim, wall_set))
+		return
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()

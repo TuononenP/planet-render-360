@@ -11,24 +11,97 @@ extends RefCounted
 ## just with a read-back.
 
 const META := "src_arrays"
+const MATS_META := "src_mats"
 
 ## Thread whose kept meshes wait for release() before their upload (one
 ## building's meshes, so RoofVariety tints them before they reach the
 ## server instead of uploading every one twice); the meshes held.
 static var _hold_thread := -1
 static var _held: Array[ArrayMesh] = []
+## When true (set by View360 around build_world + LodRing.merge_buildings),
+## BuildingBuilder defers GPU uploads on its thread so ~10,000 throwaway
+## per-building ArrayMeshes stay CPU-only until LodRing merges them into ~80
+## cell meshes.
+static var defer_buildings := false
+static var _defer_thread := -1
+
+static func is_deferred() -> bool:
+	return defer_buildings and _defer_thread == OS.get_thread_caller_id()
 
 ## One-surface ArrayMesh from `arrays`; `keep` stores them for merging.
 static func mesh(arrays: Array, keep: bool = true) -> ArrayMesh:
 	var m := ArrayMesh.new()
-	if keep and _hold_thread == OS.get_thread_caller_id():
+	if keep and (_hold_thread == OS.get_thread_caller_id() or is_deferred()):
 		m.set_meta(META, [arrays])
-		_held.append(m)
+		if not is_deferred():
+			_held.append(m)
 		return m
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	if keep:
 		m.set_meta(META, [arrays])
 	return m
+
+## Records a deferred surface (arrays + optional material) without uploading.
+static func deferred_surface(m: ArrayMesh, arrays: Array, mat: Material = null) -> void:
+	keep_surface(m, arrays)
+	var mats: Array = m.get_meta(MATS_META, [])
+	mats.append(mat)
+	m.set_meta(MATS_META, mats)
+
+## Surface material of `m` at `s`, reading MATS_META for deferred meshes.
+static func surface_material(m: Mesh, s: int) -> Material:
+	if s < m.get_surface_count():
+		return m.surface_get_material(s)
+	if m.has_meta(MATS_META):
+		var mats: Array = m.get_meta(MATS_META)
+		if s < mats.size():
+			return mats[s] as Material
+	return null
+
+## AABB of `m`, computed from CPU src_arrays when `m` is deferred.
+static func aabb_of(m: Mesh) -> AABB:
+	if m.get_surface_count() > 0 or not m.has_meta(META):
+		return m.get_aabb()
+	var box := AABB()
+	var first := true
+	for s in surface_count(m):
+		var verts: Variant = surface(m, s)[Mesh.ARRAY_VERTEX]
+		if not (verts is PackedVector3Array):
+			continue
+		for v: Vector3 in (verts as PackedVector3Array):
+			if first:
+				box = AABB(v, Vector3.ZERO)
+				first = false
+			else:
+				box = box.expand(v)
+	return box
+
+## Surface format key matching ArrayMesh.surface_get_format() for deferred meshes.
+static func format_key(m: Mesh, s: int) -> String:
+	if m is ArrayMesh and s < m.get_surface_count():
+		return str((m as ArrayMesh).surface_get_format(s))
+	if not (m is ArrayMesh) or not m.has_meta(META):
+		return m.get_class()
+	var arr := surface(m, s)
+	var bits := 0
+	for slot in mini(arr.size(), Mesh.ARRAY_MAX):
+		if arr[slot] != null:
+			bits |= 1 << slot
+	return "def:%d" % bits
+
+## Uploads a deferred ArrayMesh if it was not merged away by LodRing.
+static func upload(m: ArrayMesh) -> void:
+	if m.get_surface_count() > 0 or not m.has_meta(META):
+		return
+	var all: Array = m.get_meta(META)
+	var mats: Array = m.get_meta(MATS_META, [])
+	for i in all.size():
+		var arrays: Array = all[i]
+		if arrays[Mesh.ARRAY_VERTEX] == null or (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+			continue
+		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		if i < mats.size() and mats[i] != null:
+			m.surface_set_material(m.get_surface_count() - 1, mats[i] as Material)
 
 ## Holds this thread's kept meshes (no surfaces yet) until release().
 static func hold() -> void:
@@ -36,10 +109,11 @@ static func hold() -> void:
 
 ## Uploads the held meshes not yet given surfaces and stops holding.
 static func release() -> void:
-	for m in _held:
-		if m.get_surface_count() == 0:
-			for arrays in m.get_meta(META):
-				m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	if not is_deferred():
+		for m in _held:
+			if m.get_surface_count() == 0:
+				for arrays in m.get_meta(META):
+					m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_held.clear()
 	_hold_thread = -1
 

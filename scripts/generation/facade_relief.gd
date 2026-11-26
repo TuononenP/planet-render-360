@@ -214,6 +214,35 @@ static func _storeys(kit: ReliefKit, sp: Dictionary, rows: Array, look: Dictiona
 	# stop their own depth short of it: the next face's run fills the
 	# corner, and the two never overlap.
 	var b_inside := bool(sp.get("b_inside", false))
+	if ReliefKit._native:
+		var stone_s: Object = kit.surfaces[stone] if kit.surfaces.has(stone) else ClassDB.instantiate("QuadSink")
+		var frame_s: Object = stone_s if frame == stone else (kit.surfaces[frame] if kit.surfaces.has(frame) else ClassDB.instantiate("QuadSink"))
+		var iron_mat := ReliefKit.iron()
+		var iron_s: Object = kit.surfaces[iron_mat] if kit.surfaces.has(iron_mat) else ClassDB.instantiate("QuadSink")
+		var glass_mat: Material = kit.pane() if glazed else null
+		var glass_s: Object = (kit.surfaces[glass_mat] if kit.surfaces.has(glass_mat) else ClassDB.instantiate("QuadSink")) if glazed else null
+		var gf_mat: Material = ReliefKit.flat("#a3a7a3", 0.4, 0.3) if glazed else null
+		var gf_s: Object = (kit.surfaces[gf_mat] if kit.surfaces.has(gf_mat) else ClassDB.instantiate("QuadSink")) if glazed else null
+		var flags := (1 if paris else 0) | (2 if punched else 0) | (4 if pattern == "balcony" else 0) \
+			| (8 if french else 0) | (16 if courses else 0) | (32 if mullion else 0) \
+			| (64 if deep else 0) | (128 if solid else 0) | (256 if bool(relief.get("quoins", false)) else 0) \
+			| (512 if b_inside else 0) \
+			| (1024 if (bool(sp["first"]) and not bool(sp.get("a_inside", false))) else 0) \
+			| (2048 if (bool(sp["last"]) and not bool(sp.get("b_inside", false))) else 0)
+		ClassDB.class_call_static("QuadSink", "build_storeys", stone_s, frame_s, iron_s, glass_s, gf_s,
+			a, dir, n, float(sp["len_m"]), bays, rows, stacks, flags, seed_v,
+			float(relief.get("balconette", 0.0)), DEEP_BALCONY_M, m)
+		if not stone_s.is_empty():
+			kit.surfaces[stone] = stone_s
+		if frame != stone and not frame_s.is_empty():
+			kit.surfaces[frame] = frame_s
+		if not iron_s.is_empty():
+			kit.surfaces[iron_mat] = iron_s
+		if glazed and not glass_s.is_empty():
+			kit.surfaces[glass_mat] = glass_s
+		if glazed and not gf_s.is_empty():
+			kit.surfaces[gf_mat] = gf_s
+		return
 	var b_depth := 0.55 * m if paris else 0.8 * m
 	for row in rows:
 		if row["ground"]:

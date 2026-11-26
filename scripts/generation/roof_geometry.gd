@@ -149,6 +149,30 @@ const GABLE_UV_SCALE := 5.0
 static func split_gables(mesh: ArrayMesh, ring: PackedVector2Array = PackedVector2Array(),
 		party: PackedByteArray = PackedByteArray()) -> Array:
 	var src := MeshArrays.surface(mesh, 0)
+	if _native:
+		var res: Array = ClassDB.class_call_static("RoofKernels", "split_gables",
+			src[Mesh.ARRAY_VERTEX], src[Mesh.ARRAY_NORMAL], src[Mesh.ARRAY_TEX_UV],
+			src[Mesh.ARRAY_TANGENT] if src[Mesh.ARRAY_TANGENT] != null else PackedFloat32Array(),
+			ring, party, GABLE_MAX_Y, GABLE_UV_SCALE)
+		if res.is_empty():
+			return [null, null]
+		var to_mesh_arrays := func(r: Array) -> Array:
+			var a: Array = []
+			a.resize(Mesh.ARRAY_MAX)
+			a[Mesh.ARRAY_VERTEX] = r[0]
+			a[Mesh.ARRAY_NORMAL] = r[1]
+			a[Mesh.ARRAY_TEX_UV] = r[2]
+			a[Mesh.ARRAY_TANGENT] = r[3]
+			return a
+		var roof: Array = to_mesh_arrays.call(res[0])
+		if mesh.get_surface_count() == 0:
+			mesh.set_meta(MeshArrays.META, [roof])
+		else:
+			mesh.clear_surfaces()
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, roof)
+			mesh.set_meta(MeshArrays.META, [roof])
+		return [null if (res[1] as Array).is_empty() else MeshArrays.mesh(to_mesh_arrays.call(res[1])),
+			null if (res[2] as Array).is_empty() else MeshArrays.mesh(to_mesh_arrays.call(res[2]))]
 	var normals: PackedVector3Array = src[Mesh.ARRAY_NORMAL]
 	var roof_tris := PackedInt32Array()
 	var open_tris := PackedInt32Array()

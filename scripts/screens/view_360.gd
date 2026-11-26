@@ -334,8 +334,10 @@ func _rebuild_world(prebuilt: Node3D = null, pre_ranged := false) -> void:
 ## main thread (see build_location).
 static func make_world(data: LocationData, ground: GroundTruth,
 		abort: BuildAbort = null) -> Node3D:
+	MeshArrays.defer_buildings = true
 	var world := TerrainBuilder.build_world(data, ground, abort)
 	_merge(world, abort)
+	MeshArrays.defer_buildings = false
 	return world
 
 ## T7.1: merge building masses per material/cell (preset-independent).
@@ -363,9 +365,11 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 	_threads.append(thread)
 	thread.start(func() -> Array:
 		var g := ground if ground != null else GroundTruth.new(data, abort)
+		MeshArrays.defer_buildings = true
 		var w := TerrainBuilder.build_world(data, g, abort)
 		var m0 := Time.get_ticks_msec()
 		_merge(w, abort)
+		MeshArrays.defer_buildings = false
 		if abort != null:
 			abort.set_ms(BuildAbort.Step.MERGE, Time.get_ticks_msec() - m0)
 		# Packed here, detached and pristine, so the save costs the main

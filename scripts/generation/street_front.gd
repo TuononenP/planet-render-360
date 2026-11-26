@@ -177,6 +177,10 @@ static func _shopfront(kit: ReliefKit, sp: Dictionary, ground_y: float, g_top: f
 	var ax := Vector3(dir.x, 0.0, dir.y)
 	var az := Vector3(n.x, 0.0, n.y)
 	var sign_px := 30 if kind == "signage" else 16
+	if ReliefKit._native:
+		kit._sink(trim).shopfront(sp["a"], dir, n, ground_y, step, height, bays, door, sign_px,
+			float(FacadeComposer.CELL), FacadeComposer.BAYS, m)
+		return
 	for j in bays:
 		var left := (sp["a"] as Vector2) + dir * step * float(j) * m
 		for piece: Array in shopfront_pieces(step, height, j % FacadeComposer.BAYS == door, sign_px):

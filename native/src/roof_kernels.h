@@ -25,6 +25,15 @@ public:
 	// form() over `jobs` ([ring, top, rh, shape, party, gable_front, holes]
 	// each) on every core, results in job order.
 	static Array form_many(const Array &jobs);
+	// RoofGeometry.split_gables in native code: returns [] when no gable
+	// triangles exist, else [[rv, rn, ru, rt], [ov, on, ou, ot], [pv, pn, pu, pt]].
+	static Array split_gables(const PackedVector3Array &sv, const PackedVector3Array &sn,
+			const PackedVector2Array &su, const PackedFloat32Array &st,
+			const PackedVector2Array &ring, const PackedByteArray &party,
+			double gable_max_y, double gable_uv_scale);
+	// BuildingTrim.add mesh arrays in native code: [verts, normals, uvs, tangents, idx].
+	static Array trim_arrays(const PackedVector2Array &ring, double top, int trim,
+			const PackedByteArray &party, double m2u);
 };
 
 } // namespace godot

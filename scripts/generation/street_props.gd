@@ -127,12 +127,16 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 				var be := BeachDressing.build(h, data, ground, mask)
 				counts[11] = [w, u, sn, be]
 		slot_ms[slot] = Time.get_ticks_msec() - ts
-	var lanes: Array = [[1, 7, 10, 11], [0, 2, 3, 4, 5, 6, 8, 9]]
-	var lane_job := func(lane: int) -> void:
-		for slot: int in lanes[lane]:
-			run_slot.call(slot)
-	var group := WorkerThreadPool.add_group_task(lane_job, lanes.size(), -1, false, "StreetProps")
-	WorkerThreadPool.wait_for_group_task_completion(group)
+	if OS.get_thread_caller_id() == OS.get_main_thread_id():
+		for s in SLOTS:
+			run_slot.call(s)
+	else:
+		var lanes: Array = [[1, 7, 10, 11], [0, 2, 3, 4, 5, 6, 8, 9]]
+		var lane_job := func(lane: int) -> void:
+			for slot: int in lanes[lane]:
+				run_slot.call(slot)
+		var group := WorkerThreadPool.add_group_task(lane_job, lanes.size(), -1, false, "StreetProps")
+		WorkerThreadPool.wait_for_group_task_completion(group)
 	if abort != null and abort.requested:
 		for h in holders:
 			h.free()

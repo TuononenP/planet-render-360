@@ -28,11 +28,12 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 		return hit
 	_mutex.unlock()
 	var s := CarSpecs.spec(kind)
+	var glass_key := "Glass" if not far and bool(s["cabin"]) else "GlassDark"
 	var lm := LandmarkMesh.new()
 	_mutex.lock()
 	lm.use("Paint", paint(kind, far))
 	# Near to, the glass shows the cabin behind it; far off it is dark.
-	lm.use("Glass", material("Glass" if not far and bool(s["cabin"]) else "GlassDark"))
+	lm.use("Glass", material(glass_key))
 	for key in ["Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate", "Sign", "Chrome", "Amber", "Board",
 			"Drl", "TailGlow", "Cabin", "Grille", "RimDark", "RimGun"]:
 		lm.use(key, material(key))

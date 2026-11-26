@@ -269,6 +269,8 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 	AmsterdamHouseboats.build_all(root, data, ground, sorted, standing, lod2_done)
 	timings["lod2_meshes"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
+	if MeshArrays.defer_buildings:
+		MeshArrays._defer_thread = OS.get_thread_caller_id()
 	for k in sorted.size():
 		var b: Dictionary = sorted[k]
 		if abort != null and abort.requested:
@@ -341,6 +343,7 @@ static func _real_buildings(root: Node3D, data: LocationData, ground: GroundTrut
 				wall_w, TerrainBuilder._hash(pos.x, pos.z), data, shape,
 				rh_m * WorldScale.metres_to_units(), b)
 		placed += 1
+	MeshArrays._defer_thread = -1
 	timings["mapped"] = Time.get_ticks_msec() - t0
 	t0 = Time.get_ticks_msec()
 	last_stats["real"] = placed

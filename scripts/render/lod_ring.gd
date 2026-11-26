@@ -86,14 +86,15 @@ static func merge_buildings(root: Node3D) -> int:
 			continue
 		var mi := c as MeshInstance3D
 		if mi.mesh == null or mi.get_child_count() > 0:
+			if mi.mesh is ArrayMesh:
+				MeshArrays.upload(mi.mesh as ArrayMesh)
 			continue
-		var centre := mi.transform * mi.mesh.get_aabb().get_center()
+		var centre := mi.transform * MeshArrays.aabb_of(mi.mesh).get_center()
 		var cell := Vector2i(floori(centre.x / MERGE_CELL_M), floori(centre.z / MERGE_CELL_M))
 		var detail := bool(mi.get_meta("lod_detail", false))
-		for s in mi.mesh.get_surface_count():
-			var mat := mi.get_active_material(s)
-			var fmt := str(mi.mesh.surface_get_format(s)) if mi.mesh is ArrayMesh \
-				else mi.mesh.get_class()
+		for s in MeshArrays.surface_count(mi.mesh):
+			var mat := mi.material_override if mi.material_override != null else MeshArrays.surface_material(mi.mesh, s)
+			var fmt := MeshArrays.format_key(mi.mesh, s)
 			var key := "%d,%d|%s|%d|%d|%s" % [cell.x, cell.y, detail,
 				mat.get_instance_id() if mat != null else 0, mi.cast_shadow, fmt]
 			if not groups.has(key):

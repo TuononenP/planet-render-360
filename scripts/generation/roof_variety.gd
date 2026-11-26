@@ -105,8 +105,11 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 	for s in MeshArrays.surface_count(mesh):
 		src.append(MeshArrays.surface(mesh, s))
 	var out := mesh if held else ArrayMesh.new()
+	var defer := held and MeshArrays.is_deferred()
 	if held:
 		out.set_meta(MeshArrays.META, [])
+		if defer:
+			out.set_meta(MeshArrays.MATS_META, [])
 	var kept := 0
 	for s in src.size():
 		var mat := _surface_material(mesh, s)
@@ -121,11 +124,14 @@ static func _recoloured(mesh: ArrayMesh, over: Material, c: Color, wall_c: Color
 			# A gable end carries its wall's paint on a shared white render.
 			var own: Color = mesh.get_meta(WALL_TINT, Color.WHITE)
 			arrays[Mesh.ARRAY_COLOR] = WallVariety.colours(arrays[Mesh.ARRAY_VERTEX], wall_c * own, foot)
-		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		if mat != null:
-			out.surface_set_material(kept, mat)
-		kept += 1
-		MeshArrays.keep_surface(out, arrays)
+		if defer:
+			MeshArrays.deferred_surface(out, arrays, mat)
+		else:
+			out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			if mat != null:
+				out.surface_set_material(kept, mat)
+			kept += 1
+			MeshArrays.keep_surface(out, arrays)
 	return out
 
 ## Per-vertex colours of one roof surface: `c`, on a pitched surface darkened
@@ -153,6 +159,6 @@ static func weathered(verts: PackedVector3Array, normals: PackedVector3Array, c:
 			c.b * k * (1.0 - 0.11 * north))
 	return cols
 
-## Surface `s`'s material; none on a held mesh (MeshArrays.mesh sets none).
+## Surface `s`'s material; reads MATS_META on a deferred mesh.
 static func _surface_material(mesh: ArrayMesh, s: int) -> Material:
-	return mesh.surface_get_material(s) if s < mesh.get_surface_count() else null
+	return MeshArrays.surface_material(mesh, s)

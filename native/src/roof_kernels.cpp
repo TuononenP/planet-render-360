@@ -1171,11 +1171,271 @@ Array RoofKernels::form_many(const Array &jobs) {
 	return out;
 }
 
+Array RoofKernels::split_gables(const PackedVector3Array &sv, const PackedVector3Array &sn,
+		const PackedVector2Array &su, const PackedFloat32Array &st,
+		const PackedVector2Array &ring, const PackedByteArray &party,
+		double gable_max_y, double gable_uv_scale) {
+	const int64_t n_tris = sn.size() / 3;
+	if (n_tris <= 0) {
+		return Array();
+	}
+	// Precompute outward normals of party edges once.
+	std::vector<Vector2> party_norms;
+	const int64_t rn = ring.size();
+	if (rn >= 3 && party.size() == rn) {
+		const Vector2 *rvec = ring.ptr();
+		const bool ccw = signed_area(ring) > 0.0;
+		const uint8_t *pp = party.ptr();
+		for (int64_t i = 0; i < rn; ++i) {
+			if (pp[i] != 1) continue;
+			const Vector2 e = rvec[(i + 1) % rn] - rvec[i];
+			party_norms.push_back(ccw ? Vector2(e.y, -e.x).normalized() : Vector2(-e.y, e.x).normalized());
+		}
+	}
+	const Vector3 *np = sn.ptr();
+	std::vector<int64_t> roof_tris, open_tris, party_tris;
+	roof_tris.reserve(n_tris);
+	for (int64_t t = 0; t < n_tris; ++t) {
+		const Vector3 &n = np[t * 3];
+		if (std::abs((double)n.y) >= gable_max_y) {
+			roof_tris.push_back(t);
+		} else {
+			bool on_p = false;
+			if (!party_norms.empty()) {
+				const Vector2 n2 = Vector2(n.x, n.z).normalized();
+				for (const Vector2 &pn : party_norms) {
+					if ((double)pn.dot(n2) > 0.7) {
+						on_p = true;
+						break;
+					}
+				}
+			}
+			if (on_p) party_tris.push_back(t);
+			else open_tris.push_back(t);
+		}
+	}
+	if (open_tris.empty() && party_tris.empty()) {
+		return Array();
+	}
+	const Vector3 *vp = sv.ptr();
+	const Vector2 *up = su.ptr();
+	const float *tp = st.ptr();
+	const bool has_t = (st.size() == sv.size() * 4);
+	auto pack_tris = [&](const std::vector<int64_t> &tris, float uv_s) -> Array {
+		if (tris.empty()) return Array();
+		const int64_t vc = (int64_t)tris.size() * 3;
+		PackedVector3Array ov, on;
+		PackedVector2Array ou;
+		PackedFloat32Array ot;
+		ov.resize(vc); on.resize(vc); ou.resize(vc);
+		if (has_t) ot.resize(vc * 4);
+		Vector3 *ovw = ov.ptrw(), *onw = on.ptrw();
+		Vector2 *ouw = ou.ptrw();
+		float *otw = has_t ? ot.ptrw() : nullptr;
+		int64_t dst = 0;
+		for (int64_t tri : tris) {
+			const int64_t base = tri * 3;
+			for (int k = 0; k < 3; ++k, ++dst) {
+				const int64_t si = base + k;
+				ovw[dst] = vp[si];
+				onw[dst] = np[si];
+				ouw[dst] = up[si] * uv_s;
+				if (has_t) {
+					otw[dst * 4 + 0] = tp[si * 4 + 0];
+					otw[dst * 4 + 1] = tp[si * 4 + 1];
+					otw[dst * 4 + 2] = tp[si * 4 + 2];
+					otw[dst * 4 + 3] = tp[si * 4 + 3];
+				}
+			}
+		}
+		Array a;
+		a.resize(4);
+		a[0] = ov; a[1] = on; a[2] = ou; a[3] = ot;
+		return a;
+	};
+	Array out;
+	out.resize(3);
+	out[0] = pack_tris(roof_tris, 1.0f);
+	out[1] = pack_tris(open_tris, (float)gable_uv_scale);
+	out[2] = pack_tris(party_tris, (float)gable_uv_scale);
+	return out;
+}
+
+Array RoofKernels::trim_arrays(const PackedVector2Array &ring, double top, int trim,
+		const PackedByteArray &party, double m2u) {
+	const int64_t n = ring.size();
+	if (trim == 0 || n < 3) {
+		return Array();
+	}
+	const Vector2 *rvec = ring.ptr();
+	const bool ccw = signed_area(ring) > 0.0;
+	const bool has_p = (party.size() == n);
+	const uint8_t *pp = has_p ? party.ptr() : nullptr;
+	std::vector<Vector2> onorms(n);
+	for (int64_t i = 0; i < n; ++i) {
+		const Vector2 e = rvec[(i + 1) % n] - rvec[i];
+		onorms[i] = ccw ? Vector2(e.y, -e.x).normalized() : Vector2(-e.y, e.x).normalized();
+	}
+	auto offset_ring = [&](double d, bool use_party) -> std::vector<Vector2> {
+		std::vector<Vector2> out(n);
+		for (int64_t i = 0; i < n; ++i) {
+			const int64_t prev = (i - 1 + n) % n;
+			const Vector2 &n0 = onorms[prev];
+			const Vector2 &n1 = onorms[i];
+			if (use_party && has_p && (pp[prev] == 1 || pp[i] == 1)) {
+				Vector2 keep(0.0f, 0.0f);
+				if (pp[prev] == 0) keep = n0;
+				else if (pp[i] == 0) keep = n1;
+				out[i] = rvec[i] + keep * (float)d;
+				continue;
+			}
+			const double denom = std::max(1.0 + (double)n0.dot(n1), 0.0001);
+			Vector2 off = (n0 + n1) * (float)(d / denom);
+			const double max_off = std::abs(d) * 3.0;
+			if ((double)off.length() > max_off) {
+				off = off.normalized() * (float)max_off;
+			}
+			out[i] = rvec[i] + off;
+		}
+		return out;
+	};
+
+	std::vector<Vector3> verts, normals;
+	std::vector<Vector2> uvs;
+	std::vector<int32_t> idx;
+	verts.reserve(n * 16);
+	normals.reserve(n * 16);
+	uvs.reserve(n * 16);
+	idx.reserve(n * 24);
+	auto push_quad = [&](const Vector3 &a, const Vector3 &b, const Vector3 &c, const Vector3 &d, const Vector3 &nrm) {
+		const int32_t k = (int32_t)verts.size();
+		verts.push_back(a); verts.push_back(b); verts.push_back(c); verts.push_back(d);
+		for (int q = 0; q < 4; ++q) normals.push_back(nrm);
+		const float e = (b - a).length();
+		const float h = (d - a).length();
+		const float u0 = (a.x + a.z) * 0.5f;
+		uvs.emplace_back(u0, 0.0f);
+		uvs.emplace_back((a.x + a.z + e) * 0.5f, 0.0f);
+		uvs.emplace_back((a.x + a.z + e) * 0.5f, h * 0.5f);
+		uvs.emplace_back(u0, h * 0.5f);
+		if ((c - a).cross(b - a).dot(nrm) >= 0.0f) {
+			idx.push_back(k); idx.push_back(k + 1); idx.push_back(k + 2);
+			idx.push_back(k); idx.push_back(k + 2); idx.push_back(k + 3);
+		} else {
+			idx.push_back(k); idx.push_back(k + 2); idx.push_back(k + 1);
+			idx.push_back(k); idx.push_back(k + 3); idx.push_back(k + 2);
+		}
+	};
+
+	const float topf = (float)top;
+	if (trim == 1) { // CORNICE
+		const auto outer = offset_ring(0.28 * m2u, false);
+		const float y0 = (float)(top - 0.34 * m2u);
+		const float y1 = (float)(y0 + 0.22 * m2u);
+		for (int64_t i = 0; i < n; ++i) {
+			if (has_p && pp[i] == 1) continue;
+			const int64_t j = (i + 1) % n;
+			const Vector2 &a = rvec[i], &b = rvec[j], &oa = outer[i], &ob = outer[j];
+			const Vector2 &out = onorms[i];
+			push_quad(Vector3(a.x, y0, a.y), Vector3(b.x, y0, b.y),
+					Vector3(ob.x, y0, ob.y), Vector3(oa.x, y0, oa.y), Vector3(0.0f, -1.0f, 0.0f));
+			push_quad(Vector3(oa.x, y0, oa.y), Vector3(ob.x, y0, ob.y),
+					Vector3(ob.x, y1, ob.y), Vector3(oa.x, y1, oa.y), Vector3(out.x, 0.0f, out.y));
+			push_quad(Vector3(oa.x, y1, oa.y), Vector3(ob.x, y1, ob.y),
+					Vector3(b.x, topf, b.y), Vector3(a.x, topf, a.y),
+					Vector3(out.x * 0.6f, 0.8f, out.y * 0.6f).normalized());
+		}
+	} else { // PARAPET
+		const auto inner = offset_ring(-0.28 * m2u, false);
+		const auto cin = offset_ring(-(0.28 + 0.06) * m2u, false);
+		const auto cout = offset_ring(0.06 * m2u, true);
+		const float y0 = (float)(top - 0.65 * m2u);
+		const float y1 = (float)(top - 0.1 * m2u);
+		for (int64_t i = 0; i < n; ++i) {
+			const int64_t j = (i + 1) % n;
+			const Vector3 o3(onorms[i].x, 0.0f, onorms[i].y);
+			push_quad(Vector3(inner[i].x, y0, inner[i].y), Vector3(inner[j].x, y0, inner[j].y),
+					Vector3(inner[j].x, y1, inner[j].y), Vector3(inner[i].x, y1, inner[i].y), -o3);
+			if (has_p && pp[i] == 1) {
+				push_quad(Vector3(cin[i].x, topf, cin[i].y), Vector3(cin[j].x, topf, cin[j].y),
+						Vector3(rvec[j].x, topf, rvec[j].y), Vector3(rvec[i].x, topf, rvec[i].y),
+						Vector3(0.0f, 1.0f, 0.0f));
+				continue;
+			}
+			const Vector3 e3 = Vector3(rvec[j].x - rvec[i].x, 0.0f, rvec[j].y - rvec[i].y).normalized();
+			if (has_p && pp[(i - 1 + n) % n] == 1) {
+				push_quad(Vector3(rvec[i].x, y1, rvec[i].y), Vector3(cout[i].x, y1, cout[i].y),
+						Vector3(cout[i].x, topf, cout[i].y), Vector3(rvec[i].x, topf, rvec[i].y), -e3);
+			}
+			if (has_p && pp[j] == 1) {
+				push_quad(Vector3(rvec[j].x, y1, rvec[j].y), Vector3(cout[j].x, y1, cout[j].y),
+						Vector3(cout[j].x, topf, cout[j].y), Vector3(rvec[j].x, topf, rvec[j].y), e3);
+			}
+			push_quad(Vector3(rvec[i].x, y1, rvec[i].y), Vector3(rvec[j].x, y1, rvec[j].y),
+					Vector3(cout[j].x, y1, cout[j].y), Vector3(cout[i].x, y1, cout[i].y),
+					Vector3(0.0f, -1.0f, 0.0f));
+			push_quad(Vector3(cout[i].x, y1, cout[i].y), Vector3(cout[j].x, y1, cout[j].y),
+					Vector3(cout[j].x, topf, cout[j].y), Vector3(cout[i].x, topf, cout[i].y), o3);
+			push_quad(Vector3(cin[i].x, topf, cin[i].y), Vector3(cin[j].x, topf, cin[j].y),
+					Vector3(cout[j].x, topf, cout[j].y), Vector3(cout[i].x, topf, cout[i].y),
+					Vector3(0.0f, 1.0f, 0.0f));
+		}
+	}
+	if (idx.empty()) {
+		return Array();
+	}
+	// Compute per-vertex tangents matching MassBatch.tangents(verts, normals, uvs, idx).
+	const size_t vn = verts.size();
+	std::vector<Vector3> tan_acc(vn, Vector3(0.0f, 0.0f, 0.0f));
+	std::vector<Vector3> bitan_acc(vn, Vector3(0.0f, 0.0f, 0.0f));
+	for (size_t t = 0; t + 2 < idx.size(); t += 3) {
+		const int32_t i0 = idx[t], i1 = idx[t + 1], i2 = idx[t + 2];
+		const Vector3 e1 = verts[i1] - verts[i0];
+		const Vector3 e2 = verts[i2] - verts[i0];
+		const Vector2 d1 = uvs[i1] - uvs[i0];
+		const Vector2 d2 = uvs[i2] - uvs[i0];
+		const float det = d1.x * d2.y - d2.x * d1.y;
+		if (std::abs(det) < 1e-8f) continue;
+		const float inv = 1.0f / det;
+		const Vector3 tx = (e1 * d2.y - e2 * d1.y) * inv;
+		const Vector3 bx = (e2 * d1.x - e1 * d2.x) * inv;
+		tan_acc[i0] += tx; tan_acc[i1] += tx; tan_acc[i2] += tx;
+		bitan_acc[i0] += bx; bitan_acc[i1] += bx; bitan_acc[i2] += bx;
+	}
+	PackedFloat32Array tans;
+	tans.resize((int64_t)vn * 4);
+	float *tw = tans.ptrw();
+	for (size_t i = 0; i < vn; ++i) {
+		const Vector3 &nrm = normals[i];
+		Vector3 t = tan_acc[i] - nrm * nrm.dot(tan_acc[i]);
+		if (t.length_squared() < 1e-10f) {
+			t = nrm.cross(std::abs(nrm.y) < 0.9f ? Vector3(0.0f, 1.0f, 0.0f) : Vector3(1.0f, 0.0f, 0.0f));
+		}
+		t.normalize();
+		const float w = (nrm.cross(t).dot(bitan_acc[i]) < 0.0f) ? -1.0f : 1.0f;
+		tw[i * 4 + 0] = t.x; tw[i * 4 + 1] = t.y; tw[i * 4 + 2] = t.z; tw[i * 4 + 3] = w;
+	}
+	Array out;
+	out.resize(5);
+	out[0] = packed<PackedVector3Array>(verts);
+	out[1] = packed<PackedVector3Array>(normals);
+	out[2] = packed<PackedVector2Array>(uvs);
+	out[3] = tans;
+	out[4] = packed<PackedInt32Array>(idx);
+	return out;
+}
+
 void RoofKernels::_bind_methods() {
 	ClassDB::bind_static_method("RoofKernels",
 			D_METHOD("form", "ring", "top", "rh", "shape", "party", "gable_front", "holes"),
 			&RoofKernels::form);
 	ClassDB::bind_static_method("RoofKernels", D_METHOD("form_many", "jobs"), &RoofKernels::form_many);
+	ClassDB::bind_static_method("RoofKernels",
+			D_METHOD("split_gables", "sv", "sn", "su", "st", "ring", "party", "gable_max_y", "gable_uv_scale"),
+			&RoofKernels::split_gables);
+	ClassDB::bind_static_method("RoofKernels",
+			D_METHOD("trim_arrays", "ring", "top", "trim", "party", "m2u"),
+			&RoofKernels::trim_arrays);
 }
 
 } // namespace godot

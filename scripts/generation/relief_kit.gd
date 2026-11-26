@@ -136,9 +136,12 @@ func flush(root: Node3D, name: String) -> void:
 		arrays[Mesh.ARRAY_TEX_UV] = s[2]
 		arrays[Mesh.ARRAY_TANGENT] = s[4]
 		arrays[Mesh.ARRAY_INDEX] = s[3]
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		mesh.surface_set_material(mesh.get_surface_count() - 1, mat as Material)
-		MeshArrays.keep_surface(mesh, arrays)
+		if MeshArrays.is_deferred():
+			MeshArrays.deferred_surface(mesh, arrays, mat as Material)
+		else:
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			mesh.surface_set_material(mesh.get_surface_count() - 1, mat as Material)
+			MeshArrays.keep_surface(mesh, arrays)
 	var mi := MeshInstance3D.new()
 	mi.name = name
 	mi.mesh = mesh
@@ -184,9 +187,12 @@ static func flush_merged(root: Node3D, name: String, kits: Array) -> void:
 		arrays[Mesh.ARRAY_TEX_UV] = s[2]
 		arrays[Mesh.ARRAY_TANGENT] = s[4]
 		arrays[Mesh.ARRAY_INDEX] = s[3]
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		mesh.surface_set_material(mesh.get_surface_count() - 1, mat as Material)
-		MeshArrays.keep_surface(mesh, arrays)
+		if MeshArrays.is_deferred():
+			MeshArrays.deferred_surface(mesh, arrays, mat as Material)
+		else:
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			mesh.surface_set_material(mesh.get_surface_count() - 1, mat as Material)
+			MeshArrays.keep_surface(mesh, arrays)
 	var mi := MeshInstance3D.new()
 	mi.name = name
 	mi.mesh = mesh

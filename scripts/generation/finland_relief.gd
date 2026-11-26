@@ -14,6 +14,9 @@ static func plinth(kit: ReliefKit, sp: Dictionary, rows: Array, seed_v: float, c
 	var h := minf(float(rows[0]["y1"]) - float(rows[0]["y0"]), 1.2 * m)
 	var stone := _base_stone("#958c86" if ArchitectureStyle._h(seed_v, 93) < 0.5 else "#928f89", calm)
 	var len := float(sp["len_m"]) * m
+	if ReliefKit._native:
+		kit._sink(stone).granite_plinth(sp["a"], dir, n, len, float(rows[0]["y0"]), h, seed_v, m)
+		return
 	var count := maxi(1, ceili(len / (0.95 * m)))
 	for row in 3:
 		var rh := h / 3.0
