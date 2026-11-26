@@ -905,7 +905,10 @@ func _tick_near_ground() -> void:
 		_mover = null
 		_tree_lod = null
 		_near_world = world
-		_near_step = 0 if world != 0 else 4
+		# Delay 2 frames after swap so near-ground/tree-LOD attaches don't stack on swap+0/1.
+		_near_step = -2 if world != 0 else 4
+	elif _near_step < 0:
+		_near_step += 1
 	elif _near_step < 4:
 		# One attach a frame: together they walked a new world in its first
 		# frame, the hitch right after a streamed swap.

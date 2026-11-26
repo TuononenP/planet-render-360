@@ -1,8 +1,10 @@
 #pragma once
 
+#include <godot_cpp/classes/fast_noise_lite.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
@@ -31,6 +33,15 @@ public:
 	static Dictionary probes(const PackedVector2Array &cells, const PackedFloat64Array &dists,
 			const PackedFloat64Array &steps, const Array &drapes, double lat, double lon, double dark,
 			double min_green, double cell_m, int64_t budget);
+
+	// Filters probes by far_water_mask, samples blended terrain height, picks
+	// species/stand size/tint, and packs MultiMesh.buffer (16 floats/instance)
+	// per (species_idx, band_idx). Returns {"total": int, "groups": [[sp, band, PackedFloat32Array], ...]}.
+	static Dictionary build_instances(const PackedFloat64Array &xs, const PackedFloat64Array &zs,
+			const PackedFloat32Array &rgb, const PackedFloat64Array &widens,
+			const Dictionary &far_params, const Array &dem_rings, bool far_ok,
+			const PackedFloat64Array &bands, const PackedFloat64Array &mix_weights,
+			bool winter, const Ref<FastNoiseLite> &stand);
 };
 
 } // namespace godot

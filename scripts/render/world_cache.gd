@@ -392,13 +392,26 @@ static func save_async(view: Node, threads: Array, data: LocationData, built: Ar
 	# waits for room, and is dropped if none comes (the world is built
 	# again next visit instead of ending the app).
 	var waited := 0.0
-	while not MemoryGuard.save_allowed() and not (asked and not MemoryGuard.save_dropped()):
-		if MemoryGuard.save_dropped() or waited >= SAVE_WAIT_S or not is_instance_valid(view) \
-				or not view.is_inside_tree():
-			print("WORLD CACHE save of %s skipped: memory short" % name)
+	while true:
+		var mem_ok := MemoryGuard.save_allowed() or (asked and not MemoryGuard.save_dropped())
+		var flight_busy := not background and not asked and not hurry \
+			and is_instance_valid(view) and view is View360 \
+			and (((view as View360)._streamer != null \
+					and (view as View360)._streamer.state != WorldStreamer.State.IDLE) \
+				or ((view as View360)._drone != null and (view as View360)._drone.on \
+					and (view as View360)._drone._vel.length() > 15.0))
+		if mem_ok and not flight_busy:
+			break
+		if (not mem_ok and (MemoryGuard.save_dropped() or waited >= SAVE_WAIT_S)) \
+				or not is_instance_valid(view) or not view.is_inside_tree():
+			if not mem_ok:
+				print("WORLD CACHE save of %s skipped: memory short" % name)
 			return
+		if flight_busy and view is View360 and (view as View360)._data != data:
+			return  # flew on to a new stretch while deferred; drop stale save
 		await view.get_tree().create_timer(1.0).timeout
-		waited += 1.0
+		if not mem_ok:
+			waited += 1.0
 	if waited > 0.0:
 		# Another save of this world may have started meanwhile.
 		if _save_in_progress(p["scene"]):

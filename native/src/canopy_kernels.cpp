@@ -1,4 +1,5 @@
 #include "canopy_kernels.h"
+#include "far_sampling.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/math.hpp>
@@ -119,11 +120,128 @@ Dictionary CanopyKernels::probes(const PackedVector2Array &cells, const PackedFl
 	return out;
 }
 
+Dictionary CanopyKernels::build_instances(const PackedFloat64Array &xs, const PackedFloat64Array &zs,
+		const PackedFloat32Array &rgb, const PackedFloat64Array &widens,
+		const Dictionary &far_params, const Array &dem_rings, bool far_ok,
+		const PackedFloat64Array &bands, const PackedFloat64Array &mix_weights,
+		bool winter, const Ref<FastNoiseLite> &stand) {
+	Dictionary out;
+	Array groups_out;
+	const int64_t n = xs.size();
+	const int64_t n_sp = mix_weights.size();
+	const int64_t n_bands = bands.size() - 1;
+	if (n == 0 || zs.size() != n || widens.size() != n || rgb.size() < n * 3 || n_sp <= 0 || n_bands <= 0) {
+		out["total"] = (int64_t)0;
+		out["groups"] = groups_out;
+		return out;
+	}
+	far::Far f = far::read_far(far_params, dem_rings);
+	double w_total = 0.0;
+	for (int64_t i = 0; i < n_sp; ++i) w_total += mix_weights[i];
+	if (w_total <= 0.0) w_total = 1.0;
+	std::vector<double> cdf(n_sp);
+	double acc = 0.0;
+	for (int64_t i = 0; i < n_sp; ++i) {
+		acc += mix_weights[i] / w_total;
+		cdf[i] = acc;
+	}
+	std::vector<std::vector<float>> buckets((size_t)(n_sp * n_bands));
+	const double *xp = xs.ptr();
+	const double *zp = zs.ptr();
+	const float *rp = rgb.ptr();
+	const double *wp = widens.ptr();
+	const double *bp = bands.ptr();
+	const bool has_stand = stand.is_valid();
+	int64_t total = 0;
+	for (int64_t k = 0; k < n; ++k) {
+		const double x = xp[k];
+		const double z = zp[k];
+		if (f.mask.n > 0) {
+			const Vector2 muv = far::merc_uv(f, x, z);
+			if (f.mask.sample_uv(muv.x, muv.y) > far::MASK_LAND) continue;
+		}
+		const double y = far_ok ? far::blend_height(f, x, z) : far::height_at_world(f, x, z);
+		const double u_sp = hash(x, z, 5.0) * 0.999;
+		int64_t sp = n_sp - 1;
+		for (int64_t i = 0; i < n_sp; ++i) {
+			if (u_sp < cdf[i]) {
+				sp = i;
+				break;
+			}
+		}
+		const double n2d = has_stand ? (double)stand->get_noise_2d((float)x, (float)z) : 0.0;
+		const double st_t = Math::clamp(0.5 + n2d * 0.9, 0.0, 1.0);
+		const double sz = Math::lerp(0.75, 1.25, st_t) * Math::lerp(0.8, 1.2, hash(x, z, 4.0));
+		const double sw = sz * wp[k];
+		const double cr = (double)rp[k * 3];
+		const double cg = (double)rp[k * 3 + 1];
+		const double cb = (double)rp[k * 3 + 2];
+		const double lum = 0.299 * cr + 0.587 * cg + 0.114 * cb;
+		const double v = Math::clamp(lum / 0.3, 0.5, 1.25) * (0.88 + 0.24 * hash(x, z, 7.0));
+		float col_r, col_g, col_b;
+		if (winter) {
+			col_r = col_g = col_b = (float)v;
+		} else {
+			const double warm = Math::clamp((cr - cb) * 2.0, -0.3, 0.3);
+			col_r = (float)(v * (1.0 + warm * 0.25));
+			col_g = (float)v;
+			col_b = (float)(v * (1.0 - warm * 0.3));
+		}
+		const double r_len = std::sqrt(x * x + z * z);
+		int64_t band = 0;
+		while (band < n_bands - 1 && r_len >= bp[band + 1]) ++band;
+		const double ang = hash(x, z, 6.0) * Math::TAU;
+		const double cs = std::cos(ang);
+		const double sn = std::sin(ang);
+		std::vector<float> &dst = buckets[(size_t)(sp * n_bands + band)];
+		const size_t o = dst.size();
+		dst.resize(o + 16);
+		dst[o + 0] = (float)(cs * sw);
+		dst[o + 1] = 0.0f;
+		dst[o + 2] = (float)(sn * sw);
+		dst[o + 3] = (float)x;
+		dst[o + 4] = 0.0f;
+		dst[o + 5] = (float)sz;
+		dst[o + 6] = 0.0f;
+		dst[o + 7] = (float)y;
+		dst[o + 8] = (float)(-sn * sw);
+		dst[o + 9] = 0.0f;
+		dst[o + 10] = (float)(cs * sw);
+		dst[o + 11] = (float)z;
+		dst[o + 12] = col_r;
+		dst[o + 13] = col_g;
+		dst[o + 14] = col_b;
+		dst[o + 15] = 1.0f;
+		++total;
+	}
+	for (int64_t sp = 0; sp < n_sp; ++sp) {
+		for (int64_t band = 0; band < n_bands; ++band) {
+			const std::vector<float> &src = buckets[(size_t)(sp * n_bands + band)];
+			if (src.empty()) continue;
+			PackedFloat32Array pbuf;
+			pbuf.resize((int64_t)src.size());
+			std::copy(src.begin(), src.end(), pbuf.ptrw());
+			Array entry;
+			entry.append(sp);
+			entry.append(band);
+			entry.append(pbuf);
+			groups_out.append(entry);
+		}
+	}
+	out["total"] = total;
+	out["groups"] = groups_out;
+	return out;
+}
+
 void CanopyKernels::_bind_methods() {
 	ClassDB::bind_static_method("CanopyKernels",
 			D_METHOD("probes", "cells", "dists", "steps", "drapes", "lat", "lon", "dark", "min_green", "cell_m",
 					"budget"),
 			&CanopyKernels::probes);
+	ClassDB::bind_static_method("CanopyKernels",
+			D_METHOD("build_instances", "xs", "zs", "rgb", "widens", "far_params", "dem_rings", "far_ok",
+					"bands", "mix_weights", "winter", "stand"),
+			&CanopyKernels::build_instances);
 }
 
 } // namespace godot

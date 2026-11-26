@@ -49,6 +49,12 @@ const IMPOSTOR_LOD := 2
 
 static func build(root: Node3D, data: LocationData, ground: GroundTruth, smap: SettlementMap) -> int:
 	var t0 := Time.get_ticks_msec()
+	var preset := clampi(data.quality_preset, 0, MAX_CROWNS.size() - 1)
+	if _native and ClassDB.class_has_method("CanopyKernels", "build_instances") \
+			and not HeritageZones.near(data.latitude, data.longitude, REACH_M[preset]):
+		var n := _build_native(root, data, ground, smap, preset, t0)
+		if n >= 0:
+			return n
 	var crowns := plan(data, ground, smap)
 	if crowns.is_empty():
 		return 0
@@ -67,6 +73,65 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth, smap: S
 		meshes += 1
 	print("FAR-CANOPY %d crowns in %d meshes in %d ms" % [crowns.size(), meshes, Time.get_ticks_msec() - t0])
 	return crowns.size()
+
+static func _build_native(root: Node3D, data: LocationData, ground: GroundTruth, smap: SettlementMap,
+		preset: int, t0: int) -> int:
+	var budget := MAX_CROWNS[preset]
+	if budget == 0 or smap == null or smap.is_empty() or data.far_drapes.is_empty():
+		return 0
+	var bytes := SettlementMap.drape_bytes(data)
+	var cells := _vegetation_cells(data, bytes, smap, REACH_M[preset])
+	if cells.is_empty():
+		return 0
+	var dark := maxf(scene_luminance(data, bytes, smap, REACH_M[preset]) * DARK_SHARE,
+		_quantile(data, bytes, cells, VEG_SHARE))
+	var hits := _probes_native(data, bytes, cells, dark, budget)
+	var xs: PackedFloat64Array = hits["x"]
+	if xs.is_empty():
+		return 0
+	var far_ok := data.far_grid_size >= 2 and data.far_heights.size() == data.far_grid_size * data.far_grid_size
+	var surf := FarTerrainBuilder._surface(data) if far_ok else {}
+	var biome := TreeSpecies.biome_for_data(data)
+	var mix := TreeSpecies.mix(biome, "park")
+	var weights := PackedFloat64Array()
+	for r in mix:
+		weights.append(float((r as Array)[1]))
+	var bands := PackedFloat64Array()
+	for b in FarCityBuilder.BANDS:
+		bands.append(float(b))
+	var stand := FastNoiseLite.new()
+	stand.frequency = 1.0 / 180.0
+	stand.seed = 7
+	var built: Dictionary = ClassDB.class_call_static("CanopyKernels", "build_instances",
+		xs, hits["z"], hits["rgb"], hits["widen"],
+		FarSampler.native_params(data, ground, surf), data.dem_rings, far_ok,
+		bands, weights, data.season == LocationData.Season.WINTER, stand)
+	var total := int(built.get("total", 0))
+	if total == 0:
+		return 0
+	var groups: Array = built.get("groups", [])
+	for g: Array in groups:
+		var sp := str((mix[int(g[0])] as Array)[0])
+		var band := int(g[1])
+		var buf: PackedFloat32Array = g[2]
+		root.add_child(_instances_from_buffer(buf, FarCityBuilder.BANDS[band], sp, data.season))
+	print("FAR-CANOPY %d crowns in %d meshes in %d ms" % [total, groups.size(), Time.get_ticks_msec() - t0])
+	return total
+
+static func _instances_from_buffer(buf: PackedFloat32Array, r0: float, sp: String, season: int) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = TreeMeshLibrary.mesh(sp, IMPOSTOR_LOD, season, 0.0)
+	mm.instance_count = buf.size() / 16
+	mm.buffer = buf
+	var mi := MultiMeshInstance3D.new()
+	mi.name = "FarCanopy_" + sp
+	mi.multimesh = mm
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.set_meta("lod_layer", "FarCity")
+	mi.set_meta("far_r0", r0)
+	return mi
 
 ## The trees to plant: [base on the ground, scale (wide, tall, wide),
 ## colour, species] each, nearest first, at most the preset's budget.

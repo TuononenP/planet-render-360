@@ -42,6 +42,10 @@ var _holder := Node.new()
 ## detail layer, made after its core): [world, node, dress], added like
 ## staged pieces, a slice a frame, each dressed by its own callable.
 var _late: Array = []
+## Deferred detail-layer waves revealed 1 wave/frame after swap_in so Metal /
+## Forward+ spreads pipeline compilation, uploads and shadow passes across
+## 3-4 frames instead of one swap+3 hitch: [[world, Array[Node3D]], ...].
+var _revealing: Array = []
 
 ## Whether `world` is fully staged: in the tree with every subtree back.
 func ready_for(world: Node3D) -> bool:
@@ -76,6 +80,14 @@ func stage(root: Node3D, world: Node3D) -> void:
 func pump(budget_us: int = BUDGET_US) -> bool:
 	var t := Time.get_ticks_usec()
 	var moved := false
+	if not _revealing.is_empty():
+		var wave: Array = _revealing.pop_front()
+		var w: Variant = wave[0]
+		if is_instance_valid(w) and not (w in _retiring):
+			for node: Variant in (wave[1] as Array):
+				if is_instance_valid(node):
+					(node as Node3D).visible = true
+		moved = true
 	while not _pending.is_empty() and (not moved or Time.get_ticks_usec() - t < budget_us):
 		_add_back(_pending.pop_front())
 		moved = true
@@ -155,7 +167,23 @@ func staged_ms(world: Node3D) -> int:
 	return Time.get_ticks_msec() - _staged_at if ready_for(world) and _staged_at > 0 else 0
 
 func busy() -> bool:
-	return not _pending.is_empty() or not _retiring.is_empty() or not _late.is_empty()
+	return not _pending.is_empty() or not _retiring.is_empty() or not _late.is_empty() \
+		or not _revealing.is_empty()
+
+## Assigns a top-level world child to a swap-reveal wave (0 = immediate on
+## swap frame, 1 = Buildings/Landmarks, 2 = Vegetation/Canopy, 3 = Props/vehicles).
+static func _reveal_wave(node: Node) -> int:
+	if not (node is Node3D) or not (node as Node3D).visible:
+		return 0
+	var n := str(node.name)
+	if n == "Buildings" or n.begins_with("Landmark"):
+		return 1
+	if n == "Vegetation" or n.begins_with("FarCanopy") or n.begins_with("VegTrees") \
+			or n.begins_with("GroundCover") or n.begins_with("GrassCarpet"):
+		return 2
+	if n in ["Props", "Trams", "Trains", "Boats", "Cars", "Vessels", "Aircraft"]:
+		return 3
+	return 0
 
 ## The swap: the staged world (finished now if it was not yet) becomes
 ## the view's world and shows; the old one hides and leaves over the
@@ -172,8 +200,20 @@ func swap_in(v: View360, keep_old := false) -> bool:
 			old.visible = false
 		else:
 			retire(old)
-	v._generated = staged
-	staged.visible = true
+	var next := staged
+	var adopted := _staged_at == 1  # parked world: already rendered & warm
+	if not adopted:
+		var waves: Array = [[], [], []]
+		for c in next.get_children():
+			var w := _reveal_wave(c)
+			if w > 0:
+				(c as Node3D).visible = false
+				(waves[w - 1] as Array).append(c)
+		for bucket: Array in waves:
+			if not bucket.is_empty():
+				_revealing.append([next, bucket])
+	v._generated = next
+	next.visible = true
 	staged = null
 	return true
 
@@ -181,8 +221,20 @@ func swap_in(v: View360, keep_old := false) -> bool:
 func retire(old: Node3D) -> void:
 	if old == null or not is_instance_valid(old) or old in _retiring:
 		return
+	_drop_revealing(old)
 	old.visible = false
 	_retiring.append(old)
+
+func _drop_revealing(world: Node3D) -> void:
+	var kept: Array = []
+	for wave: Array in _revealing:
+		if is_same(wave[0], world):
+			for node: Variant in (wave[1] as Array):
+				if is_instance_valid(node):
+					(node as Node3D).visible = true
+		else:
+			kept.append(wave)
+	_revealing = kept
 
 ## Drops a staged world that will not swap in (turned back, cancelled):
 ## it leaves like an old world, a slice at a time.
@@ -247,6 +299,7 @@ func _free_late() -> void:
 	_late.clear()
 
 func clear() -> void:
+	_revealing.clear()
 	_free_pending()
 	_free_late()
 	if staged != null and is_instance_valid(staged) and not staged.is_inside_tree():
