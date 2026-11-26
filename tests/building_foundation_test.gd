@@ -43,6 +43,17 @@ func _quay_ground(slope: float) -> GroundTruth:
 		Vector2(-1200, -1200), Vector2(-5, -1200), Vector2(-5, 1200), Vector2(-1200, 1200)]), "holes": []}]
 	return GroundTruth.new(d)
 
+## Stub shoreline: a ready mask whose footing() reports fixed reads, so the
+## courtyard-basin rule is tested without building a full ShorelineModel.
+class _BasinShore:
+	var ready := true
+	var _reads: PackedFloat64Array
+	func _init(reads: PackedFloat64Array) -> void:
+		_reads = reads
+	func footing(_ring: PackedVector2Array, _centre: Vector2, _sea_y: float,
+			_edge_step: float, _max_n: int) -> PackedFloat64Array:
+		return _reads
+
 func _run() -> void:
 	var failures: Array[String] = []
 	var m := WorldScale.metres_to_units()
@@ -238,6 +249,30 @@ func _run() -> void:
 	if dland.get_child_count() != 0:
 		failures.append("low dry building behind shoreline built a water foundation (%d children)" % dland.get_child_count())
 	dland.free()
+	# A courtyard basin or fountain (e.g. the Swedish Embassy's ornamental
+	# basin) wets the footprint's centre while its ring stays fully dry:
+	# the building seats on dry land, never on pier pilings.
+	var basin_ground := _ground(0.0)
+	var bring := _square(Vector2.ZERO, 10.0 * m)
+	basin_ground.shoreline = _BasinShore.new(PackedFloat64Array(
+		[3.0, 3.0, 3.0, 3.0, 100.0, 0.0, 3.4, 1.0]))
+	var cf := BuildingFoundation.sample(basin_ground, bring, Vector2.ZERO, 3.4)
+	if bool(cf["raised"]):
+		failures.append("courtyard basin must not raise a dry-ringed building on piles: %s" % [cf])
+	if not is_equal_approx(float(cf["floor"]), float(cf["low"])):
+		failures.append("courtyard-basin building should seat at dry low %.2f, got %.2f" % [float(cf["low"]), float(cf["floor"])])
+	var bsroot := Node3D.new()
+	BuildingFoundation.build(bsroot, bring, [], cf, {"kind": "government"}, basin_ground)
+	if bsroot.get_child_count() != 0:
+		failures.append("courtyard-basin building built a water foundation (%d children)" % bsroot.get_child_count())
+	bsroot.free()
+	# Control: the same ready mask with a wet majority of the ring still
+	# raises a pier.
+	basin_ground.shoreline = _BasinShore.new(PackedFloat64Array(
+		[3.0, 3.0, 3.0, 3.0, 40.0, 60.0, 3.4, 1.0]))
+	var wf := BuildingFoundation.sample(basin_ground, bring, Vector2.ZERO, 3.4)
+	if not bool(wf["raised"]):
+		failures.append("wet-ringed pier must stay raised: %s" % [wf])
 	# Pile depth cap: a bad deep ground sample must not grow a pile
 	# hundreds of metres under the water.
 	var droot := Node3D.new()

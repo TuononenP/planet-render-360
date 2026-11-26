@@ -147,11 +147,17 @@ static func sample(ground: GroundTruth, ring: PackedVector2Array, centre: Vector
 				floor_y = cleared
 	else:
 		# Mostly wet is a pier however high its one dry corner stands.
-		# When the shoreline mask is active, a completely dry footprint
-		# (wet_n == 0, not centre_wet) sits on land behind the shore —
-		# never on pier pilings just because its ground is near sea level.
-		var low_pier: bool = (not shoreline_ready or wet_n > 0 or centre_wet) and low < water + freeboard * m
-		raised = is_finite(water) and (wet_n > dry_n or low_pier)
+		# When the shoreline mask is active, a completely dry ring never
+		# stands on pier pilings: with no wet ring, a wet centre is a
+		# courtyard basin, fountain or pool inside the footprint (or a
+		# mapping sliver), and the building around it stands on dry land.
+		# A fully dry footprint (wet_n == 0, not centre_wet) likewise sits
+		# on land behind the shore, never on pilings just because its
+		# ground is near sea level.
+		var dry_ring := shoreline_ready and wet_n == 0
+		var low_pier: bool = (not shoreline_ready or wet_n > 0 or centre_wet) \
+			and not dry_ring and low < water + freeboard * m
+		raised = is_finite(water) and not dry_ring and (wet_n > dry_n or low_pier)
 		floor_y = water + freeboard * m if raised else low
 		if raised and high - low <= SLAB_RELIEF_M * m:
 			floor_y = maxf(floor_y, high)
