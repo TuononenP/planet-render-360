@@ -27,7 +27,7 @@ const FhP = preload("res://scripts/generation/landmarks/finland_helsinki/landmar
 
 const ENTRY := {"type": "st_johns_church_helsinki", "skyline": true, "name": "St. John's Church, Helsinki", "lat": 60.16182, "lon": 24.94504,
 	"radius_m": 5000.0, "wiki_title": "St. John's Church, Helsinki", "height_m": 74.0, "clear_m": 50.0,
-	"yaw_deg": -126.0, "kind": "Church", "aliases": ["st. john's church, helsinki", "johanneksenkirkko",
+	"base_at_m": [0.0, 0.0], "yaw_deg": -126.0, "kind": "Church", "aliases": ["st. john's church, helsinki", "johanneksenkirkko",
 		"johanneskyrkan", "st john's church, helsinki"]}
 
 static func build(model: Node3D) -> void:
