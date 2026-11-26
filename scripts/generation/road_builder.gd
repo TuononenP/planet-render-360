@@ -258,6 +258,8 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 	surf.use_native()
 	var plan := RoadMarkings.shared_plan(data, ground)
 	var junc := plan.junctions
+	if surf.native != null and not junc.is_empty() and surf.native.has_method("set_junctions"):
+		surf.native.set_junctions(junc, RoadSurface.JUNCTION_M)
 	surf.aprons = RoadMarkings._apron_grid(plan.aprons, m2u)
 	for ring: PackedVector2Array in plan.aprons:
 		surf.apron_rings.append([ring, RingGeometry.aabb(ring)])
@@ -449,8 +451,10 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 		if int(r["rank"]) == 0 and not finish.begins_with("crossing") and not surf.aprons.is_empty():
 			pieces = RoadCrossingClip.off_apron_runs(run, surf.aprons, m2u)
 		for piece: PackedVector2Array in pieces:
-			_ribbon(_batch(batches, finish), band_rows(piece, m2u) if finish.begins_with("crossing") \
-				else _straighten(piece, surf.step), float(r["width_u"]), surf, lift, attr, junc, layer)
+			var rows: PackedVector2Array = band_rows(piece, m2u) if finish.begins_with("crossing") \
+				else (surf.native.straighten(piece, surf.step) if surf.native != null and surf.native.has_method("straighten") \
+				else _straighten(piece, surf.step))
+			_ribbon(_batch(batches, finish), rows, float(r["width_u"]), surf, lift, attr, junc, layer)
 
 ## Dominant edge axis of a civic pedestrian square (>= 350 m²), packed
 ## into COLOR.rg (`0.5 + 0.45 * u`) for RoadSurface's granite bay grid.
@@ -621,6 +625,8 @@ static func _straighten(pts: PackedVector2Array, max_len: float) -> PackedVector
 ## Maximal runs of the polyline that are on land and on the detailed
 ## surface (≥2 points each): a non-bridge way never lays shards on water.
 static func _dry_runs(pts: PackedVector2Array, surf: _Surface) -> Array:
+	if surf.native != null and surf.native.has_method("dry_runs"):
+		return surf.native.dry_runs(pts, 0.0)
 	var runs: Array = []
 	var cur := PackedVector2Array()
 	for p in pts:
@@ -664,6 +670,9 @@ static func _ribbon(b: _Batch, pts: PackedVector2Array, width: float,
 	var m2u := WorldScale.metres_to_units()
 	b.pad()
 	if surf.native != null and (surf.native_shore or not surf.near_shore(pts, half)):
+		if surf.native.has_method("ribbon_junc"):
+			b.append(surf.native.ribbon_junc(pts, width, lift, attr, not junc.is_empty(), layer, m2u, b.verts.size()))
+			return
 		var jf := PackedFloat64Array()
 		for p in pts:
 			jf.append(RoadSurface.junction_frac(junc, p) if not junc.is_empty() else 1.0)

@@ -192,7 +192,7 @@ static func _lanes(layered := false) -> Array:
 	if not lanes_override.is_empty():
 		return lanes_override
 	if OS.is_debug_build():
-		return [[3], [5], [4], [6]] if layered else [[3], [6], [4], [0, 1, 2, 5]]
+		return [[3], [5], [4], [6]] if layered else [[3], [6], [4], [1, 2]]
 	return [[0], [1], [2], [3], [4], [5], [6]]
 
 static func _stage(step: int, fn: Callable) -> Stage:

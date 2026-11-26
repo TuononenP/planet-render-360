@@ -179,9 +179,12 @@ static func _riser_material(finish: String, tread: Material) -> Material:
 		return RoadBuilder._mats[key] as Material
 	var m := tread.duplicate() as Material
 	if m is ShaderMaterial:
-		var t: Variant = (m as ShaderMaterial).get_shader_parameter("tint")
+		# Avoid get_shader_parameter() on worker threads (blocks on RenderingServer).
+		var t: Variant = m.get_meta("tint") if m.has_meta("tint") else (m as ShaderMaterial).get_shader_parameter("tint")
 		if t is Vector3:
-			(m as ShaderMaterial).set_shader_parameter("tint", (t as Vector3) * RISER_TINT)
+			var darkened := (t as Vector3) * RISER_TINT
+			(m as ShaderMaterial).set_shader_parameter("tint", darkened)
+			m.set_meta("tint", darkened)
 	RoadBuilder._mats[key] = m
 	return m
 

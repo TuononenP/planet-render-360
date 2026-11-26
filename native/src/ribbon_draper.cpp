@@ -431,6 +431,184 @@ void RibbonDraper::set_shore_sampler(const Ref<ShoreSampler> &sampler) {
 	}
 }
 
+void RibbonDraper::set_water_context(const Ref<ShoreDomainIndex> &domains, const Rect2 &bounds, bool empty,
+		const PackedFloat64Array &body_levels_in, const PackedFloat32Array &level_in, double half_u) {
+	shore_domains = domains;
+	shore_bounds = bounds;
+	shore_empty = empty;
+	half_units = half_u;
+	body_levels.assign(body_levels_in.ptr(), body_levels_in.ptr() + body_levels_in.size());
+	water_level_grid.assign(level_in.ptr(), level_in.ptr() + level_in.size());
+	water_ready = true;
+}
+
+static inline int64_t junc_cell_key(int32_t cx, int32_t cz) {
+	return (int64_t(cx) << 32) | uint32_t(cz);
+}
+
+void RibbonDraper::set_junctions(const Dictionary &buckets, double junction_m) {
+	junc_buckets.clear();
+	junc_m = junction_m > 0.0 ? junction_m : 1.0;
+	const Array keys = buckets.keys();
+	junc_buckets.reserve((size_t)keys.size());
+	for (int64_t i = 0; i < keys.size(); i++) {
+		const Vector2i cell = keys[i];
+		const PackedVector2Array pts = buckets[keys[i]];
+		std::vector<Vector2> vec;
+		vec.assign(pts.ptr(), pts.ptr() + pts.size());
+		junc_buckets[junc_cell_key(cell.x, cell.y)] = std::move(vec);
+	}
+}
+
+bool RibbonDraper::inside(const Vector2 &p) const {
+	const double lo = -(double)mesh_size * 0.5 * mesh_step + 2.0;
+	const double hi = ((double)mesh_size * 0.5 - 1.0) * mesh_step - 2.0;
+	return (double)p.x >= lo && (double)p.x <= hi && (double)p.y >= lo && (double)p.y <= hi;
+}
+
+double RibbonDraper::water_at(double x, double z) const {
+	if (shore_domains.is_valid() && shore_bounds.has_point(Vector2((real_t)x, (real_t)z))) {
+		const int id = shore_domains->at(Vector2((real_t)x, (real_t)z));
+		if (id == 0) {
+			return -1.0;
+		}
+		if (id > 0 && id < (int)body_levels.size()) {
+			return (double)body_levels[id] - ground_height(x, z);
+		}
+	} else if (shore_empty) {
+		return -1.0;
+	}
+	if ((int)water_level_grid.size() == g_size * g_size && g_size >= 2) {
+		const double fx = clampd((x + half_units) / g_step, 0.0, (double)(g_size - 1));
+		const double fz = clampd((z + half_units) / g_step, 0.0, (double)(g_size - 1));
+		const int x0 = std::min((int)fx, g_size - 2);
+		const int z0 = std::min((int)fz, g_size - 2);
+		const double tx = fx - (double)x0;
+		const double tz = fz - (double)z0;
+		const double a = (double)water_level_grid[z0 * g_size + x0];
+		const double b = (double)water_level_grid[z0 * g_size + x0 + 1];
+		const double c = (double)water_level_grid[(z0 + 1) * g_size + x0];
+		const double d = (double)water_level_grid[(z0 + 1) * g_size + x0 + 1];
+		if (a <= -9000.0 && b <= -9000.0 && c <= -9000.0 && d <= -9000.0) {
+			return -1.0;
+		}
+		const double wl = lerpd(lerpd(a, b, tx), lerpd(c, d, tx), tz);
+		if (wl <= -9000.0) {
+			return -1.0;
+		}
+		return wl - ground_height(x, z);
+	}
+	return water_level - ground_height(x, z);
+}
+
+double RibbonDraper::junction_frac_at(const Vector2 &p) const {
+	if (junc_buckets.empty()) {
+		return 1.0;
+	}
+	const int32_t cx = (int32_t)std::floor((double)p.x / junc_m);
+	const int32_t cz = (int32_t)std::floor((double)p.y / junc_m);
+	double best = junc_m;
+	for (int32_t dz = -1; dz <= 1; dz++) {
+		for (int32_t dx = -1; dx <= 1; dx++) {
+			auto it = junc_buckets.find(junc_cell_key(cx + dx, cz + dz));
+			if (it == junc_buckets.end()) {
+				continue;
+			}
+			for (const Vector2 &q : it->second) {
+				const double d = (double)q.distance_to(p);
+				if (d < best) {
+					best = d;
+				}
+			}
+		}
+	}
+	return best / junc_m;
+}
+
+Array RibbonDraper::dry_runs(const PackedVector2Array &pts, double max_resample) const {
+	Array runs;
+	const int64_t pn = pts.size();
+	if (pn < 2) {
+		return runs;
+	}
+	std::vector<Vector2> dense;
+	if (max_resample > 0.0) {
+		const double step_lim = max_resample > 0.05 ? max_resample : 0.05;
+		dense.reserve((size_t)pn * 2);
+		dense.push_back(pts[0]);
+		for (int64_t i = 1; i < pn; i++) {
+			const Vector2 a = pts[i - 1];
+			const Vector2 b = pts[i];
+			const int n = std::max(1, (int)std::ceil((double)a.distance_to(b) / step_lim));
+			for (int k = 1; k <= n; k++) {
+				dense.push_back(a.lerp(b, (real_t)((double)k / (double)n)));
+			}
+		}
+	} else {
+		dense.assign(pts.ptr(), pts.ptr() + pn);
+	}
+	std::vector<Vector2> cur;
+	auto flush_cur = [&]() {
+		if (cur.size() >= 2) {
+			PackedVector2Array arr;
+			arr.resize((int64_t)cur.size());
+			std::memcpy(arr.ptrw(), cur.data(), cur.size() * sizeof(Vector2));
+			runs.push_back(arr);
+		}
+		cur.clear();
+	};
+	for (const Vector2 &p : dense) {
+		if (inside(p) && water_at((double)p.x, (double)p.y) <= 0.0) {
+			cur.push_back(p);
+		} else {
+			flush_cur();
+		}
+	}
+	flush_cur();
+	return runs;
+}
+
+PackedVector2Array RibbonDraper::straighten(const PackedVector2Array &pts, double max_len) const {
+	const int64_t n = pts.size();
+	if (n <= 2) {
+		return pts;
+	}
+	std::vector<Vector2> out;
+	out.reserve((size_t)n);
+	out.push_back(pts[0]);
+	for (int64_t i = 1; i < n - 1; i++) {
+		const Vector2 d0 = pts[i] - out.back();
+		const Vector2 d1 = pts[i + 1] - pts[i];
+		const bool bend = std::fabs((double)d0.normalized().cross(d1.normalized())) > 0.001;
+		if (bend || (double)(pts[i + 1] - out.back()).length() > max_len) {
+			out.push_back(pts[i]);
+		}
+	}
+	out.push_back(pts[n - 1]);
+	PackedVector2Array arr;
+	arr.resize((int64_t)out.size());
+	std::memcpy(arr.ptrw(), out.data(), out.size() * sizeof(Vector2));
+	return arr;
+}
+
+Array RibbonDraper::ribbon_junc(const PackedVector2Array &pts, double width, double lift, const Color &attr,
+		bool use_junc, double layer, double m2u, int base) const {
+	const int64_t n = pts.size();
+	PackedFloat64Array jf;
+	jf.resize(n);
+	double *jfp = jf.ptrw();
+	if (use_junc && !junc_buckets.empty()) {
+		for (int64_t i = 0; i < n; i++) {
+			jfp[i] = junction_frac_at(pts[i]);
+		}
+	} else {
+		for (int64_t i = 0; i < n; i++) {
+			jfp[i] = 1.0;
+		}
+	}
+	return build(pts, width, lift, attr, jf, layer, m2u, base, false);
+}
+
 void RibbonDraper::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("setup", "surface", "g_size", "g_step", "water_level", "size", "step",
 								 "mesh_size", "mesh_step"),
@@ -438,6 +616,13 @@ void RibbonDraper::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("height", "x", "z"), &RibbonDraper::height);
 	ClassDB::bind_method(D_METHOD("normal", "x", "z"), &RibbonDraper::normal);
 	ClassDB::bind_method(D_METHOD("set_shore_sampler", "sampler"), &RibbonDraper::set_shore_sampler);
+	ClassDB::bind_method(D_METHOD("set_water_context", "domains", "bounds", "empty", "body_levels", "level", "half_u"),
+			&RibbonDraper::set_water_context);
+	ClassDB::bind_method(D_METHOD("set_junctions", "buckets", "junction_m"), &RibbonDraper::set_junctions);
+	ClassDB::bind_method(D_METHOD("dry_runs", "pts", "max_resample"), &RibbonDraper::dry_runs);
+	ClassDB::bind_method(D_METHOD("straighten", "pts", "max_len"), &RibbonDraper::straighten);
+	ClassDB::bind_method(D_METHOD("ribbon_junc", "pts", "width", "lift", "attr", "use_junc", "layer", "m2u", "base"),
+			&RibbonDraper::ribbon_junc);
 	ClassDB::bind_method(D_METHOD("area", "triangles", "lift", "attr", "layer", "m2u", "base"), &RibbonDraper::area);
 	ClassDB::bind_method(D_METHOD("ribbon", "pts", "width", "lift", "attr", "jf", "layer", "m2u", "base"),
 			&RibbonDraper::ribbon);

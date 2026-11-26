@@ -126,7 +126,8 @@ void fragment() {
 		rough = mix(pv_rgh, 0.3, wet);
 	}
 	if (paving_on > 0.5 && width_m < 0.2 && (attr.r + attr.g) > 0.25) {
-		vec2 sq_u = normalize(vec2(attr.r - 0.5, attr.g - 0.5));
+		vec2 sq_v = vec2(attr.r - 0.5, attr.g - 0.5);
+		vec2 sq_u = length(sq_v) > 1e-4 ? normalize(sq_v) : vec2(1.0, 0.0);
 		vec2 sq_p = vec2(dot(wpos.xz, sq_u), dot(wpos.xz, vec2(-sq_u.y, sq_u.x)));
 		vec2 sq_fw = fwidth(sq_p);
 		float sq_fade = 1.0 - smoothstep(0.06, 0.28, max(sq_fw.x, sq_fw.y) / 0.46);
@@ -617,7 +618,9 @@ static func material(target: Color) -> ShaderMaterial:
 	_mat.shader = sh
 	var mean: Color = (MaterialLibrary.PBR_SETS["asphalt"] as Dictionary)["mean"]
 	var t := MaterialLibrary._calib_tint(mean, target)
-	_mat.set_shader_parameter("tint", Vector3(t.r, t.g, t.b))
+	var tv := Vector3(t.r, t.g, t.b)
+	_mat.set_shader_parameter("tint", tv)
+	_mat.set_meta("tint", tv)
 	_mat.set_shader_parameter("alb_tex", _tex("diff"))
 	_mat.set_shader_parameter("nor_tex", _tex("nor"))
 	_mat.set_shader_parameter("rough_tex", _tex("rough"))
@@ -675,9 +678,11 @@ static func paved_material(set_name: String, target: Color, traffic: float = 0.0
 			.replace("// @CLOUD_SHADOW", TerrainGlsl.CLOUD_SHADOW_GLSL)
 	var row: Dictionary = MaterialLibrary.PBR_SETS[set_name]
 	var t := MaterialLibrary._calib_tint(row["mean"], target)
+	var tv := Vector3(t.r, t.g, t.b)
 	var m := ShaderMaterial.new()
 	m.shader = _paved_shader
-	m.set_shader_parameter("tint", Vector3(t.r, t.g, t.b))
+	m.set_shader_parameter("tint", tv)
+	m.set_meta("tint", tv)
 	m.set_shader_parameter("metallic", float(row["metal"]))
 	m.set_shader_parameter("alb_tex", PbrTextures._set_tex(set_name, "diff"))
 	m.set_shader_parameter("nor_tex", PbrTextures._set_tex(set_name, "nor"))

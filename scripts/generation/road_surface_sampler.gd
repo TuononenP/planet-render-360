@@ -146,6 +146,13 @@ func use_native() -> void:
 				and native.has_method("set_shore_sampler"):
 			native.set_shore_sampler(ground.shoreline.sampler)
 			native_shore = true
+		if native.has_method("set_water_context"):
+			var shore_ready: bool = ground.shoreline != null and ground.shoreline.ready
+			native.set_water_context(
+				ground.shoreline.domains.native if shore_ready and ground.shoreline.domains != null else null,
+				ground.shoreline.bounds if shore_ready else Rect2(),
+				ground.shoreline != null and ground.shoreline.empty(),
+				ParkedCars._shore_body_levels(ground), ground._level, ground._half_units)
 
 func near_shore(points: PackedVector2Array, radius: float) -> bool:
 	if ground.shoreline == null or not ground.shoreline.ready:
