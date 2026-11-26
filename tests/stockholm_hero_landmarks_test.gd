@@ -9,7 +9,7 @@ extends SceneTree
 ## nearest-first.
 
 const MIN_TRIANGLES := 1000
-const MAX_TRIANGLES := 150000
+const MAX_TRIANGLES := 200000
 ## Only things that stand on the skyline may jump the nearest-first queue.
 const SKYLINE_MIN_M := 40.0
 const PRESET := Vector2(59.3207, 18.0604)

@@ -171,10 +171,10 @@ func _on_resized() -> void:
 	var base := size
 	if base.x < 2.0 or base.y < 2.0:
 		base = Vector2(_world_vp.size)
-	var w := maxf(base.x, 2.0)
-	var h := maxf(base.y, 2.0)
+	var w := maxf(base.x, 32.0)
+	var h := maxf(base.y, 32.0)
 	var aspect := w / h
-	rays_vp.size = Vector2i(maxi(2, roundi(w * RAYS_SCALE)), maxi(2, roundi(h * RAYS_SCALE)))
+	rays_vp.size = Vector2i(maxi(32, roundi(w * RAYS_SCALE)), maxi(32, roundi(h * RAYS_SCALE)))
 	if _rays_quad != null and _rays_quad.mesh is QuadMesh:
 		(_rays_quad.mesh as QuadMesh).size = Vector2(2.0 * aspect, 2.0)
 	if _rays_mat != null:

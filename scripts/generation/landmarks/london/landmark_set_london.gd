@@ -42,7 +42,7 @@ static func build(model: Node3D, type: String) -> bool:
 			LandmarkLnSomersetWestminster.methodist_central_hall(model)
 		"lambeth_palace":
 			LandmarkLnSomersetWestminster.lambeth_palace(model)
-		"cleopatras_needle":
+		"cleopatras_needle_london":
 			LandmarkLnSomersetWestminster.cleopatras_needle(model)
 		"tate_modern":
 			LandmarkLnBanksideCity.tate_modern(model)

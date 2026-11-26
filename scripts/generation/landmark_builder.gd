@@ -14,6 +14,21 @@ extends RefCounted
 
 const ARCHETYPES := ["church", "cathedral", "castle", "lighthouse", "stadium",
 	"mosque", "temple", "windmill", "tower", "big_wheel", "station"]
+const TEMPLATE_CACHE_MAX := 32
+
+static var _template_cache: Dictionary = {}
+static var _template_order: Array[String] = []
+static var _template_mutex := Mutex.new()
+
+static func clear_cache() -> void:
+	_template_mutex.lock()
+	for k in _template_cache:
+		var n: Variant = _template_cache[k]
+		if n is Node and is_instance_valid(n):
+			(n as Node).free()
+	_template_cache.clear()
+	_template_order.clear()
+	_template_mutex.unlock()
 
 ## Region batches of bespoke landmarks, tried in order for a type the
 ## core match above does not know (LandmarkSet*.build returns false for
@@ -47,6 +62,31 @@ const StoSetBridges = preload("res://scripts/generation/landmarks/sweden_stockho
 const HelsinkiCathedral =preload("res://scripts/generation/landmarks/finland_helsinki/landmark_fh_cathedral.gd")
 
 static func build(type: String) -> Node3D:
+	if DisplayServer.get_name() == "headless":
+		return _build_fresh(type)
+	var ckey := "%s|%d|%.3f" % [type, 1 if MaterialLibrary.hi_res else 0, WorldScale.metres_to_units()]
+	_template_mutex.lock()
+	if _template_cache.has(ckey):
+		var tpl: Node3D = _template_cache[ckey]
+		var copy := tpl.duplicate(0) as Node3D
+		_template_mutex.unlock()
+		return copy
+	_template_mutex.unlock()
+	var root := _build_fresh(type)
+	_template_mutex.lock()
+	if not _template_cache.has(ckey):
+		_template_cache[ckey] = root.duplicate(0)
+		_template_order.append(ckey)
+		while _template_order.size() > TEMPLATE_CACHE_MAX:
+			var old_key: String = _template_order.pop_front()
+			var old_node: Variant = _template_cache.get(old_key)
+			_template_cache.erase(old_key)
+			if old_node is Node and is_instance_valid(old_node):
+				(old_node as Node).free()
+	_template_mutex.unlock()
+	return root
+
+static func _build_fresh(type: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Landmark_%s" % type
 	var model := model_root(root)

@@ -122,7 +122,7 @@ static func entries() -> Array:
 			"skyline_priority": 3, "clear_m": 36.0, "clear_rect_m": [0.0, 0.0, 62.0, 44.0],
 			"model_rects_m": [[0.0, 0.0, 62.0, 44.0]], "kind": "Palace",
 			"aliases": ["lambeth palace"]},
-		{"type": "cleopatras_needle", "name": "Cleopatra's Needle",
+		{"type": "cleopatras_needle_london", "name": "Cleopatra's Needle",
 			"lat": 51.5086, "lon": -0.1204, "radius_m": 3000.0,
 			"wiki_title": "Cleopatra's Needle, London", "height_m": 21.0, "yaw_deg": -22.0,
 			"skyline_priority": 3, "clear_m": 12.0, "kind": "Monument",

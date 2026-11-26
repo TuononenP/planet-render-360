@@ -19,6 +19,7 @@ static func release_all() -> void:
 		RenderingServer.global_shader_parameter_set("street_heights", null)
 	SharedTexture.clear()
 	SharedShader.clear()
+	LandmarkBuilder.clear_cache()
 	LandmarkImpostor.clear_view_cache()
 	FacadeComposer.clear_cache()
 	StoreyComposer.clear_cache()
@@ -214,11 +215,12 @@ static func trim_for_pressure(level: int) -> void:
 	if level < MemoryGuard.Level.TIGHT:
 		return
 	PbrTextures._raw_images.clear()
-	FacadeComposer.clear_cache()
-	StoreyComposer.clear_cache()
 	OsmParseCache.clear()
-	LandmarkImpostor.clear_view_cache()
 	if level >= MemoryGuard.Level.CRITICAL:
+		FacadeComposer.clear_cache()
+		StoreyComposer.clear_cache()
+		LandmarkBuilder.clear_cache()
+		LandmarkImpostor.clear_view_cache()
 		MaterialLibrary._set_images.clear()
 		HelsinkiLod2._decoded.clear()
 		HelsinkiLod2._decoded_order.clear()
