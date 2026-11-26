@@ -275,7 +275,7 @@ func _towers() -> void:
 				_tower_mass(part, part["footprint"], base + 2.0, mat)
 			_penthouse(stepped[-1], stepped[-1]["footprint"], base + 2.0)
 		elif parts.is_empty():
-			_tower_mass(t, ring, base + 2.0, mat)
+			_tower_mass(t, ring, base + 2.0, mat, idx)
 			_penthouse(t, ring, base + 2.0)
 		else:
 			# If all parts are lifted, fill the missing lower mass using
@@ -286,7 +286,7 @@ func _towers() -> void:
 				lowest = minf(lowest, _part_lift(part))
 			if lowest > 0.5 and lowest < INF:
 				var under := {"height": lowest, "levels": roundi(lowest / 3.5)}
-				_tower_mass(under, ring, base + 2.0, mat)
+				_tower_mass(under, ring, base + 2.0, mat, idx)
 			for part in parts:
 				var part_ring := BuildingBuilder._clean_ring(part.get("footprint", PackedVector2Array()))
 				if part_ring.size() >= 3:
@@ -345,7 +345,8 @@ func _tower_material(mass: Dictionary, fallback: Material, centre: Vector2) -> M
 static func _part_lift(part: Dictionary) -> float:
 	return maxf(float(part.get("min_height_m", 0.0)), float(part.get("min_level", 0)) * 3.5)
 
-func _tower_mass(mass: Dictionary, ring: PackedVector2Array, base: float, mat: Material) -> void:
+func _tower_mass(mass: Dictionary, ring: PackedVector2Array, base: float, mat: Material,
+		tri_idx: PackedInt32Array = PackedInt32Array()) -> void:
 	var total := float(mass.get("height", 0.0))
 	var lift := _part_lift(mass)
 	if total <= lift + 0.1:
@@ -377,7 +378,7 @@ func _tower_mass(mass: Dictionary, ring: PackedVector2Array, base: float, mat: M
 	var holes: Array = mass.get("holes", [])
 	if roof_h <= 0.0 or not BuildingBuilder._roof_form(null, ring, wall_top, roof_h, shape,
 			roof_mat, PackedByteArray(), false, holes):
-		var idx := Geometry2D.triangulate_polygon(ring)
+		var idx := tri_idx if tri_idx.size() >= 3 else Geometry2D.triangulate_polygon(ring)
 		if idx.size() >= 3:
 			BuildingBuilder._roof_cap(null, ring, idx, wall_top, roof_mat)
 

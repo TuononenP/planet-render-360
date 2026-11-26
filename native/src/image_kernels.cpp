@@ -185,12 +185,62 @@ Ref<Image> ImageKernels::r8_overlay(const Ref<Image> &base, const Ref<Image> &to
 	return Image::create_from_data(w, h, false, Image::FORMAT_R8, out);
 }
 
+PackedFloat32Array ImageKernels::terrarium_assemble(const Array &tiles, const Array &images,
+		const Rect2i &rect, int tile_px) {
+	const int w = rect.size.x;
+	const int h = rect.size.y;
+	PackedFloat32Array heights;
+	if (w <= 0 || h <= 0) {
+		return heights;
+	}
+	heights.resize((int64_t)w * h);
+	float *hp = heights.ptrw();
+	std::fill(hp, hp + (size_t)w * h, 0.0f);
+	const int64_t n = std::min(tiles.size(), images.size());
+	for (int64_t ti = 0; ti < n; ++ti) {
+		const Vector2i t = tiles[ti];
+		Ref<Image> img = images[ti];
+		if (img.is_null() || img->is_empty()) {
+			continue;
+		}
+		if (img->get_format() != Image::FORMAT_RGB8) {
+			Ref<Image> dup = img->duplicate();
+			dup->convert(Image::FORMAT_RGB8);
+			img = dup;
+		}
+		const PackedByteArray bytes = img->get_data();
+		const uint8_t *bp = bytes.ptr();
+		const int tw = img->get_width();
+		const Rect2i tile_rect(t.x * tile_px, t.y * tile_px, tile_px, tile_px);
+		const Rect2i inter = tile_rect.intersection(rect);
+		if (!inter.has_area()) {
+			continue;
+		}
+		const int y0 = inter.position.y;
+		const int y1 = inter.position.y + inter.size.y;
+		const int x0 = inter.position.x;
+		const int x1 = inter.position.x + inter.size.x;
+		for (int gy = y0; gy < y1; ++gy) {
+			const int row_src = (gy - tile_rect.position.y) * tw;
+			const int row_dst = (gy - rect.position.y) * w - rect.position.x;
+			for (int gx = x0; gx < x1; ++gx) {
+				const int64_t idx = (int64_t)(row_src + gx - tile_rect.position.x) * 3;
+				hp[row_dst + gx] = (float)bp[idx] * 256.0f + (float)bp[idx + 1] +
+						(float)bp[idx + 2] / 256.0f - 32768.0f;
+			}
+		}
+	}
+	return heights;
+}
+
 void ImageKernels::_bind_methods() {
 	ClassDB::bind_static_method("ImageKernels", D_METHOD("fix_alpha_edges", "image"), &ImageKernels::fix_alpha_edges);
 	ClassDB::bind_static_method("ImageKernels", D_METHOD("hsy_canopy_compose", "bands", "chm", "size"),
 			&ImageKernels::hsy_canopy_compose);
 	ClassDB::bind_static_method("ImageKernels", D_METHOD("r8_overlay", "base", "top", "replace"),
 			&ImageKernels::r8_overlay);
+	ClassDB::bind_static_method("ImageKernels", D_METHOD("terrarium_assemble", "tiles", "images", "rect", "tile_px"),
+			&ImageKernels::terrarium_assemble);
 }
 
 } // namespace godot

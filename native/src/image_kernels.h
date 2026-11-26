@@ -25,6 +25,9 @@ public:
 	static Ref<Image> hsy_canopy_compose(const Array &bands, const Ref<Image> &chm, int size);
 	// HsyCover.overlay: R8 class overlay with optional replacement mask.
 	static Ref<Image> r8_overlay(const Ref<Image> &base, const Ref<Image> &top, const Array &replace);
+	// FarFieldFetcher._assemble_dem: decode Terrarium RGB8 tile bytes into float32 heights.
+	static PackedFloat32Array terrarium_assemble(const Array &tiles, const Array &images,
+			const Rect2i &rect, int tile_px);
 };
 
 } // namespace godot

@@ -349,30 +349,67 @@ static func _assemble_all(layers: Array, lat: float, water_zoom: int,
 	var rings: Array = []
 	var drapes: Array = []
 	var bad: Array = []  # [layer index, tile, path] of cached tiles that would not decode
+	var jobs: Array = []
 	for li in layers.size():
-		var layer: Dictionary = layers[li]
-		var images: Dictionary = layer["images"]
+		var images: Dictionary = (layers[li] as Dictionary)["images"]
 		for t in images.keys():
 			if images[t] is String:
+				jobs.append([li, t, str(images[t])])
+	var jn := jobs.size()
+	if jn > 0:
+		var decoded: Array = []
+		decoded.resize(jn)
+		var chunks := mini(jn, 2 if OS.is_debug_build() else 8)
+		if chunks <= 1:
+			for k in jn:
 				var img := Image.new()
-				if img.load(images[t]) == OK:
-					images[t] = img
-				else:
-					bad.append([li, t, images[t]])
-					images.erase(t)
+				decoded[k] = img if img.load(str(jobs[k][2])) == OK else null
+		else:
+			var grp := WorkerThreadPool.add_group_task(func(c: int) -> void:
+				for k in range(jn * c / chunks, jn * (c + 1) / chunks):
+					var img := Image.new()
+					decoded[k] = img if img.load(str(jobs[k][2])) == OK else null,
+				chunks, -1, true, "FarFieldDecode")
+			WorkerThreadPool.wait_for_group_task_completion(grp)
+		for k in jn:
+			var job: Array = jobs[k]
+			var images: Dictionary = (layers[int(job[0])] as Dictionary)["images"]
+			if decoded[k] != null:
+				images[job[1]] = decoded[k]
+			else:
+				bad.append(job)
+				images.erase(job[1])
 	out["bad"] = bad
 	if not bad.is_empty():
 		return  # _finish fetches those tiles again first
+	var valid_layers: Array = []
 	for layer in layers:
-		var images: Dictionary = layer["images"]
-		if images.size() < (layer["tiles"] as Array).size():
+		var images: Dictionary = (layer as Dictionary)["images"]
+		if images.size() < ((layer as Dictionary)["tiles"] as Array).size():
 			print("Far-field %s z%d incomplete (%d/%d tiles): layer dropped" % [
 				layer["kind"], layer["zoom"], images.size(), (layer["tiles"] as Array).size()])
 			continue
-		if layer["kind"] == "dem":
-			rings.append(_assemble_dem(layer))
+		valid_layers.append(layer)
+	var vn := valid_layers.size()
+	var results: Array = []
+	results.resize(vn)
+	var lchunks := mini(vn, 2 if OS.is_debug_build() else vn)
+	if lchunks <= 1:
+		for i in vn:
+			var l: Dictionary = valid_layers[i]
+			results[i] = _assemble_dem(l) if l["kind"] == "dem" else _assemble_drape(l)
+	else:
+		var lgrp := WorkerThreadPool.add_group_task(func(c: int) -> void:
+			for i in range(vn * c / lchunks, vn * (c + 1) / lchunks):
+				var l: Dictionary = valid_layers[i]
+				results[i] = _assemble_dem(l) if l["kind"] == "dem" else _assemble_drape(l),
+			lchunks, -1, true, "FarFieldLayers")
+		WorkerThreadPool.wait_for_group_task_completion(lgrp)
+	for i in vn:
+		if (valid_layers[i] as Dictionary)["kind"] == "dem":
+			rings.append(results[i])
 		else:
-			drapes.append(_assemble_drape(layer))
+			drapes.append(results[i])
 	var t2 := Time.get_ticks_msec()
 	var despiked := DemDespike.clean_rings(rings, lat)
 	var t3 := Time.get_ticks_msec()
@@ -385,12 +422,25 @@ static func _assemble_all(layers: Array, lat: float, water_zoom: int,
 	out["drapes"] = drapes
 	out["water"] = water
 
+static var _native_img := ClassDB.class_exists("ImageKernels")
+
 ## Decodes the window's Terrarium pixels straight from each tile's byte
 ## buffer (no per-pixel Color allocation) into metres ASL.
 static func _assemble_dem(layer: Dictionary) -> Dictionary:
 	var rect: Rect2i = layer["rect"]
 	var w := rect.size.x
 	var h := rect.size.y
+	if _native_img:
+		var tiles: Array = layer["tiles"]
+		var imgs: Array = []
+		imgs.resize(tiles.size())
+		for ti in tiles.size():
+			imgs[ti] = layer["images"][tiles[ti]]
+		var nh: PackedFloat32Array = ClassDB.class_call_static("ImageKernels", "terrarium_assemble",
+			tiles, imgs, rect, TILE_PX)
+		return {"zoom": layer["zoom"], "origin_px": Vector2(rect.position),
+			"width": w, "height": h, "heights": nh,
+			"reach_m": layer["reach_m"]}
 	var heights := PackedFloat32Array()
 	heights.resize(w * h)
 	for t in layer["tiles"]:

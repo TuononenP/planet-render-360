@@ -87,7 +87,8 @@ func pump(budget_us: int = BUDGET_US) -> bool:
 			for node: Variant in (wave[1] as Array):
 				if is_instance_valid(node):
 					(node as Node3D).visible = true
-		moved = true
+		# Let the reveal frame finish GPU uploads without tearing down the old world.
+		return busy()
 	while not _pending.is_empty() and (not moved or Time.get_ticks_usec() - t < budget_us):
 		_add_back(_pending.pop_front())
 		moved = true
