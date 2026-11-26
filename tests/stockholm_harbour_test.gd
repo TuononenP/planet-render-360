@@ -119,13 +119,21 @@ func _route_checks(m: float) -> void:
 		"a Waxholm boat is longer than a Djurgården ferry")
 	# They reach the world as meshes, tagged with their route.
 	var root := Node3D.new()
+	var liners := HarbourFerries.liner_boats(d, g, mask)
 	var placed := HarbourFerries.build(root, d, g, mask)
-	_check(placed == boats.size(), "build() should place every route boat, got %d of %d" % [placed, boats.size()])
+	_check(placed == boats.size() + liners.size(),
+		"build() should place every route boat and liner, got %d of %d" % [placed, boats.size() + liners.size()])
 	var tagged := 0
 	for node in root.find_children("RouteFerry_*", "MeshInstance3D", true, false):
 		tagged += 1 if str(node.get_meta("ferry_route", "")) != "" else 0
 	_check(tagged >= boats.size(), "route ferry meshes should carry their route")
-	_motion_checks(root, boats.size(), m)
+	var liner_tagged := 0
+	for prefix in ["LinerFerry_*", "CruiseLiner_*"]:
+		for node in root.find_children(prefix, "MeshInstance3D", true, false):
+			liner_tagged += 1 if str(node.get_meta("liner_route", "")) != "" else 0
+	_check(liner_tagged >= liners.size(), "liner meshes should carry their route")
+	_motion_checks(root, boats.size() + liners.size(), m)
+	_liner_checks(liners, m)
 	root.free()
 	# A boat never stands across a bridge or on land.
 	var bridged := _data(ROUTE_WORLD, -8.0)
@@ -148,7 +156,7 @@ func _route_checks(m: float) -> void:
 	_lake(high, [Vector2(-e, -e), Vector2(e, -e), Vector2(e, e), Vector2(-e, e)])
 	var hg := _ground(high)
 	var hroot := Node3D.new()
-	_check(HarbourFerries.build(hroot, high, hg, VegetationMask.new(high, hg)) == 0, "route ferries are Ultra only")
+	_check(HarbourFerries.build(hroot, high, hg, VegetationMask.new(high, hg)) == 0, "route ferries and liners are Ultra only")
 	hroot.free()
 
 ## The route boats travel (RouteBoatDriver): positions change over simulated time,
@@ -156,7 +164,7 @@ func _route_checks(m: float) -> void:
 ## at the end of it, and two boats of one line never come within a hull length.
 func _motion_checks(root: Node3D, count: int, m: float) -> void:
 	var driver := root.get_node_or_null("RouteBoats") as RouteBoatDriver
-	_check(driver != null and driver.boats.size() == count, "every route boat is driven")
+	_check(driver != null and driver.boats.size() == count, "every route boat and liner is driven")
 	if driver == null or driver.boats.is_empty():
 		return
 	var start: Array[Vector2] = []
@@ -166,7 +174,7 @@ func _motion_checks(root: Node3D, count: int, m: float) -> void:
 	var moved := 0
 	for i in driver.boats.size():
 		moved += 1 if driver.position_of(int(driver.boats[i]["id"])).distance_to(start[i]) > 10.0 * m else 0
-	_check(moved >= driver.boats.size() - 1, "route boats should travel over a minute, %d of %d moved" % [moved, driver.boats.size()])
+	_check(moved >= driver.boats.size() - 1, "route boats and liners should travel over a minute, %d of %d moved" % [moved, driver.boats.size()])
 	# The hull parts and the wake stand where the driver says.
 	for b: Dictionary in driver.boats:
 		var id := int(b["id"])
@@ -194,6 +202,30 @@ func _motion_checks(root: Node3D, count: int, m: float) -> void:
 					min_gap = minf(min_gap, driver.position_of(int(b["id"])).distance_to(driver.position_of(int(driver.boats[j]["id"]))))
 	_check(turned >= 1, "a route boat turns round at the end of its stretch")
 	_check(min_gap > 20.0 * m, "boats of one line keep a hull length apart, closest %.0f m" % min_gap)
+
+## The moving liners of the route world: the Saltsjön fairway carries a
+## Viking-red cruise ferry, liners are liner-sized with slow-turning
+## drivers, and they stay in open water.
+func _liner_checks(liners: Array, m: float) -> void:
+	var ids := {}
+	for liner: Dictionary in liners:
+		ids[str(liner["route"])] = true
+		var route: Dictionary = liner["route_row"]
+		_check(float(route["length"]) >= 190.0 and float(route["length"]) <= 260.0,
+			"a liner is liner-sized, got %.0f m" % float(route["length"]))
+		_check(float(liner["hi"]) > float(liner["lo"]),
+			"%s has open water to travel" % liner["route"])
+	_check(ids.has("stockholm_viking"), "the Saltsjön fairway should carry a moving Viking ferry, got %s" % [ids.keys()])
+	for liner: Dictionary in liners:
+		if str(liner["route"]) == "stockholm_viking":
+			var route: Dictionary = liner["route_row"]
+			_check(str(route.get("hull", "")) == "#c21f2c",
+				"the moving Stadsgården ferry is Viking red, got %s" % route.get("hull", "none"))
+	for liner: Dictionary in liners:
+		var lm := HarbourFerries.liner_model(liner["route_row"], liner)
+		var holder := Node3D.new()
+		_check(lm.commit(holder, "L_").size() >= 8, "%s builds a detailed cruise ferry" % liner["route"])
+		holder.free()
 
 # --- cruise ferries at the ports ----------------------------------------
 
@@ -504,7 +536,9 @@ func _other_city_checks(m: float) -> void:
 			"%s gets no Stockholm route boats" % city[0])
 		_check(QuayMoorings.ports(d, m).is_empty() and QuayMoorings.port_at(d, Vector2.ZERO, m).is_empty(),
 			"%s has no Stockholm ferry port" % city[0])
-		_check(QuayMoorings.quay_rows(d, m).is_empty(), "%s has no Stockholm quay row" % city[0])
+		var rows := QuayMoorings.quay_rows(d, m)
+		_check(rows.all(func(r: Dictionary) -> bool: return str(r["id"]) not in ["strandvagen", "soder_malarstrand"]),
+			"%s has no Stockholm quay row" % city[0])
 	# New York still gets its Staten Island ferry beside the terminal.
 	var ny := _data(Vector2(40.7033, -74.0170), -8.0)
 	var e2 := 2400.0 * m

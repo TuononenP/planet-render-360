@@ -68,6 +68,75 @@ const EYE_CLEAR_M := 60.0
 ## Step (m) a boat's run is checked for open water along its route.
 const SPAN_STEP_M := 10.0
 
+## Moving cruise ferries and liners on their approach fairways: one entry
+## per approach, with "boats" as [{"at": share, "line": optional
+## HarbourVesselData.CRUISE_LIVERIES id}] so two companies can share one
+## fairway (Turku, Helsinki West Harbour). Scenery, not live positions:
+## each ship shuttles along the open-water stretch of its fairway with a
+## wake, like the small route boats. Points are [lat, lon] from the open
+## sea to the terminal.
+const LINER_ACROSS_M := [0.0, 30.0, -30.0, 70.0, -70.0, 130.0, -130.0]
+const LINER_ALONG_M := [0.0, 80.0, -80.0, 180.0, -180.0]
+const LINER_MARGIN_M := 12.0
+const LINER_EYE_CLEAR_M := 150.0
+const LINER_SPAN_STEP_M := 20.0
+const LINER_TURN_RAD_S := 0.15
+const LINER_ACCEL_MS2 := 0.25
+const LINER_BRAKE_MS2 := 0.35
+const LINER_DWELL_S := 25.0
+const LINER_ROUTES := [
+	# Silja Line to Olympiaterminaali: open sea south of Suomenlinna through
+	# the strait to the terminal.
+	{"id": "helsinki_silja", "model": "cruise_ferry", "length": 200.0, "beam": 27.0, "height": 42.0,
+		"line": "silja", "speed": 7.0,
+		"points": [[60.1300, 24.9850], [60.1400, 24.9780], [60.1500, 24.9680], [60.1570, 24.9620], [60.1606, 24.9588]],
+		"boats": [{"at": 0.85}]},
+	# Viking Line to Katajanokka: south-east approach past Katajaluoto.
+	{"id": "helsinki_viking", "model": "cruise_ferry", "length": 200.0, "beam": 27.0, "height": 42.0,
+		"line": "viking", "speed": 7.0,
+		"points": [[60.1300, 25.0000], [60.1420, 24.9900], [60.1540, 24.9780], [60.1639, 24.9684]],
+		"boats": [{"at": 0.85}]},
+	# Tallink and Eckerö Line to West Harbour: south-west approach shared by
+	# both companies' ships.
+	{"id": "helsinki_west", "model": "cruise_ferry", "length": 190.0, "beam": 27.0, "height": 40.0,
+		"line": "tallink", "speed": 7.0,
+		"points": [[60.1300, 24.8800], [60.1380, 24.8950], [60.1450, 24.9070], [60.1500, 24.9140]],
+		"boats": [{"at": 0.7}, {"at": 0.9, "line": "eckero"}]},
+	# Viking Line to Stadsgården: Saltsjön fairway from the east.
+	{"id": "stockholm_viking", "model": "cruise_ferry", "length": 200.0, "beam": 28.0, "height": 42.0,
+		"hull": "#c21f2c", "livery": "#c21f2c", "speed": 7.0,
+		"points": [[59.3220, 18.1500], [59.3205, 18.1300], [59.3185, 18.1080], [59.3170, 18.0910]],
+		"boats": [{"at": 0.75}]},
+	# Tallink Silja to Värtahamnen: Lilla Värtan fairway from the east.
+	{"id": "stockholm_silja", "model": "cruise_ferry", "length": 200.0, "beam": 28.0, "height": 42.0,
+		"hull": "#f0eee8", "livery": "#1b2f5c", "speed": 7.0,
+		"points": [[59.3550, 18.1600], [59.3530, 18.1380], [59.3510, 18.1220], [59.3500, 18.1110]],
+		"boats": [{"at": 0.75}]},
+	# Viking and Silja Lines to Linnansatama, Turku: Airisto fairway shared
+	# by both companies' ships.
+	{"id": "turku_approach", "model": "cruise_ferry", "length": 190.0, "beam": 27.0, "height": 40.0,
+		"line": "turku_viking", "speed": 7.0,
+		"points": [[60.4100, 22.1650], [60.4200, 22.1850], [60.4290, 22.2050], [60.4345, 22.2215]],
+		"boats": [{"at": 0.75}, {"at": 0.9, "line": "turku_silja"}]},
+	# PortMiami cruise approach through Government Cut: a generic ocean liner
+	# standing in for the lines berthed on Dodge Island.
+	{"id": "miami_cruise", "model": "liner", "length": 260.0, "beam": 32.0, "height": 58.0,
+		"hull": "#e9e8e2", "speed": 8.0,
+		"points": [[25.7550, -80.0600], [25.7600, -80.1000], [25.7670, -80.1350], [25.7760, -80.1680]],
+		"boats": [{"at": 0.9}]},
+]
+
+## Extra separation (m) kept between the centres of two placed hulls,
+## beyond their half-lengths: small craft keep 20 m, liners 80 m, so a
+## berthed hull and a passing one never overlap, moving or not.
+const TAKEN_GAP_M := 20.0
+const LINER_TAKEN_GAP_M := 80.0
+
+## Centre distance (m) keeping hulls of `a_len` and `b_len` metres apart:
+## half-lengths plus `margin`.
+static func hull_gap(a_len: float, b_len: float, margin: float) -> float:
+	return (a_len + b_len) * 0.5 + margin
+
 static func terminal(b: Dictionary) -> bool:
 	return str(b.get("use", "")) == "ferry_terminal" \
 		and str(b.get("name", "")).to_lower().contains("staten island ferry")
@@ -117,25 +186,64 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: V
 		break
 	var driver := RouteBoatDriver.new()
 	driver.name = "RouteBoats"
-	var boat_id := 0
-	for boat in route_boats(data, ground, mask):
+	# One shared separation list across every moving fleet: each fleet below
+	# keeps clear of the moored rows and of the fleets placed before it, so
+	# a berthed ferry and a passing liner never share a hull rectangle.
+	var moored := HarbourTraffic.plan(data, ground, mask)
+	var small := route_boats(data, ground, mask, moored)
+	# Berthed static hulls keep moving ships off their rectangles: a liner
+	# dwelling at its terminal never overlaps the ferry, liner, hotel ship
+	# or cargo ship already berthed there. MarinaBuilder ran just above,
+	# so its berths are reused; a direct build (tests) plans them here with
+	# an empty claim map instead.
+	var static_ships := MarinaBuilder.static_ships(data, ground)
+	if static_ships.is_empty() and not data.has_meta(MarinaBuilder.STATIC_META):
+		QuayMoorings.begin_plan(data, m)
+		static_ships = QuayMoorings.liners(data, ground, {}, m, mask)
+		static_ships.append_array(CargoBerths.plan(data, ground, {}, m, mask, static_ships))
+		QuayMoorings.end_plan()
+	var seed: Array = small.duplicate()
+	for s in static_ships:
+		var sc: Vector3 = s[0]
+		seed.append({"centre": Vector2(sc.x, sc.z), "length": float(s[2])})
+	for boat in small:
+		var bid := _next_boat_id(driver)
 		var spec: Dictionary = VESSELS[str(boat["vessel"])]
 		var parts := _commit(root, vessel_model(str(boat["vessel"])), "RouteFerry_", boat["centre"], boat["axis"],
-			ground, float(spec["length"]), float(spec["beam"]), boat_id)
-		driver.boats.append({"id": boat_id, "route": boat["route"], "pts": boat["pts"], "s": boat["t"], "lo": boat["lo"], "hi": boat["hi"],
+			ground, float(spec["length"]), float(spec["beam"]), bid)
+		driver.boats.append({"id": bid, "route": boat["route"], "pts": boat["pts"], "s": boat["t"], "lo": boat["lo"], "hi": boat["hi"],
 			"dir": boat["dir"], "across": boat["across"], "speed": float(spec["speed"]) * m,
 			"y": ground.water_level_at((boat["centre"] as Vector2).x, (boat["centre"] as Vector2).y),
 			"length": float(spec["length"])})
-		boat_id += 1
 		for part in parts:
 			part.set_meta("ferry_route", str(boat["route"]))
 		var at: Vector2 = boat["centre"]
 		print("HARBOUR-ROUTE %s %s at=(%.1f, %.1f)" % [boat["route"], boat["vessel"], at.x, at.y])
 		count += 1
+	var liners := liner_boats(data, ground, mask, seed)
+	for liner in liners:
+		var bid := _next_boat_id(driver)
+		var route: Dictionary = liner["route_row"]
+		var prefix := "CruiseLiner_" if str(route.get("model", "cruise_ferry")) == "liner" else "LinerFerry_"
+		var parts := _commit(root, liner_model(route, liner), prefix, liner["centre"], liner["axis"],
+			ground, float(route["length"]), float(route["beam"]), bid)
+		driver.boats.append({"id": bid, "route": str(liner["route"]), "pts": liner["pts"], "s": liner["t"],
+			"lo": liner["lo"], "hi": liner["hi"], "dir": liner["dir"], "across": liner["across"],
+			"speed": float(route["speed"]) * m, "accel": LINER_ACCEL_MS2, "brake": LINER_BRAKE_MS2,
+			"turn": LINER_TURN_RAD_S, "dwell": LINER_DWELL_S,
+			"y": ground.water_level_at((liner["centre"] as Vector2).x, (liner["centre"] as Vector2).y),
+			"length": float(route["length"])})
+		for part in parts:
+			part.set_meta("liner_route", str(liner["route"]))
+		var pos: Vector2 = liner["centre"]
+		print("HARBOUR-LINER %s at=(%.1f, %.1f)" % [liner["route"], pos.x, pos.y])
+		count += 1
+	var moving: Array = small.duplicate()
+	moving.append_array(liners)
 	# Commuter ferries, icebreakers and market boats of rows in view (Helsinki).
 	count += HarbourTraffic.build(root, data, ground, mask)
-	count += _bangkok_boats(root, data, ground, mask, driver, boat_id, m)
-	count += _venice_boats(root, data, ground, mask, driver, boat_id + count, m)
+	count += _bangkok_boats(root, data, ground, mask, driver, _next_boat_id(driver), m, moving)
+	count += _venice_boats(root, data, ground, mask, driver, _next_boat_id(driver), m, moving)
 	if not driver.boats.is_empty():
 		root.add_child(driver)
 	else:
@@ -143,12 +251,12 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth, mask: V
 	return count
 
 static func _bangkok_boats(root: Node3D, data: LocationData, ground: GroundTruth, mask: VegetationMask,
-		driver: RouteBoatDriver, next_id: int, m: float) -> int:
+		driver: RouteBoatDriver, next_id: int, m: float, seed: Array = []) -> int:
 	if CityStyles.city_of_region(CityStyles.region_at(data.latitude, data.longitude)) != "bangkok":
 		return 0
 	var eye := View360.spawn_xz(data)
 	var bridge_list := QuayMoorings.bridges(data, m)
-	var taken: Array = []
+	var taken: Array = seed.duplicate()
 	var added := 0
 	for row: Dictionary in BangkokVesselModels.ROUTES:
 		var pts := PackedVector2Array()
@@ -164,7 +272,7 @@ static func _bangkok_boats(root: Node3D, data: LocationData, ground: GroundTruth
 			var site := _route_site(pts, total, float(share), length, beam, ground, mask, bridge_list, eye, taken, m)
 			if site.is_empty():
 				continue
-			taken.append({"centre": site["centre"]})
+			taken.append({"centre": site["centre"], "length": length})
 			var lm := LandmarkMesh.new()
 			BangkokVesselModels.build(lm, model_name, {
 				"length": length, "beam": beam, "detail": true, "maps": true,
@@ -175,12 +283,12 @@ static func _bangkok_boats(root: Node3D, data: LocationData, ground: GroundTruth
 	return added
 
 static func _venice_boats(root: Node3D, data: LocationData, ground: GroundTruth, mask: VegetationMask,
-		driver: RouteBoatDriver, next_id: int, m: float) -> int:
+		driver: RouteBoatDriver, next_id: int, m: float, seed: Array = []) -> int:
 	if CityStyles.city_of_region(CityStyles.region_at(data.latitude, data.longitude)) != "venice":
 		return 0
 	var eye := View360.spawn_xz(data)
 	var bridge_list := QuayMoorings.bridges(data, m)
-	var taken: Array = []
+	var taken: Array = seed.duplicate()
 	var added := 0
 	for row: Dictionary in VeniceVesselModels.ROUTES:
 		var pts := PackedVector2Array()
@@ -197,7 +305,7 @@ static func _venice_boats(root: Node3D, data: LocationData, ground: GroundTruth,
 			var site := _route_site(pts, total, float(shares[i]), length, beam, ground, mask, bridge_list, eye, taken, m)
 			if site.is_empty():
 				continue
-			taken.append({"centre": site["centre"]})
+			taken.append({"centre": site["centre"], "length": length})
 			var axis: Vector2 = site["axis"]
 			if i % 2 == 1:
 				axis = -axis
@@ -233,9 +341,12 @@ static func _commit(root: Node3D, lm: LandmarkMesh, prefix: String, p: Vector2, 
 	return parts
 
 ## The route boats of `data`: {"route", "vessel", "centre" (world XZ),
-## "axis" (bow direction)}, ROUTES order.
-static func route_boats(data: LocationData, ground: GroundTruth, mask: VegetationMask) -> Array:
+## "axis" (bow direction), "length" (m)}, ROUTES order. `seed` holds taken
+## {"centre", "length"} hulls of fleets placed earlier (moored rows); every
+## fleet below keeps the same contract, so no two hulls overlap at build.
+static func route_boats(data: LocationData, ground: GroundTruth, mask: VegetationMask, seed: Array = []) -> Array:
 	var out: Array = []
+	var taken: Array = seed.duplicate()
 	var m := WorldScale.metres_to_units()
 	var eye := View360.spawn_xz(data)
 	var bridge_list := {}
@@ -256,7 +367,8 @@ static func route_boats(data: LocationData, ground: GroundTruth, mask: Vegetatio
 		var total := MarinaBuilder._length(pts)
 		var boats: Array = route["boats"]
 		for i in boats.size():
-			var site := _route_site(pts, total, float(boats[i]), length, beam, ground, mask, bridge_list, eye, out, m)
+			var site := _route_site(pts, total, float(boats[i]), length, beam, ground, mask, bridge_list, eye,
+				taken, m)
 			if site.is_empty():
 				continue
 			var axis: Vector2 = site["axis"]
@@ -266,7 +378,8 @@ static func route_boats(data: LocationData, ground: GroundTruth, mask: Vegetatio
 				bridge_list, m)
 			out.append({"route": str(route["id"]), "vessel": str(route["vessel"]), "centre": site["centre"],
 				"axis": axis, "pts": pts, "t": site["t"], "across": site["across"], "lo": span.x, "hi": span.y,
-				"dir": -1.0 if i % 2 == 1 else 1.0})
+				"dir": -1.0 if i % 2 == 1 else 1.0, "length": length})
+			taken.append({"centre": site["centre"], "length": length})
 		_keep_apart(out, str(route["id"]), (length + 20.0) * m)
 	return out
 
@@ -323,7 +436,8 @@ static func _route_site(pts: PackedVector2Array, total: float, share: float, len
 				continue
 			var clear := true
 			for other: Dictionary in taken:
-				clear = clear and (other["centre"] as Vector2).distance_to(c) > (length + 20.0) * m
+				var gap := hull_gap(length, float(other.get("length", length)), TAKEN_GAP_M)
+				clear = clear and (other["centre"] as Vector2).distance_to(c) > gap * m
 			if clear:
 				return {"centre": c, "axis": dir, "t": t, "across": across}
 	return {}
@@ -339,3 +453,148 @@ static func vessel_model(id: String) -> LandmarkMesh:
 		"height": float(spec["height"]), "hull": VesselMaterials.paint(str(spec["hull"]), true, 0.42, 0.05),
 		"funnel": str(spec["funnel"]), "detail": true, "maps": true, "ultra": MaterialLibrary.hi_res})
 	return lm
+
+## An unused boat id for `driver` (route, liner, Bangkok and Venice boats
+## share one driver with sparse ids).
+static func _next_boat_id(driver: RouteBoatDriver) -> int:
+	var top := -1
+	for b: Dictionary in driver.boats:
+		top = maxi(top, int(b["id"]))
+	return top + 1
+
+## The moving ship of a LINER_ROUTES entry at true size, +X bow. A listed
+## line (HarbourVesselData.CRUISE_LIVERIES) wears its full livery, a plain
+## "livery" hex rides as the sweep colour, and a "liner" is a generic
+## cruise ship.
+static func liner_model(route: Dictionary, boat: Dictionary) -> LandmarkMesh:
+	var length := float(route["length"])
+	var beam := float(route["beam"])
+	var height := float(route["height"])
+	var seed_value := fposmod(float(boat.get("at", 0.5)) * 7.0 + length * 0.01, 1.0)
+	if str(route.get("model", "cruise_ferry")) == "liner":
+		return VesselPrototypes.geometry("liner", length, beam, height,
+			VesselMaterials.paint(str(route.get("hull", "#e9e8e2")), true, 0.42, 0.05),
+			true, true, seed_value)
+	var line_id := str(boat.get("line", route.get("line", "")))
+	var variant := ""
+	if line_id != "":
+		variant = "line:" + line_id
+	elif str(route.get("livery", "")) != "":
+		variant = str(route["livery"])
+	return VesselPrototypes.geometry("cruise_ferry", length, beam, height,
+		VesselMaterials.paint(str(route.get("hull", "#f0eee8")), true, 0.42, 0.05),
+		true, true, seed_value, variant)
+
+## The moving liners of `data`: one row per ship, like route_boats but on
+## the LINER_ROUTES fairways with liner-sized search margins. `seed` holds
+## taken {"centre", "length"} hulls of fleets placed earlier.
+static func liner_boats(data: LocationData, ground: GroundTruth, mask: VegetationMask, seed: Array = []) -> Array:
+	var out: Array = []
+	var taken: Array = seed.duplicate()
+	var m := WorldScale.metres_to_units()
+	var eye := View360.spawn_xz(data)
+	var bridge_list := {}
+	for route: Dictionary in LINER_ROUTES:
+		var pts := PackedVector2Array()
+		for ll: Array in route["points"]:
+			pts.append(WorldScale.xz_from_latlon(float(ll[0]), float(ll[1]), data.latitude, data.longitude) * m)
+		var inside := false
+		for q in pts:
+			inside = inside or ground.is_inside(q.x, q.y)
+		if not inside:
+			continue
+		if bridge_list.is_empty():
+			bridge_list = QuayMoorings.bridges(data, m)
+		var length := float(route["length"])
+		var beam := float(route["beam"])
+		var total := MarinaBuilder._length(pts)
+		var ships: Array = route["boats"]
+		for i in ships.size():
+			var entry: Dictionary = ships[i]
+			var site := _liner_site(pts, total, float(entry.get("at", 0.5)), length, beam, ground, mask,
+				bridge_list, eye, taken, m)
+			if site.is_empty():
+				continue
+			var axis: Vector2 = site["axis"]
+			if i % 2 == 1:
+				axis = -axis
+			var span := _liner_span(pts, total, float(site["t"]), float(site["across"]), length, beam, ground,
+				mask, bridge_list, m)
+			out.append({"route": str(route["id"]), "route_row": route, "at": float(entry.get("at", 0.5)),
+				"line": str(entry.get("line", route.get("line", ""))),
+				"centre": site["centre"], "axis": axis, "pts": pts, "t": site["t"], "across": site["across"],
+				"lo": span.x, "hi": span.y, "dir": -1.0 if i % 2 == 1 else 1.0, "length": length})
+			taken.append({"centre": site["centre"], "length": length})
+		_keep_apart(out, str(route["id"]), (length + 80.0) * m)
+	return out
+
+## Wide fallback window (m) used only when a berthed hull sits on every
+## in-window site: the liner squeezes past instead of vanishing.
+const LINER_ALONG_WIDE_M := [0.0, 80.0, -80.0, 180.0, -180.0, 320.0, -320.0, 500.0, -500.0]
+const LINER_ACROSS_WIDE_M := [0.0, 30.0, -30.0, 70.0, -70.0, 130.0, -130.0, 200.0, -200.0, 280.0, -280.0]
+
+static func _liner_site(pts: PackedVector2Array, total: float, share: float, length: float, beam: float,
+		ground: GroundTruth, mask: VegetationMask, bridge_list: Dictionary, eye: Vector2, taken: Array,
+		m: float) -> Dictionary:
+	var site := _liner_search(pts, total, share, length, beam, ground, mask, bridge_list, eye, taken, m,
+		LINER_ALONG_M, LINER_ACROSS_M)
+	if not site.is_empty():
+		return site
+	# Squeeze past instead of vanishing: the same window with no hulls
+	# finds open water, so only berthed hulls block the liner. Water,
+	# bridge or eye blockage still drops it.
+	var open_water := _liner_search(pts, total, share, length, beam, ground, mask, bridge_list, eye, [], m,
+		LINER_ALONG_M, LINER_ACROSS_M)
+	if open_water.is_empty():
+		return {}
+	return _liner_search(pts, total, share, length, beam, ground, mask, bridge_list, eye, taken, m,
+		LINER_ALONG_WIDE_M, LINER_ACROSS_WIDE_M)
+
+static func _liner_search(pts: PackedVector2Array, total: float, share: float, length: float, beam: float,
+		ground: GroundTruth, mask: VegetationMask, bridge_list: Dictionary, eye: Vector2, taken: Array,
+		m: float, alongs: Array, acrosses: Array) -> Dictionary:
+	for along: float in alongs:
+		var t := clampf(total * share + along * m, length * m, total - length * m)
+		var sample := MarinaBuilder._at(pts, t, [0, 0.0])
+		var at: Vector2 = sample[0]
+		var dir: Vector2 = sample[1]
+		var side := Vector2(-dir.y, dir.x)
+		for across: float in acrosses:
+			var c: Vector2 = at + side * across * m
+			if c.distance_to(eye) < (LINER_EYE_CLEAR_M + length * 0.5) * m \
+					or not _open(ground, mask, c, dir, (length + 2.0 * LINER_MARGIN_M) * m,
+						(beam + 2.0 * LINER_MARGIN_M) * m) \
+					or QuayMoorings.near_bridge(bridge_list, c - dir * length * 0.5 * m,
+						c + dir * length * 0.5 * m, (beam * 0.5 + LINER_MARGIN_M) * m):
+				continue
+			var clear := true
+			for other: Dictionary in taken:
+				var gap := hull_gap(length, float(other.get("length", length)), LINER_TAKEN_GAP_M)
+				clear = clear and (other["centre"] as Vector2).distance_to(c) > gap * m
+			if clear:
+				return {"centre": c, "axis": dir, "t": t, "across": across}
+	return {}
+
+static func _liner_span(pts: PackedVector2Array, total: float, t: float, across: float, length: float,
+		beam: float, ground: GroundTruth, mask: VegetationMask, bridge_list: Dictionary, m: float) -> Vector2:
+	var out := Vector2(t, t)
+	for dir_s: float in [-1.0, 1.0]:
+		var at_t := t
+		while true:
+			var next := at_t + dir_s * LINER_SPAN_STEP_M * m
+			if next < length * 0.5 * m or next > total - length * 0.5 * m:
+				break
+			var sample := MarinaBuilder._at(pts, next, [0, 0.0])
+			var dir: Vector2 = sample[1]
+			var c: Vector2 = (sample[0] as Vector2) + Vector2(-dir.y, dir.x) * across * m
+			if not _open(ground, mask, c, dir, (length + 2.0 * LINER_MARGIN_M) * m,
+					(beam + 2.0 * LINER_MARGIN_M) * m) \
+					or QuayMoorings.near_bridge(bridge_list, c - dir * length * 0.5 * m,
+						c + dir * length * 0.5 * m, (beam * 0.5 + LINER_MARGIN_M) * m):
+				break
+			at_t = next
+		if dir_s < 0.0:
+			out.x = at_t
+		else:
+			out.y = at_t
+	return out

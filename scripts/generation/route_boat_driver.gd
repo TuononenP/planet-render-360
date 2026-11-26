@@ -8,7 +8,8 @@ extends Node
 ## length where it stands), "lo"/"hi" (the stretch of the route its hull
 ## stays in open water and clear of the other boats of the line), "dir"
 ## (+1 along the line, -1 back), "across" (its offset from the line), "speed",
-## "y" (the water level) and "length" (m).
+## "y" (the water level) and "length" (m). Optional "accel"/"brake" (m/s2),
+## "turn" (rad/s) and "dwell" (s) override the defaults for large ships.
 ## A boat accelerates to its cruising speed, brakes for the end of its
 ## stretch, dwells there turning round, and goes back; the wake shows
 ## while it makes way. Time is the sum of the deltas given to advance(), so a
@@ -85,6 +86,10 @@ func _step(b: Dictionary, dt: float) -> void:
 		b["yaw"] = yaw_goal
 		b["v"] = 0.0
 		b["wait"] = 0.0
+	var accel := float(b.get("accel", ACCEL_MS2))
+	var brake := float(b.get("brake", BRAKE_MS2))
+	var turn_rate := float(b.get("turn", TURN_RAD_S))
+	var dwell := float(b.get("dwell", DWELL_S))
 	var wait := float(b["wait"])
 	if wait > 0.0:
 		b["wait"] = wait - dt
@@ -93,17 +98,17 @@ func _step(b: Dictionary, dt: float) -> void:
 		var dir := float(b["dir"])
 		var s := float(b["s"])
 		var room := (float(b["hi"]) - s) if dir > 0.0 else (s - float(b["lo"]))
-		var v := minf(float(b["v"]) + ACCEL_MS2 * dt, float(b["speed"]))
-		v = minf(v, sqrt(2.0 * BRAKE_MS2 * maxf(room, 0.0)) + 0.3)
+		var v := minf(float(b["v"]) + accel * dt, float(b["speed"]))
+		v = minf(v, sqrt(2.0 * brake * maxf(room, 0.0)) + 0.3)
 		s += dir * v * dt
 		b["s"] = clampf(s, float(b["lo"]), float(b["hi"]))
 		b["v"] = v
 		if room - v * dt <= ARRIVE_M:
 			b["dir"] = -dir
-			b["wait"] = DWELL_S
+			b["wait"] = dwell
 			b["v"] = 0.0
 	var turn := wrapf(yaw_goal - float(b["yaw"]), -PI, PI)
-	b["yaw"] = float(b["yaw"]) + clampf(turn, -TURN_RAD_S * dt, TURN_RAD_S * dt)
+	b["yaw"] = float(b["yaw"]) + clampf(turn, -turn_rate * dt, turn_rate * dt)
 
 ## The boat's place: the route at `s`, `across` to the side.
 func _place(b: Dictionary) -> Vector2:

@@ -80,13 +80,33 @@ static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask) 
 		return _plan_cached
 	var m := WorldScale.metres_to_units()
 	var out: Array = []
+	# One shared separation list across the moored fleets: a berthed ferry,
+	# an icebreaker raft and a market boat never share a hull rectangle,
+	# even though none of them moves.
+	var taken: Array = []
 	if mask != null:
-		out.append_array(_commuters(data, ground, mask, m))
-	out.append_array(_icebreakers(data, ground, m))
-	out.append_array(_market_boats(data, ground, m))
+		out.append_array(_commuters(data, ground, mask, m, taken))
+	out.append_array(_icebreakers(data, ground, m, taken))
+	out.append_array(_market_boats(data, ground, m, taken))
 	_plan_for = key
 	_plan_cached = out
 	return out
+
+## Fender gap (m) kept between the hulls of two stationary vessels.
+const CLEAR_M := 4.0
+
+## True when a `length`-metre hull at `c` keeps half-lengths plus CLEAR_M
+## from every taken {"centre", "length"} hull, except `ignore` (a raft
+## lies outboard of its parent by design).
+static func _clear_of(taken: Array, c: Vector2, length: float, m: float, ignore: Vector2 = Vector2.INF) -> bool:
+	for other: Dictionary in taken:
+		var oc: Vector2 = other["centre"]
+		if oc == ignore:
+			continue
+		var gap := (length + float(other.get("length", length))) * 0.5 + CLEAR_M
+		if oc.distance_to(c) <= gap * m:
+			return false
+	return true
 
 ## `points` ([lat, lon] rows) as world XZ in internal units.
 static func _world(data: LocationData, points: Array, m: float) -> PackedVector2Array:
@@ -103,11 +123,11 @@ static func _any_inside(ground: GroundTruth, pts: PackedVector2Array) -> bool:
 
 # --- Commuter ferries and water buses -----------------------------------
 
-static func _commuters(data: LocationData, ground: GroundTruth, mask: VegetationMask, m: float) -> Array:
+static func _commuters(data: LocationData, ground: GroundTruth, mask: VegetationMask, m: float,
+		taken: Array) -> Array:
 	var out: Array = []
 	var eye := View360.spawn_xz(data)
 	var bridge_list := {}
-	var taken: Array = []
 	for row: Dictionary in HarbourVesselData.FERRY_ROUTES:
 		if str(row.get("kind", "")) != "route":
 			continue
@@ -126,7 +146,7 @@ static func _commuters(data: LocationData, ground: GroundTruth, mask: Vegetation
 					mask, bridge_list, eye, taken, m)
 			if site.is_empty():
 				continue
-			taken.append({"centre": site["centre"]})
+			taken.append({"centre": site["centre"], "length": length})
 			out.append({"kind": "commuter", "prefix": "CommuterFerry_", "id": str(row["id"]), "row": row,
 				"centre": site["centre"], "axis": site["axis"], "length": length, "beam": beam,
 				"underway": not berthed})
@@ -149,7 +169,8 @@ static func _berth_site(pts: PackedVector2Array, total: float, length: float, be
 				continue
 			var clear := true
 			for other: Dictionary in taken:
-				clear = clear and (other["centre"] as Vector2).distance_to(c) > (length + 6.0) * m
+				var gap := (length + float(other.get("length", length))) * 0.5 + 6.0
+				clear = clear and (other["centre"] as Vector2).distance_to(c) > gap * m
 			if clear:
 				return {"centre": c, "axis": dir}
 		t += BERTH_ALONG_M * m
@@ -185,7 +206,7 @@ static func _offset_over_water(ground: GroundTruth, at: Vector2, dir: Vector2, s
 		off += FENDER_STEP_M
 	return -1.0
 
-static func _icebreakers(data: LocationData, ground: GroundTruth, m: float) -> Array:
+static func _icebreakers(data: LocationData, ground: GroundTruth, m: float, taken: Array) -> Array:
 	var out: Array = []
 	for fleet: Dictionary in HarbourVesselData.MOORED_FLEETS:
 		if str(fleet.get("kind", "")) != "icebreaker":
@@ -213,23 +234,31 @@ static func _icebreakers(data: LocationData, ground: GroundTruth, m: float) -> A
 					# Outboard of the ship before it, one fender apart.
 					start = float(previous["offset"]) + float(previous["beam"]) * 0.5 + beam * 0.5 + 1.0
 				var off := _offset_over_water(ground, spot, heading, side, length, beam, start, m)
-				if off >= 0.0:
-					found = {"at": spot, "dir": heading, "side": side, "offset": off, "shift": slide}
-					break
+				if off < 0.0:
+					continue
+				var centre := spot + Vector2(-heading.y, heading.x) * side * off * m
+				# A raft lies outboard of its parent by design; every other
+				# hull keeps half-lengths plus a fender gap, moving or not.
+				if not _clear_of(taken, centre, length, m, previous.get("centre", Vector2.INF)):
+					continue
+				found = {"at": spot, "dir": heading, "side": side, "offset": off, "shift": slide,
+					"centre": centre}
+				break
 			if found.is_empty():
 				previous = {}
 				continue
 			shift = float(found["shift"])
 			var at: Vector2 = found["at"]
 			var dir: Vector2 = found["dir"]
-			var centre := at + Vector2(-dir.y, dir.x) * float(found["side"]) * float(found["offset"]) * m
+			var centre: Vector2 = found["centre"]
 			out.append({"kind": "icebreaker", "prefix": "Icebreaker_", "id": str(ship.get("name", "")),
 				"name": str(ship.get("name", "")), "centre": centre, "axis": dir, "length": length,
 				"beam": beam, "underway": false})
-			previous = {"offset": found["offset"], "beam": beam, "side": found["side"]}
+			taken.append({"centre": centre, "length": length})
+			previous = {"offset": found["offset"], "beam": beam, "side": found["side"], "centre": centre}
 	return out
 
-static func _market_boats(data: LocationData, ground: GroundTruth, m: float) -> Array:
+static func _market_boats(data: LocationData, ground: GroundTruth, m: float, taken: Array) -> Array:
 	var out: Array = []
 	for fleet: Dictionary in HarbourVesselData.MARKET_BOATS:
 		var pts := _world(data, fleet["quay"], m)
@@ -252,10 +281,16 @@ static func _market_boats(data: LocationData, ground: GroundTruth, m: float) -> 
 			var off := _offset_over_water(ground, at, dir, side, length, beam, FENDER_M + beam * 0.5, m)
 			if off < 0.0:
 				continue
+			var centre := at + Vector2(-dir.y, dir.x) * side * off * m
+			# A market boat never shares a hull rectangle with a berthed
+			# ferry or an icebreaker, even though none of them moves.
+			if not _clear_of(taken, centre, length, m):
+				continue
+			taken.append({"centre": centre, "length": length})
 			var hulls: Array = MarketBoatModel.HULLS
 			var awnings: Array = MarketBoatModel.AWNINGS
 			out.append({"kind": "market", "prefix": "MarketBoat_", "id": "market boat",
-				"centre": at + Vector2(-dir.y, dir.x) * side * off * m, "axis": dir if i % 2 == 0 else -dir,
+				"centre": centre, "axis": dir if i % 2 == 0 else -dir,
 				"length": length, "beam": beam, "underway": false,
 				"hull": hulls[int(h * 997.0) % hulls.size()], "awning": awnings[int(h * 541.0) % awnings.size()]})
 	return out

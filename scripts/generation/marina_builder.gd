@@ -74,6 +74,20 @@ static func fleet_of(data: LocationData) -> Dictionary:
 	return {"hulls": hulls, "sail_share": float(row.get("sail_share", SAIL_SHARE)),
 		"yacht_share": float(row.get("yacht_share", NATURAL_YACHT_SHARE))}
 
+## The plan's large ships (LargeShips entries) kept on `data` for the
+## ground they were planned on, so HarbourFerries.build can separate its
+## moving ships from the berthed hulls without recomputing the berths.
+const STATIC_META := &"static_ships"
+const STATIC_GROUND := &"static_ships_ground"
+
+## The berthed large ships planned for `ground`, or [] when MarinaBuilder
+## has not planned this ground yet (callers fall back to planning).
+static func static_ships(data: LocationData, ground: GroundTruth) -> Array:
+	if data != null and ground != null and data.has_meta(STATIC_META) \
+			and data.get_meta(STATIC_GROUND) == ground:
+		return data.get_meta(STATIC_META)
+	return []
+
 ## Boats [position, yaw, scale, kind, colour], deck ribbons (each an
 ## Array of [x, z, water y]) for `data`'s piers, nearest boats first, and
 ## large ships (LargeShips entries: liners, ferries, then cargo ships).
@@ -205,6 +219,8 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		return 0
 	var m2u := WorldScale.metres_to_units()
 	var p := plan(data, ground, m2u, mask)
+	data.set_meta(STATIC_META, p["liners"])
+	data.set_meta(STATIC_GROUND, ground)
 	var boats: Array = p["boats"]
 	var decks: Array = p["decks"]
 	var liners: Array = p["liners"]
