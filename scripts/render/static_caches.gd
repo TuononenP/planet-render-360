@@ -128,14 +128,65 @@ static func release_all() -> void:
 	BridgeLandings._idx_surf = null
 	BridgeLandings._idx_ends.clear()
 	BridgeLandings._idx_segs.clear()
+	HarbourTraffic._plan_for.clear()
+	HarbourTraffic._plan_cached.clear()
+	QuayMoorings._scope.clear()
+	MalarShips._plan.clear()
+	MeshArrays._held.clear()
+	BuildingBasement._mats.clear()
+	BuildingDetail._mats.clear()
+	CarPaint._paint = null
+	CarPaint._shadow = null
+	FacadeLiteShader._shader = null
+	FountainWater._flow_mat = null
+	FountainWater._foam_mat = null
+	FountainWater._mist_mat = null
+	FountainWater._flow_fallback = null
+	FountainWater._foam_fallback = null
+	LandmarkShader._shader = null
+	LandmarkShader._swapped.clear()
+	RoadBuilder._mats.clear()
+	RoadBuilder._stone_deck = null
+	RoadDecals._cover = null
+	RoadDecals._grate = null
+	RoadDecals._litter = null
+	RooflineDetail._mats.clear()
+	StreetProps._lamp_meshes.clear()
+	StreetProps._fence_tex = null
+	StreetProps._chainlink_tex = null
+	StreetProps._mats.clear()
+	TreeImpostor._tex.clear()
+	TreeMeshLibrary._bufs.clear()
+	TreeMeshLibrary._meshes.clear()
+	TreeMeshLibrary._mats.clear()
+	TreeMeshLibrary._shader_leaf = null
+	TreeMeshLibrary._shader_imp = null
+	VegetationBuilder._canopy_mesh = null
+	VegetationBuilder._card_mats_by_season.clear()
+	CarModel._meshes.clear()
+	CarModel._materials.clear()
 	TramModel._meshes.clear()
 	TramModel._materials.clear()
 	TramBoards._materials.clear()
+	TransitVehicles._bus_meshes.clear()
+	TransitVehicles._shadows.clear()
+	TukTukModel._meshes.clear()
+	WaterWakes._wake_mat = null
+	WaterWakes._collar_mat = null
+	GodrayShader._rays_shader = null
+	GodrayShader._overlay_shader = null
+	Precipitation._drift_shader = null
+	SharedShader._by_code.clear()
+	PrivacyHero._disc = null
+	VideoScaler._shader = null
+	AccentSun.refresh = Callable()
+	AccentSun._tween = null
+	PostpassGate._busy = null
+	PostpassGate._queue.clear()
 	FarSurface._shader = null
 	ShoreRailings._white_mat = null
 	RealityMeshKit._cache.clear()
 	LandmarkSfAlcatrazSurface._material = null
-	HarbourTraffic._plan_cached.clear()
 	BuildingMasses.end_build()
 	OsmParseCache.clear()
 	ClimateFetcher.clear_static_caches()

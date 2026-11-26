@@ -171,8 +171,8 @@ func _marks() -> Dictionary:
 	return {
 		"trees": v._tree_lod.centre() if v._tree_lod != null else Vector2.INF,
 		"near": v._near_window.centre() if v._near_window != null else Vector2.INF,
-		"gather": v._drone._near_at,
-		"floor": v._drone._floor_here,
+		"gather": v._drone._obstacles._bldg_count,
+		"floor": v._drone._on_surface,
 		"stream": v._streamer.state,
 		"swap": v._generated.get_instance_id() if is_instance_valid(v._generated) else 0,
 	}
@@ -191,8 +191,7 @@ func _time_jobs() -> void:
 	var data := v._data
 	var drone := v._drone
 	var spans := ViewDrone.reaches(data.buildings)
-	var near := ViewDrone.nearby(data.buildings, spans, eye, View360.CLEAR_RADIUS_M + ViewDrone.NEAR_REFRESH_M
-		+ ViewDrone.CRUISE_MPS * ViewDrone.BOOST_MULT * ViewDrone.LOOKAHEAD_S)
+	var near := ViewDrone.nearby(data.buildings, spans, eye, 258.0)
 	_time("reaches", func() -> void: ViewDrone.reaches(data.buildings))
 	_time("nearby", func() -> void: ViewDrone.nearby(data.buildings, spans, eye, 258.0))
 	_time("floor_x2 (%d near)" % near.size(), func() -> void:
@@ -209,7 +208,7 @@ func _time_jobs() -> void:
 		var img := nw._tex.get_image()
 		if img != null:
 			_time("near_upload %dpx" % img.get_width(), func() -> void: nw._tex.update(img))
-	drone._near_at = Vector2.INF
+	drone._obstacles.invalidate()
 
 func _time(label: String, job: Callable) -> void:
 	var best := INF
