@@ -31,6 +31,7 @@ const AHN_COVERAGE := "dtm_05m"
 const MML_URL := "https://www.nic.funet.fi/index/geodata/mml/dem2m/2008_latest"
 const MML_HEADER_BYTES := 16384
 const MML_MAX_RANGE_BYTES := 2 * 1024 * 1024
+const MML_CACHE_VERSION := 2
 const EPSG_3857 := "http://www.opengis.net/def/crs/EPSG/0/3857"
 ## Mapterhorn's keyless Terrarium tiles (512 px lossless WebP). In Sweden
 ## they carry Lantmäteriet's Markhöjdmodell (1 m laser bare earth; the
@@ -72,7 +73,8 @@ static func timeout_for(source: String) -> float:
 	return SWISS_TIMEOUT_S if source == "swisstopo" else TOTAL_TIMEOUT_S
 
 static func cache_path(source: String, lat: float, lon: float, ext: String) -> String:
-	return "%s/gmodel_v1_%s_%d_%d.%s" % [CacheStore.base_dir(), source,
+	var ver := MML_CACHE_VERSION if source == "mml" else 1
+	return "%s/gmodel_v%d_%s_%d_%d.%s" % [CacheStore.base_dir(), ver, source,
 		CacheStore.quant(lat), CacheStore.quant(lon), ext]
 
 static func gsi_tile_path(layer: String, zoom: int, x: int, y: int) -> String:
@@ -324,38 +326,9 @@ func _mml(lat: float, lon: float, offline: bool) -> Dictionary:
 	var raster: Dictionary = await _in_thread(func() -> Dictionary:
 		var rasters: Array = []
 		for plan: Dictionary in plans:
-			var hdr: Dictionary = plan["hdr"]
-			var bw: int = hdr["bw"]
-			var bh: int = hdr["bh"]
-			var tx0: int = plan["tx0"]
-			var ty0: int = plan["ty0"]
-			var w_px := (int(plan["tx1"]) - tx0 + 1) * bw
-			var h_px := (int(plan["ty1"]) - ty0 + 1) * bh
-			var sub := PackedFloat32Array()
-			sub.resize(w_px * h_px)
-			sub.fill(NAN)
-			var comp: int = hdr["compression"]
-			var pred: int = hdr["predictor"]
-			var big: bool = hdr["big"]
-			for t: Dictionary in plan["tiles"]:
-				var blob: PackedByteArray = range_blobs[int(t["job"])]
-				var rel: int = t["rel_off"]
-				var tlen: int = t["len"]
-				if rel < 0 or rel + tlen > blob.size():
-					continue
-				var vals := GroundTiff.decode_tile(blob.slice(rel, rel + tlen), bw, bh, bh, comp, pred, big)
-				if vals.size() != bw * bh:
-					continue
-				var x0 := (int(t["tx"]) - tx0) * bw
-				var y0 := (int(t["ty"]) - ty0) * bh
-				for r in bh:
-					for c in bw:
-						sub[(y0 + r) * w_px + x0 + c] = GroundModel.valid_height(vals[r * bw + c])
-			var orig: Vector2 = hdr["origin"]
-			var cell: Vector2 = hdr["cell"]
-			rasters.append({"size": Vector2i(w_px, h_px), "values": sub,
-				"origin": Vector2(orig.x + float(tx0 * bw) * cell.x, orig.y - float(ty0 * bh) * cell.y),
-				"cell": cell})
+			var sub_raster := assemble_mml_subraster(plan, range_blobs)
+			if not sub_raster.is_empty():
+				rasters.append(sub_raster)
 		var mosaic := mosaic_rasters(rasters)
 		if mosaic.is_empty():
 			return {}
@@ -363,6 +336,51 @@ func _mml(lat: float, lon: float, offline: bool) -> Dictionary:
 	if not raster.is_empty() and GroundModel.missing_share(raster) <= GroundModel.MAX_MISSING:
 		_save_raster(cache, raster)
 	return raster
+
+## Assembles the requested tile window of one MML GeoTIFF sheet into a
+## sub-raster clipped to the sheet's true pixel dimensions (hdr["width"],
+## hdr["height"]). Edge tiles are padded to bw × bh with 0.0 past the
+## sheet border; leaving that padding unclipped bleeds a 144 m zero-metre
+## trench over the neighbouring sheet in mosaic_rasters.
+static func assemble_mml_subraster(plan: Dictionary, range_blobs: Array) -> Dictionary:
+	var hdr: Dictionary = plan["hdr"]
+	var img_w: int = hdr["width"]
+	var img_h: int = hdr["height"]
+	var bw: int = hdr["bw"]
+	var bh: int = hdr["bh"]
+	var tx0: int = plan["tx0"]
+	var ty0: int = plan["ty0"]
+	var w_px := mini((int(plan["tx1"]) + 1) * bw, img_w) - tx0 * bw
+	var h_px := mini((int(plan["ty1"]) + 1) * bh, img_h) - ty0 * bh
+	if w_px <= 0 or h_px <= 0:
+		return {}
+	var sub := PackedFloat32Array()
+	sub.resize(w_px * h_px)
+	sub.fill(NAN)
+	var comp: int = hdr["compression"]
+	var pred: int = hdr["predictor"]
+	var big: bool = hdr["big"]
+	for t: Dictionary in plan["tiles"]:
+		var blob: PackedByteArray = range_blobs[int(t["job"])]
+		var rel: int = t["rel_off"]
+		var tlen: int = t["len"]
+		if rel < 0 or rel + tlen > blob.size():
+			continue
+		var vals := GroundTiff.decode_tile(blob.slice(rel, rel + tlen), bw, bh, bh, comp, pred, big)
+		if vals.size() != bw * bh:
+			continue
+		var x0 := (int(t["tx"]) - tx0) * bw
+		var y0 := (int(t["ty"]) - ty0) * bh
+		var rows := mini(bh, h_px - y0)
+		var cols := mini(bw, w_px - x0)
+		for r in rows:
+			for c in cols:
+				sub[(y0 + r) * w_px + x0 + c] = GroundModel.valid_height(vals[r * bw + c])
+	var orig: Vector2 = hdr["origin"]
+	var cell: Vector2 = hdr["cell"]
+	return {"size": Vector2i(w_px, h_px), "values": sub,
+		"origin": Vector2(orig.x + float(tx0 * bw) * cell.x, orig.y - float(ty0 * bh) * cell.y),
+		"cell": cell}
 
 ## Lantmäteriet's bare earth from the Mapterhorn tiles over the window,
 ## decoded and mosaicked in Web Mercator, resampled to MML_CELLS and cached
@@ -495,7 +513,9 @@ static func mosaic_rasters(rasters: Array) -> Dictionary:
 		var y0 := roundi((lo.y - o.y) / cell.y)
 		for row in s.y:
 			for col in s.x:
-				values[(y0 + row) * width + x0 + col] = GroundModel.valid_height(src[row * s.x + col])
+				var h := GroundModel.valid_height(src[row * s.x + col])
+				if not is_nan(h):
+					values[(y0 + row) * width + x0 + col] = h
 	return {"size": Vector2i(width, height), "values": values, "origin": lo, "cell": cell}
 
 ## One raster from the GSI z15 tiles covering the window.

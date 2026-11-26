@@ -433,6 +433,43 @@ func _reproject_and_mosaic() -> void:
 	var mv: PackedFloat32Array = m["values"]
 	_check(m["size"] == Vector2i(4, 2) and mv[0] == 1.0 and mv[2] == 5.0 and mv[5] == 4.0 and mv[7] != mv[7],
 		"mosaic wrong: %s" % [mv])
+	# Overlapping NAN in a later raster must not wipe a valid height from an earlier one.
+	var c_nan := {"size": Vector2i(2, 2), "values": PackedFloat32Array([NAN, 9.0, NAN, NAN]),
+		"origin": Vector2(0.0, 20.0), "cell": Vector2(10.0, 10.0)}
+	var m_keep := GroundModelFetcher.mosaic_rasters([a, c_nan])
+	var mkv: PackedFloat32Array = m_keep["values"]
+	_check(mkv[0] == 1.0 and mkv[1] == 9.0 and mkv[2] == 3.0 and mkv[3] == 4.0,
+		"mosaic overwrote valid height with NAN: %s" % [mkv])
+	# Edge-tile padding beyond hdr["width"]/hdr["height"] (0.0 in MML GeoTIFFs)
+	# must be clipped so it never bleeds a zero-metre trench across a sheet border.
+	var bw := 8
+	var bh := 8
+	var north_tile := PackedByteArray()
+	north_tile.resize(bw * bh * 4)
+	for tr in bh:
+		for tc in bw:
+			# Only rows 0..1 and cols 0..1 are inside the 10x10 sheet; the rest is 0.0 padding.
+			north_tile.encode_float((tr * bw + tc) * 4, 50.0 if (tr < 2 and tc < 2) else 0.0)
+	var north_hdr := {"width": 10, "height": 10, "bw": bw, "bh": bh,
+		"compression": 1, "predictor": 1, "big": false,
+		"origin": Vector2(0.0, 100.0), "cell": Vector2(2.0, 2.0)}
+	var north_plan := {"hdr": north_hdr, "tx0": 1, "tx1": 1, "ty0": 1, "ty1": 1,
+		"tiles": [{"tx": 1, "ty": 1, "job": 0, "rel_off": 0, "len": north_tile.size()}]}
+	var north_sub := GroundModelFetcher.assemble_mml_subraster(north_plan, [north_tile])
+	_check(north_sub.get("size") == Vector2i(2, 2),
+		"MML edge subraster was not clipped to sheet dimensions: %s" % [north_sub.get("size")])
+	var south_sub := {"size": Vector2i(2, 4), "values": PackedFloat32Array([48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0]),
+		"origin": Vector2(16.0, 80.0), "cell": Vector2(2.0, 2.0)}
+	for order in [[north_sub, south_sub], [south_sub, north_sub]]:
+		var border := GroundModelFetcher.mosaic_rasters(order)
+		var bv: PackedFloat32Array = border["values"]
+		var min_h := INF
+		for h in bv:
+			min_h = minf(min_h, h)
+		_check(border["size"] == Vector2i(2, 6) and min_h >= 48.0,
+			"MML sheet border mosaic bled padding: size=%s min=%.2f" % [border["size"], min_h])
+	_check(GroundModelFetcher.cache_path("mml", 60.32, 24.976, "bil").contains("gmodel_v2_mml_"),
+		"MML cache key must be v2 to bypass legacy zero-trench cache files")
 
 func _swiss_listing() -> void:
 	var listing := JSON.stringify({"features": [
