@@ -128,6 +128,9 @@ var _lod_spread := LodSpread.new()
 ## A place opens in drone mode (the app sets this; tests and captures
 ## open on foot).
 var start_flying := false
+## A place opens in full Live mode (real clock, today's date, current season
+## and live weather): the app sets this; tests and captures keep golden hour.
+var open_live := false
 var _precip: GPUParticles3D
 var _pinch_base := 0.0
 var _magnify_accum := 1.0
@@ -322,10 +325,12 @@ func _rebuild_world(prebuilt: Node3D = null, pre_ranged := false) -> void:
 			_ground = GroundTruth.new(_data)
 		_streamer._detail.halt()  # a main-thread build, never beside a detail pass
 		_generated = make_world(_data, _ground)
-	# Range the near/mid rings for the current preset (a streamed world
-	# arrives already ranged: the streamer ranges it while it waits).
+	# Range the near/mid rings for the current preset (a streamed or freshly
+	# built world arrives already ranged on its worker thread).
 	LodRing.city_boost = CityDetail.city_at(_data.latitude, _data.longitude) != ""
-	if not pre_ranged or prebuilt == null:
+	var already_ranged := prebuilt != null and (pre_ranged
+		or int(prebuilt.get_meta(&"pre_ranged_preset", -1)) == _quality_preset)
+	if not already_ranged:
 		LodRing.apply(_generated, _quality_preset)
 	_world_root.add_child(_generated)
 	ViewConditions.apply_surface_state(self)  # climate snow, rain, ice
@@ -377,7 +382,12 @@ func build_location(data: LocationData, ground: GroundTruth = null,
 		var stopped := abort != null and abort.requested
 		if not stopped:
 			BuildPrewarm.remember()
-		return [g, w, WorldCache.pack(w) if not stopped and WorldCache.pack_wanted(bg) else null],
+		var packed := WorldCache.pack(w) if not stopped and WorldCache.pack_wanted(bg) else null
+		if not stopped and w != null:
+			LodRing.city_boost = CityDetail.city_at(data.latitude, data.longitude) != ""
+			LodRing.apply(w, data.quality_preset)
+			w.set_meta(&"pre_ranged_preset", data.quality_preset)
+		return [g, w, packed],
 		Thread.PRIORITY_LOW if bg and not abort.urgent else Thread.PRIORITY_NORMAL)
 	# The merge and the pack ask the rendering server about every mesh
 	# node, and each answer to a worker thread waits for the main thread's
@@ -462,9 +472,14 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 		_ground = prebuilt[0]
 		_rebuild_world(prebuilt[1])
 	ViewChrome.show_place(self, data)
-	# Spawn at the preset's preferred hour when provided; otherwise use
-	# the place's own afternoon golden hour. The slider still leaves it.
-	ViewConditions.spawn_golden_hour(self)
+	# Live app opens in real time, today's date, current season and live
+	# weather unless a link/restore carries explicit conditions. Captures
+	# and tests keep the curated/golden hour.
+	var explicit_conditions := data.view.has("minutes") or data.view.has("date") or data.view.has("season")
+	if open_live and not explicit_conditions:
+		ViewConditions.use_live_conditions(self)
+	else:
+		ViewConditions.spawn_golden_hour(self)
 	var spawn := spawn_xz(data)
 	_rig.position = Vector3(spawn.x, eye_y(data, _ground, spawn), spawn.y)
 	var look: Vector2
@@ -512,7 +527,8 @@ func show_location(data: LocationData, prebuilt: Array = []) -> void:
 	if _date_picker != null:
 		_date_picker.close_picker()
 	_queue_snapshot(data)
-	ViewConditions.reset_weather(self)
+	var custom_day := data.view.has("season") or (data.view.has("date") and not DatePicker._same(data.view["date"], ViewConditions.place_today(self)))
+	ViewConditions.reset_weather(self, 1 if custom_day else 0)
 	if _weather != null:
 		_weather.fetch(data.latitude, data.longitude)
 	if _wiki != null:

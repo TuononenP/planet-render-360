@@ -370,6 +370,8 @@ static func refresh_theme(v: View360) -> void:
 	if v._hud == null:
 		return
 	v._season_btn.restyle()
+	if v._date_picker != null:
+		v._date_picker.refresh_theme()
 	v._sun_arc.restyle()
 	v._sheet_grip.queue_redraw()
 	ViewTools.sync(v)

@@ -612,7 +612,21 @@ func _view_wiring() -> void:
 		await process_frame
 	_check(date_cleared and view._sun_arc.day_btn.text == "Summer", "a season returns to the season's own day")
 	ViewConditions.use_live_time(view)
+	while view._season_building:
+		await process_frame
 	_check(view._live_time and view._date.is_empty(), "Now clears the date")
+	_check(view._date_picker.is_live and view._date_picker.live_btn != null, "Live button is active above Season/Weather")
+	# Scrubbing time from Live keeps today's date and live weather, leaving only live clock.
+	var today := ViewConditions.place_today(view)
+	ViewConditions.set_time_minutes(view, 720.0)
+	_check(not view._live_time and DatePicker._same(view._date, today) and view._weather_pick == 0
+		and not view._date_picker.is_live, "scrubbing from Live preserves today's date and live weather")
+	# Clicking Live restores real clock, today's date, current season and live weather.
+	view._date_picker.live_requested.emit()
+	while view._season_building:
+		await process_frame
+	_check(view._live_time and view._date.is_empty() and view._weather_pick == 0
+		and view._date_picker.is_live, "Live button restores live clock, date, season and weather")
 	ViewTools.toggle_date(view)
 	_check(view._date_picker.visible, "the date button opens the picker")
 	var esc := InputEventKey.new()
@@ -630,23 +644,33 @@ func _view_wiring() -> void:
 		and HudParts.weather_icon(63) == "cloud-rain" and HudParts.weather_icon(95) == "cloud-lightning",
 		"the live chip's glyphs match the presets")
 	ViewConditions._on_weather(view, 21.0, "Clear", 5.0, 0)
-	_check(view._weather_pick == 0 and view._atmos.weather_code == 0 and view._weather_value.visible,
-		"live weather shows while Live is on")
+	_check(view._weather_pick == 0 and view._atmos.weather_code == 0 and view._weather_value.visible
+		and picker.weather_rows[0].selected == -1 and picker.weather_rows[1].selected == -1,
+		"live weather shows while Live is on and no override segment is selected")
 	picker.weather_rows[1].item_selected.emit(2)
-	_check(view._weather_pick == 6 and view._atmos.weather_code == 73
+	_check(view._weather_pick == 7 and view._atmos.weather_code == 73
 		and view._precip != null and view._precip.emitting, "Snow forces snowfall")
-	_check(picker.weather_rows[0].selected == -1 and picker.weather_rows[1].selected == 2,
-		"one weather segment is on across both rows")
+	_check(picker.weather_rows[0].selected == -1 and picker.weather_rows[1].selected == 2
+		and not picker.is_live, "one weather segment is on across both rows and leaves Live")
 	_check(view._weather_chip.visible and not view._weather_value.visible and view._weather_label.text == "Snow",
 		"the chip names the picked weather without a temperature")
 	ViewConditions._on_weather(view, 22.0, "Clear", 5.0, 0)
 	_check(view._atmos.weather_code == 73 and float(view._live_weather[0]) == 22.0,
 		"live weather landing later keeps the pick")
-	ViewConditions.pick_weather(view, 7)
+	ViewConditions.pick_weather(view, 8)
 	_check(bool(view._atmos.weather_look["storm"]), "Storm brings the thunderstorm")
 	ViewConditions.pick_weather(view, 0)
 	_check(view._atmos.weather_code == 0 and not view._precip.emitting and view._weather_value.visible
-		and picker.weather_rows[0].selected == 0, "Live returns to the real weather")
+		and picker.weather_rows[0].selected == -1 and picker.weather_rows[1].selected == -1,
+		"Live returns to the real weather with no override selected")
+	# Selecting Summer leaves Live weather so live winter snow never leaks into Summer.
+	ViewConditions._on_weather(view, -4.0, "Clear", 0.0, 0)
+	ViewConditions._on_season_selected(view, LocationData.Season.SUMMER)
+	while view._season_building:
+		await process_frame
+	_check(view._weather_pick == 1 and not picker.is_live and not view._live_time,
+		"picking Summer leaves Live clock and switches Live weather to Clear")
+	ViewConditions.pick_weather(view, 0)
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = false
@@ -659,7 +683,7 @@ func _view_wiring() -> void:
 	ViewChrome.layout(view)
 	await process_frame
 	_check(not view._weather_label.visible, "the live chip drops its word on a phone")
-	for pick in [1, 5, 7, 0]:
+	for pick in [1, 6, 8, 0]:
 		ViewConditions.pick_weather(view, pick)
 		ViewChrome.layout(view)
 		await process_frame
@@ -668,6 +692,16 @@ func _view_wiring() -> void:
 	view.size = Vector2(1280, 800)
 	ViewChrome.layout(view)
 	await process_frame
+	# open_live opens a fresh place in full Live mode (live clock, live weather, today's season).
+	var live_data := _flat(60.4518, 22.2666, "Liveville")
+	live_data.season = ViewLink.season_for_date(ViewConditions.place_today_at(live_data.latitude, live_data.longitude), live_data.latitude, live_data)
+	view.open_live = true
+	view.show_location(live_data)
+	while view._season_building:
+		await process_frame
+	_check(view._live_time and view._weather_pick == 0 and picker.is_live,
+		"open_live starts in full Live mode")
+	view.open_live = false
 	_check(view._weather_label.visible, "the live chip shows its word on a desktop")
 	ViewConditions.pick_weather(view, 4)
 	ViewConditions.reset_weather(view)

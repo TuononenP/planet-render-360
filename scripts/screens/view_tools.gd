@@ -56,6 +56,8 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._fps = FpsCounter.new()
 	v._hud.add_child(v._fps)
 	v._date_picker = DatePicker.new()
+	v._date_picker.live_requested.connect(func() -> void:
+		ViewConditions.use_live_conditions(v))
 	v._date_picker.date_picked.connect(func(date: Dictionary) -> void:
 		ViewConditions.set_date(v, date))
 	v._date_picker.season_requested.connect(func() -> void:
@@ -63,6 +65,7 @@ static func build(v: View360, chips: Container, actions: Container) -> void:
 	v._date_picker.season_picked.connect(func(index: int) -> void: v._on_season_selected(index))
 	v._date_picker.weather_picked.connect(func(index: int) -> void: ViewConditions.pick_weather(v, index))
 	v._date_picker.select_weather(v._weather_pick)
+	v._date_picker.set_live(ViewConditions.is_live(v))
 	# The season segments live in the sheet; the view keeps them in step.
 	v._season_btn = v._date_picker.seasons
 	v._date_picker.closed.connect(func() -> void:
@@ -130,6 +133,7 @@ static func toggle_date(v: View360) -> void:
 		v._date_picker.close_picker()
 	else:
 		var now := ViewConditions.place_now(v)
+		v._date_picker.set_live(ViewConditions.is_live(v))
 		v._date_picker.open_for(v._date, {"year": int(now["year"]), "month": int(now["month"]),
 			"day": int(now["day"])}, v._data.season)
 	sync(v)

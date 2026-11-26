@@ -30,6 +30,10 @@ static func weather_for_pick(pick: int, data: LocationData, date: Dictionary = {
 			out["rh"] = 22.0 if arid else 48.0
 			out["dew_point_c"] = base_t - (16.0 if arid else 9.0)
 			out["visibility_m"] = 28000.0
+		2:  # Partly cloudy
+			out["rh"] = 30.0 if arid else 58.0
+			out["dew_point_c"] = base_t - (13.0 if arid else 7.0)
+			out["visibility_m"] = 24000.0
 		3:  # Cloudy
 			out["rh"] = 38.0 if arid else 72.0
 			out["dew_point_c"] = base_t - (11.0 if arid else 4.5)
@@ -105,13 +109,16 @@ static func snow_state(data: LocationData, weather: Dictionary, date: Dictionary
 	var live_depth_m := float(weather.get("snow_depth_m", 0.0))
 
 	# Live snow on the ground (or falling below freezing) brings the snow line
-	# down to the viewpoint even outside winter; warm summer snowfall stays off.
-	if has_live_depth and live_depth_m > 0.01 and t_eff <= 5.0:
+	# down to the viewpoint even outside winter; never paint live winter snow
+	# onto an explicitly selected Summer scene (explicit Snow preset still sets
+	# preset=true and can force snow).
+	var allow_live_snow := s != LocationData.Season.SUMMER or bool(weather.get("preset", false))
+	if has_live_depth and live_depth_m > 0.01 and t_eff <= 5.0 and allow_live_snow:
 		on = true
 		var settled := ClimateModel.settled_line(-ClimateModel.SNOWY_RAMP_M)
 		line_y = minf(line_y, settled.x * m2u)
 		band = minf(band, settled.y * m2u)
-	elif snowing and t_eff <= 2.0 and s != LocationData.Season.SUMMER:
+	elif snowing and t_eff <= 2.0 and allow_live_snow:
 		on = true
 		var settled := ClimateModel.settled_line(-ClimateModel.SNOWY_RAMP_M)
 		line_y = minf(line_y, settled.x * m2u)

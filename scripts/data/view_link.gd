@@ -161,7 +161,7 @@ static func season_for_date(date: Dictionary, lat: float, data: LocationData = n
 	var m := int(date.get("month", 6))
 	if lat < 0.0:
 		m = (m + 5) % 12 + 1
-	if m == 3 and data != null and ClimateModel.month_temp_c(data, int(date.get("month", 3))) < 0.0:
+	if (m == 3 or m == 11) and data != null and ClimateModel.month_temp_c(data, int(date.get("month", m))) < 0.0:
 		return LocationData.Season.WINTER
 	if m in [3, 4, 5]:
 		return LocationData.Season.SPRING

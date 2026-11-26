@@ -5,10 +5,20 @@ extends RefCounted
 ## drives the AtmosphereRig and the time UI. World rebuilds stay
 ## in View360 (called back via `v`).
 static func _on_season_selected(v: View360, index: int) -> void:
-	# A season button means the season's own mid-month day again.
+	# A season button means the season's own mid-month day again: leave Live
+	# clock and Live weather so winter snow never leaks onto Summer.
+	v._lapse.stop()
+	_sync_lapse(v)
+	v._live_time = false
+	v._spawn_golden = false
 	v._date = {}
+	if v._weather_pick == 0:
+		pick_weather(v, 1)
 	date_changed(v)
 	await _select_season(v, index)
+	_apply_time(v, v._time_hour)
+	_sync_time_ui(v)
+	_sync_live_ui(v)
 
 static func _select_season(v: View360, index: int) -> void:
 	if v._data == null:
@@ -20,8 +30,11 @@ static func _select_season(v: View360, index: int) -> void:
 	if v._season_btn != null:
 		v._season_btn.select(v._data.season)
 	if v._sun_arc != null and v._date.is_empty():
-		v._sun_arc.set_day(v._data.season, "")
+		var shown_date := _effective_date(v)
+		var this_year := int(Time.get_date_dict_from_system().get("year", 0))
+		v._sun_arc.set_day(v._data.season, date_text(shown_date, not shown_date.is_empty() and int(shown_date["year"]) != this_year))
 	v._atmos.set_season(v._data.season)
+	_sync_live_ui(v)
 	# Climate snow / ice follow the season at once (shader globals); the
 	# rebuild below re-applies them to the new world's roads.
 	apply_surface_state(v)
@@ -78,18 +91,29 @@ static func _on_weather(v: View360, temp_c: float, label: String, cloud_cover: f
 		_apply_utc_offset(v, float(v._weather.utc_offset_s) / 3600.0)
 
 ## A weather segment in the Conditions sheet (DatePicker.WEATHER): Live
-## (0) is the place's real weather, the rest force a WMO code and cloud
+## (0) is the place's real weather, 1..8 force a WMO code and cloud
 ## cover through the same sky, precipitation and wet-surface path.
 static func pick_weather(v: View360, index: int) -> void:
 	v._weather_pick = clampi(index, 0, DatePicker.WEATHER.size() - 1)
 	if v._date_picker != null:
 		v._date_picker.select_weather(v._weather_pick)
 	_show_weather(v)
+	_sync_live_ui(v)
 
-## A new place opens on its live weather, which it has yet to fetch.
-static func reset_weather(v: View360) -> void:
+## A new place opens on its live weather (0) unless explicit view conditions
+## pin a different season/date (`pick = 1`, Clear).
+static func reset_weather(v: View360, pick: int = 0) -> void:
 	v._live_weather = []
-	pick_weather(v, 0)
+	pick_weather(v, pick)
+
+## Effective calendar date for WeatherDressing: the picked date, or today at
+## the place while live time is running.
+static func _effective_date(v: View360) -> Dictionary:
+	if not v._date.is_empty():
+		return v._date
+	if v._live_time:
+		return place_today(v)
+	return {}
 
 static func _weather_dict(v: View360) -> Dictionary:
 	if v._weather_pick == 0:
@@ -99,7 +123,7 @@ static func _weather_dict(v: View360) -> Dictionary:
 		if lw.size() >= 4:
 			return {"temp": float(lw[0]), "has_temp": true, "cloud": float(lw[2]), "code": int(lw[3])}
 		return {}
-	return WeatherDressing.weather_for_pick(v._weather_pick, v._data, v._date)
+	return WeatherDressing.weather_for_pick(v._weather_pick, v._data, _effective_date(v))
 
 static func _show_weather(v: View360) -> void:
 	var lw: Array = v._live_weather
@@ -136,6 +160,8 @@ static func _apply_utc_offset(v: View360, hours: float) -> void:
 	v._atmos.set_utc_offset(hours)
 	if v._live_time:
 		_apply_current_time(v)
+		date_changed(v)
+		_sync_live_ui(v)
 	elif at_spawn:
 		spawn_golden_hour(v)
 	else:
@@ -152,7 +178,7 @@ static func apply_surface_state(v: View360, dress_world := true) -> void:
 		return
 	var wd := _weather_dict(v)
 	var solar_elev := v._atmos.solar_elevation if v._atmos != null else 15.0
-	var state := WeatherDressing.solve(v._data, wd, v._date, solar_elev)
+	var state := WeatherDressing.solve(v._data, wd, _effective_date(v), solar_elev)
 	WeatherDressing.apply_globals(state)
 	if v._precip != null:
 		var wind_kmh := float(wd.get("wind_kmh", 0.0))
@@ -190,7 +216,7 @@ static func dress(world: Node, top: bool, v: View360, data: LocationData) -> voi
 		var raining := code in ClimateModel.RAINING
 		_wet_roads(world, 1.0 if raining else 0.0)
 		var solar_elev := v._atmos.solar_elevation if v._atmos != null else 15.0
-		var st := WeatherDressing.solve(data, wd, v._date, solar_elev)
+		var st := WeatherDressing.solve(data, wd, _effective_date(v), solar_elev)
 		var snow_depth := float(st["climate_snow_depth"])
 		var snow_on := float(st["climate_snow_on"]) > 0.0 and snow_depth > 0.01
 		RoofSnow.apply(world, snow_on, raining)
@@ -230,6 +256,7 @@ static func _wet_roads(world: Node, wet: float) -> void:
 static func spawn_golden_hour(v: View360) -> void:
 	# An hour slot uses the season's date, so the golden hour must be
 	# found on that date too, not on a live-time date still held.
+	v._live_time = false
 	v._atmos.date = {}
 	v._date = {}
 	date_changed(v)
@@ -242,19 +269,48 @@ static func spawn_golden_hour(v: View360) -> void:
 static func set_time_of_day(v: View360, hour: int) -> void:
 	v._lapse.stop()
 	_sync_lapse(v)
+	if v._live_time and v._date.is_empty() and v._data != null:
+		v._date = place_today(v)
+		date_changed(v)
 	v._live_time = false
 	v._spawn_golden = false
 	v._time_hour = float(clampi(hour, 0, 23))
 	_apply_time(v, v._time_hour)
 	_sync_time_ui(v)
+	_sync_live_ui(v)
 
 static func use_live_time(v: View360) -> void:
 	v._lapse.stop()
 	_sync_lapse(v)
 	v._live_time = true
+	v._spawn_golden = false
 	v._date = {}
+	if v._weather_pick != 0:
+		pick_weather(v, 0)
 	date_changed(v)
 	_apply_current_time(v)
+	_sync_live_ui(v)
+	if v._data != null:
+		var season := ViewLink.season_for_date(place_today(v), v._data.latitude, v._data)
+		if season != v._data.season:
+			_select_season(v, season)
+
+## Full Live conditions (top-level Live toggle in Conditions): live clock,
+## today's date, current season and live weather.
+static func use_live_conditions(v: View360) -> void:
+	use_live_time(v)
+
+## Whether real clock, today's date, current season and live weather are all on.
+static func is_live(v: View360) -> bool:
+	if not v._live_time or v._weather_pick != 0 or not v._date.is_empty():
+		return false
+	if v._data == null:
+		return true
+	return v._data.season == ViewLink.season_for_date(place_today(v), v._data.latitude, v._data)
+
+static func _sync_live_ui(v: View360) -> void:
+	if v._date_picker != null:
+		v._date_picker.set_live(is_live(v))
 
 ## Live time is the place's own clock and date (UTC + its offset), not
 ## the device's.
@@ -279,20 +335,39 @@ static func place_now(v: View360) -> Dictionary:
 	return Time.get_datetime_dict_from_unix_time(
 		int(Time.get_unix_time_from_system() + offset_h * 3600.0))
 
+static func place_today(v: View360) -> Dictionary:
+	var now := place_now(v)
+	return {"year": int(now.get("year", 2026)), "month": int(now.get("month", 1)),
+		"day": int(now.get("day", 1))}
+
+## Today's date {year, month, day} at (lat, lon) using the pre-weather UTC
+## offset guess, for picking the opening season before weather arrives.
+static func place_today_at(lat: float, lon: float) -> Dictionary:
+	var offset_h := AtmosphereRig._guess_utc_offset(lat, lon)
+	var now := Time.get_datetime_dict_from_unix_time(
+		int(Time.get_unix_time_from_system() + offset_h * 3600.0))
+	return {"year": int(now.get("year", 2026)), "month": int(now.get("month", 1)),
+		"day": int(now.get("day", 1))}
+
 ## A minute of the place's day (the sun arc, the [ ] keys); leaves
-## live time like an hour slot does.
+## live clock while preserving today's date when scrubbing from Live.
 static func set_time_minutes(v: View360, minutes: float) -> void:
 	v._lapse.stop()
 	_sync_lapse(v)
+	if v._live_time and v._date.is_empty() and v._data != null:
+		v._date = place_today(v)
+		date_changed(v)
 	v._live_time = false
 	v._spawn_golden = false
 	v._time_hour = fposmod(minutes, 1440.0) / 60.0
 	_apply_time(v, v._time_hour)
 	_sync_time_ui(v)
+	_sync_live_ui(v)
 
 ## A real calendar day for the sun's path (solstice, a birthday, a trip):
 ## the sun is computed for it, the clock stays, live time is left, and the
 ## season follows the date (the world rebuilds in it when it differs).
+## Non-today dates leave Live weather so winter snow never leaks onto summer.
 static func set_date(v: View360, date: Dictionary) -> void:
 	if v._data == null or date.is_empty():
 		return
@@ -301,9 +376,12 @@ static func set_date(v: View360, date: Dictionary) -> void:
 	v._live_time = false
 	v._spawn_golden = false
 	v._date = date
+	if v._weather_pick == 0 and not DatePicker._same(date, place_today(v)):
+		pick_weather(v, 1)
 	date_changed(v)
 	_apply_time(v, v._time_hour)
 	_sync_time_ui(v)
+	_sync_live_ui(v)
 	var season := ViewLink.season_for_date(date, v._data.latitude, v._data)
 	if season != v._data.season:
 		await _select_season(v, season)
@@ -325,7 +403,8 @@ static func date_changed(v: View360) -> void:
 		# On the chip the year only shows when it is not this year: the bar is narrow.
 		var this_year := int(Time.get_date_dict_from_system().get("year", 0))
 		var season := v._data.season if v._data != null else LocationData.Season.SUMMER
-		v._sun_arc.set_day(season, date_text(v._date, not v._date.is_empty() and int(v._date["year"]) != this_year))
+		var shown_date := _effective_date(v)
+		v._sun_arc.set_day(season, date_text(shown_date, not shown_date.is_empty() and int(shown_date["year"]) != this_year))
 	ViewTools.sync(v)
 
 # --- Time-lapse ---
@@ -335,9 +414,13 @@ static func toggle_lapse(v: View360) -> void:
 	if v._lapse.playing:
 		v._lapse.stop()
 	else:
+		if v._live_time and v._date.is_empty() and v._data != null:
+			v._date = place_today(v)
+			date_changed(v)
 		v._live_time = false
 		v._spawn_golden = false
 		v._lapse.play()
+		_sync_live_ui(v)
 	_sync_lapse(v)
 
 static func cycle_lapse_speed(v: View360) -> void:

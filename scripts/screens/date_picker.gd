@@ -1,25 +1,22 @@
 class_name DatePicker
 extends PanelContainer
 
-## The Conditions sheet (design system DatePicker): the season (its own
-## mid-month day), the weather, or any calendar day for the sun's path
-## (solstice, a birthday, "sunset on my trip"). A glass sheet over the
-## viewer, opened from the sun arc's day chip or the weather chip:
-## "Conditions" with a close button, the four seasons (icon over name),
-## the weather (Live and seven presets, two rows of four), then a month
-## and a year stepper, a Monday-first day grid and quick picks (Today, the
-## two solstices, Reset to the season's own day). A day emits date_picked;
-## the view maps it to its season and runs the solar model for it. A
-## season emits season_picked and a weather segment weather_picked; the
-## sheet stays open for both. Esc (the viewer's key handler) or the close
-## button dismisses it.
+## The Conditions sheet (design system DatePicker): a top-level Live
+## toggle (real clock, date, season and weather), the four seasons (each
+## on its own mid-month day), eight weather overrides (two rows of four),
+## and a Monday-first calendar with quick picks (Today, the two solstices,
+## Reset to the season's own day). Picking a season, weather override or
+## non-today date leaves Live; tapping Live restores real-world conditions.
+## Esc (the viewer's key handler) or the close button dismisses it.
 
 signal date_picked(date: Dictionary)
+## Top-level Live toggle: real clock, today's date, current season and live weather.
+signal live_requested
 ## Back to the season's own mid-month day.
 signal season_requested
 ## A season segment: that season's own day (the view rebuilds in it).
 signal season_picked(index: int)
-## A weather segment: an index into WEATHER (0 = Live).
+## A weather segment: an index into WEATHER (1..8; 0 = Live).
 signal weather_picked(index: int)
 signal closed
 
@@ -30,11 +27,13 @@ const WEEKDAYS := ["M", "T", "W", "T", "F", "S", "S"]
 const MONTHS := ["January", "February", "March", "April", "May", "June", "July",
 	"August", "September", "October", "November", "December"]
 const WIDTH := CELL * 7 + 32
-## Weather segments per row (WEATHER fills two rows).
+## Weather override segments per row (WEATHER[1..8] fills two rows).
 const ROW_SEGMENTS := 4
-## The weather segments: [label, icon, WMO code, cloud cover %]. Live (the
-## place's real weather) first; the presets force a code and cover.
-const WEATHER := [["Live", "thermometer", -1, -1.0], ["Clear", "sun", 0, 0.0],
+## Weather entries: [label, icon, WMO code, cloud cover %]. Index 0 is
+## Live (controlled by the top-level Live toggle); 1..8 are the two rows
+## of four override presets in the sheet.
+const WEATHER := [["Live", "thermometer", -1, -1.0],
+	["Clear", "sun", 0, 0.0], ["Partly cloudy", "cloud-sun", 2, 45.0],
 	["Cloudy", "cloud", 3, 100.0], ["Fog", "cloud-fog", 45, 100.0],
 	["Rain", "cloud-drizzle", 61, 100.0], ["Heavy rain", "cloud-rain", 65, 100.0],
 	["Snow", "snowflake", 73, 100.0], ["Storm", "cloud-lightning", 95, 100.0]]
@@ -46,11 +45,15 @@ var _today := {}
 var _month_label: Label
 var _year_label: Label
 var _grid: GridContainer
+## Top-level Live button above Season, Weather and Calendar.
+var live_btn: Button
+## Whether full Live mode is active.
+var is_live := false
 ## The season segments; the view keeps them in step with its season.
 var seasons: SegmentedControl
 ## The weather's two rows of four: one radio group across both.
 var weather_rows: Array[SegmentedControl] = []
-## The weather segment that is on (index into WEATHER).
+## The weather entry that is on (index into WEATHER, 0 = Live).
 var weather := 0
 
 func _init() -> void:
@@ -69,6 +72,17 @@ func _init() -> void:
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title_row.add_child(title)
 	title_row.add_child(_stepper("x", "Close", close_picker))
+	live_btn = Button.new()
+	live_btn.toggle_mode = true
+	live_btn.text = "Live"
+	live_btn.tooltip_text = "Follow the place's real clock, date, season and weather"
+	live_btn.accessibility_name = "Live conditions"
+	live_btn.custom_minimum_size = Vector2(0, 40)
+	live_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	live_btn.pressed.connect(func() -> void: live_requested.emit())
+	col.add_child(live_btn)
+	set_live(false)
+	col.add_child(_rule())
 	seasons = SegmentedControl.new(LocationData.SEASON_NAMES, SunArc.SEASON_ICONS, true)
 	seasons.set_stacked(true)
 	seasons.select(LocationData.Season.SUMMER)
@@ -85,13 +99,13 @@ func _init() -> void:
 	rows.add_theme_constant_override("separation", 2)
 	box.add_child(rows)
 	for r in 2:
-		var part := WEATHER.slice(r * ROW_SEGMENTS, (r + 1) * ROW_SEGMENTS)
+		var part := WEATHER.slice(1 + r * ROW_SEGMENTS, 1 + (r + 1) * ROW_SEGMENTS)
 		var row := SegmentedControl.new(part.map(func(w: Array) -> String: return str(w[0])),
 			part.map(func(w: Array) -> String: return str(w[1])), true)
 		row.bare = true
 		row.set_stacked(true)
 		row.set_font_size(13)
-		var base := r * ROW_SEGMENTS
+		var base := 1 + r * ROW_SEGMENTS
 		row.item_selected.connect(func(index: int) -> void:
 			select_weather(base + index)
 			weather_picked.emit(base + index))
@@ -161,11 +175,53 @@ func _rule() -> ColorRect:
 	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return rule
 
-## Turns on one weather segment (index into WEATHER) across both rows.
+## Turns on one weather override segment (1..8) across both rows, or clears
+## both rows when `index == 0` (Live weather).
 func select_weather(index: int) -> void:
 	weather = clampi(index, 0, WEATHER.size() - 1)
+	if weather == 0:
+		for row in weather_rows:
+			row.select(-1)
+		return
+	var slot := weather - 1
 	for r in weather_rows.size():
-		weather_rows[r].select(weather - r * ROW_SEGMENTS if floori(weather / float(ROW_SEGMENTS)) == r else -1)
+		weather_rows[r].select(slot - r * ROW_SEGMENTS if floori(slot / float(ROW_SEGMENTS)) == r else -1)
+
+## Highlights the top-level Live toggle while real clock, date, season and
+## weather are all active.
+func set_live(on: bool) -> void:
+	is_live = on
+	if live_btn == null:
+		return
+	live_btn.set_pressed_no_signal(on)
+	var ink := UiTheme.ON_ACCENT if on else UiTheme.INK
+	for key in ["font_color", "font_focus_color", "font_pressed_color", "font_hover_pressed_color"]:
+		live_btn.add_theme_color_override(key, ink)
+	live_btn.add_theme_color_override("font_hover_color", UiTheme.ON_ACCENT if on else UiTheme.INK)
+	live_btn.add_theme_font_override("font", UiTheme.sans(600 if on else 500))
+	live_btn.add_theme_font_size_override("font_size", 14)
+	UiIcon.apply(live_btn, "thermometer", 18, ink, UiTheme.ON_ACCENT)
+	live_btn.add_theme_constant_override("h_separation", 6)
+	var normal := UiTheme.style(UiTheme.TEAL if on else Color.TRANSPARENT, UiTheme.RADIUS_M,
+		Color.TRANSPARENT if on else UiTheme.LINE_STRONG)
+	normal.set_content_margin_all(8)
+	var hover := normal.duplicate() as StyleBoxFlat
+	if not on:
+		hover.bg_color = Color(UiTheme.INK, 0.06)
+	live_btn.add_theme_stylebox_override("normal", normal)
+	live_btn.add_theme_stylebox_override("pressed", normal)
+	live_btn.add_theme_stylebox_override("hover", hover)
+	live_btn.add_theme_stylebox_override("hover_pressed", normal)
+	live_btn.add_theme_stylebox_override("focus", UiTheme._focus_ring(UiTheme.RADIUS_M))
+
+func refresh_theme() -> void:
+	set_live(is_live)
+	if seasons != null:
+		seasons.restyle()
+	for row in weather_rows:
+		row.restyle()
+	if visible:
+		_rebuild()
 
 func _stepper(icon_name: String, tip: String, action: Callable) -> Button:
 	var b := Button.new()

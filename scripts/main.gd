@@ -605,6 +605,7 @@ func _start_generation(lat: float, lon: float, focus: Dictionary = {},
 			_end_save(SAVE_FAILED)
 		_show(_picker)
 		return
+	_pipeline.default_live_season = not capture_mode
 	_pipeline.run(lat, lon, display_name if not focus.is_empty() else _picker.selected_name,
 		_preset(), focus, view)
 
@@ -796,6 +797,7 @@ func _on_generation_finished(data: LocationData) -> void:
 	if not capture_mode:
 		_store.add_entry(data.place_name, data.latitude, data.longitude, {}, data.quality_preset)
 	_view.start_flying = not capture_mode
+	_view.open_live = not capture_mode
 	_view._streamer.enabled = not capture_mode
 	_view.show_location(data, built)
 	_notice.show_notes(data.data_notes)

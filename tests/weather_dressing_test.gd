@@ -176,12 +176,24 @@ func _test_fog_model(failures: Array[String]) -> void:
 
 func _test_preset_synthesis(failures: Array[String]) -> void:
 	var hel := _data("Helsinki", LocationData.Season.WINTER)
-	var fog_w := WeatherDressing.weather_for_pick(3, hel)  # Fog preset in sub-zero Helsinki
-	var snow_w := WeatherDressing.weather_for_pick(6, hel)  # Snow preset
+	var partly_w := WeatherDressing.weather_for_pick(2, hel)  # Partly cloudy preset
+	var fog_w := WeatherDressing.weather_for_pick(4, hel)  # Fog preset in sub-zero Helsinki
+	var snow_w := WeatherDressing.weather_for_pick(7, hel)  # Snow preset
+	if int(partly_w["code"]) != 2 or absf(float(partly_w["cloud"]) - 45.0) > 0.1:
+		failures.append("Partly cloudy preset should synthesize WMO 2 / 45%% cloud: %s" % partly_w)
 	if int(fog_w["code"]) != 48 or float(fog_w["rh"]) < 95.0:
 		failures.append("Fog preset in sub-zero winter should synthesize rime fog (48): %s" % fog_w)
 	if float(snow_w.get("snow_depth_m", 0.0)) < 0.2 or float(snow_w["temp"]) > -2.0:
 		failures.append("Snow preset should synthesize cold temp and snow_depth_m: %s" % snow_w)
+	# Live winter snow telemetry must never paint snow onto an explicitly Summer scene.
+	var hel_summer := _data("Helsinki", LocationData.Season.SUMMER)
+	var summer_live := WeatherDressing.snow_state(hel_summer, {"has_temp": true, "temp": -4.0, "code": 0, "snow_depth_m": 0.25})
+	if float(summer_live["climate_snow_on"]) > 0.0:
+		failures.append("live winter snow must not apply to Summer season: %s" % summer_live)
+	# Explicit Snow preset can still force snow on Summer.
+	var summer_forced := WeatherDressing.snow_state(hel_summer, WeatherDressing.weather_for_pick(7, hel_summer))
+	if float(summer_forced["climate_snow_on"]) <= 0.0:
+		failures.append("explicit Snow preset should still apply snow: %s" % summer_forced)
 
 func _test_shader_contracts(failures: Array[String]) -> void:
 	if not FacadeShader.shader().code.contains("climate_frost") or not FacadeShader.shader().code.contains("window_frost"):

@@ -141,6 +141,9 @@ const STREAM_FARCITY_FALLBACK_S := 1.5
 var fallback_far_city: Dictionary = {}
 ## Set by WorldStreamer while the camera is about to run out of ground.
 var hurry := false
+## When true (the live app), places without an explicit season/date in `view`
+## build in the place's real current season instead of hardcoded Summer.
+var default_live_season := false
 ## Seconds from the run's start to each step landing (stream.log).
 var timings := {}
 var _climate: ClimateFetcher
@@ -439,8 +442,15 @@ func run(lat: float, lon: float, place_name_override: String = "",
 		data.view = view
 		if view.has("season"):
 			data.season = LocationData.clamp_season(int(view["season"]))
-	elif focus.is_empty():
-		data.view = PresetViews.for_pin(lat, lon)
+		elif view.has("date"):
+			data.season = ViewLink.season_for_date(view["date"], lat)
+		elif default_live_season:
+			data.season = ViewLink.season_for_date(ViewConditions.place_today_at(lat, lon), lat)
+	else:
+		if focus.is_empty():
+			data.view = PresetViews.for_pin(lat, lon)
+		if default_live_season:
+			data.season = ViewLink.season_for_date(ViewConditions.place_today_at(lat, lon), lat)
 	# The preset sizes the DEM grids before any fetch, so Fast really
 	# downloads/builds less and High really samples finer terrain.
 	RenderSettings.apply_preset(data, quality_preset)
@@ -885,6 +895,10 @@ func _await_climate(data: LocationData) -> void:
 		_note("weather")
 		return
 	data.climate = _climate_data
+	if default_live_season and not data.view.has("season") and not data.view.has("date"):
+		data.season = ViewLink.season_for_date(ViewConditions.place_today_at(data.latitude, data.longitude), data.latitude, data)
+	elif data.view.has("date") and not data.view.has("season"):
+		data.season = ViewLink.season_for_date(data.view["date"], data.latitude, data)
 	_credits[3] = ClimateFetcher.credit_for(_climate_data)
 	print("CLIMATE: %s %s" % [str(_climate_data), str(_climate.timings)])
 
