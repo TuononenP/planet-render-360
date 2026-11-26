@@ -25,7 +25,7 @@ static func entries() -> Array:
 			"wiki_title": "White House", "height_m": 21.0, "clear_m": 75.0, "kind": "Residence",
 			"aliases": ["white house"]},
 		{"type": "gateway_arch", "name": "Gateway Arch", "lat": 38.6247, "lon": -90.1848, "radius_m": 6000.0,
-			"wiki_title": "Gateway Arch", "height_m": 192.0, "clear_m": 100.0, "kind": "Monument",
+			"wiki_title": "Gateway Arch", "height_m": 192.0, "clear_m": 100.0, "base_half_m": 16.0, "kind": "Monument",
 			"aliases": ["gateway arch", "st. louis arch"]},
 		{"type": "willis_tower", "name": "Willis Tower", "lat": 41.8789, "lon": -87.6359, "radius_m": 8000.0,
 			"wiki_title": "Willis Tower", "height_m": 527.3, "clear_m": 55.0, "kind": "Skyscraper",
@@ -47,7 +47,7 @@ static func entries() -> Array:
 			"radius_m": 6000.0, "wiki_title": "Transamerica Pyramid", "height_m": 260.0, "clear_m": 45.0,
 			"kind": "Skyscraper", "aliases": ["transamerica pyramid", "transamerica tower"]},
 		{"type": "hollywood_sign", "name": "Hollywood Sign", "lat": 34.1341, "lon": -118.3215,
-			"radius_m": 5000.0, "wiki_title": "Hollywood Sign", "height_m": 13.7, "clear_m": 30.0,
+			"radius_m": 5000.0, "wiki_title": "Hollywood Sign", "height_m": 13.7, "clear_m": 30.0, "base_at_m": [0.0, 0.0],
 			"kind": "Sign", "aliases": ["hollywood sign", "hollywoodland sign"]},
 		# Crest datum: 1,232 ft (375.5 m), usbr.gov/projects/index.php?id=122.
 		{"type": "hoover_dam", "name": "Hoover Dam", "lat": 36.0161, "lon": -114.7377, "radius_m": 6000.0,

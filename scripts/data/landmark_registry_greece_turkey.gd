@@ -41,7 +41,7 @@ static func entries() -> Array:
 				"θέατρο της επιδαύρου"]},
 		{"type": "library_of_celsus", "name": "Library of Celsus", "lat": 37.93914, "lon": 27.34075,
 			"radius_m": 3500.0, "wiki_title": "Library of Celsus", "height_m": 17.0, "kind": "Library",
-			"clear_m": 45.0, "yaw_deg": -80.0,
+			"clear_m": 45.0, "base_half_m": 8.0, "yaw_deg": -80.0,
 			"aliases": ["library of celsus", "celsus library", "celsus kütüphanesi", "celsus kutuphanesi"]},
 		{"type": "white_tower_thessaloniki", "name": "White Tower of Thessaloniki", "lat": 40.62640,
 			"lon": 22.94840, "radius_m": 3000.0, "wiki_title": "White Tower of Thessaloniki", "height_m": 33.9,

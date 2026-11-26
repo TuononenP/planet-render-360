@@ -106,7 +106,7 @@ static func entries() -> Array:
 				"sibelius' ainola"]},
 		{"type": "hvittrask", "name": "Hvitträsk", "lat": 60.18136, "lon": 24.51984,
 			"radius_m": 2500.0, "wiki_title": "Hvitträsk", "height_m": 14.5,
-			"kind": "Museum", "clear_m": 38.0, "yaw_deg": -70.8,
+			"kind": "Museum", "clear_m": 38.0, "base_half_m": 8.0, "yaw_deg": -70.8,
 			"aliases": ["hvitträsk", "hvittrask", "hvitträsk museum", "hvitträsk studio home"]},
 		{"type": "lakeuden_risti_church", "name": "Lakeuden Risti Church", "lat": 62.78682, "lon": 22.84534,
 			"radius_m": 4000.0, "wiki_title": "Lakeuden Risti Church", "height_m": 65.0,

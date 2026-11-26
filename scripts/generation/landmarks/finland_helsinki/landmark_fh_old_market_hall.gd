@@ -14,7 +14,7 @@ const FhP = preload("res://scripts/generation/landmarks/finland_helsinki/landmar
 
 const ENTRY := {"type": "old_market_hall_helsinki", "name": "Old Market Hall, Helsinki", "lat": 60.16616, "lon": 24.95279,
 	"radius_m": 5000.0, "wiki_title": "Old Market Hall, Helsinki", "height_m": 19.0, "clear_m": 55.0,
-	"yaw_deg": -93.0, "kind": "Market hall", "aliases": ["old market hall, helsinki", "vanha kauppahalli",
+	"base_at_m": [0.0, 0.0], "yaw_deg": -93.0, "kind": "Market hall", "aliases": ["old market hall, helsinki", "vanha kauppahalli",
 		"gamla saluhallen helsingfors", "helsinki old market hall"]}
 
 static func build(model: Node3D) -> void:

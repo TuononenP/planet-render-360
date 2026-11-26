@@ -15,7 +15,7 @@ const FhP = preload("res://scripts/generation/landmarks/finland_helsinki/landmar
 
 const ENTRY := {"type": "uspenski_cathedral", "name": "Uspenski Cathedral", "lat": 60.16846, "lon": 24.95993,
 	"radius_m": 5000.0, "wiki_title": "Uspenski Cathedral", "height_m": 50.0, "clear_m": 50.0,
-	"kind": "Cathedral", "aliases": ["uspenski cathedral", "uspenskin katedraali", "uspenskij-katedralen"]}
+	"base_half_m": 12.0, "kind": "Cathedral", "aliases": ["uspenski cathedral", "uspenskin katedraali", "uspenskij-katedralen"]}
 
 static func build(model: Node3D) -> void:
 	var lm := LandmarkMesh.new()

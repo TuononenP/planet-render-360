@@ -51,7 +51,7 @@ static func entries() -> Array:
 				"ναός του ηφαίστου"]},
 		{"type": "stoa_of_attalos", "name": "Stoa of Attalos", "lat": 37.97525, "lon": 23.72419,
 			"radius_m": 3000.0, "wiki_title": "Stoa of Attalos", "height_m": 12.2, "kind": "Stoa",
-			"clear_m": 68.0, "yaw_deg": 89.0,
+			"clear_m": 68.0, "base_half_m": 8.0, "yaw_deg": 89.0,
 			"aliases": ["stoa of attalos", "stoa of attalus", "stoa attalou", "στοά του αττάλου"]},
 		{"type": "tower_of_the_winds", "name": "Tower of the Winds", "lat": 37.97424, "lon": 23.72706,
 			"radius_m": 3000.0, "wiki_title": "Tower of the Winds", "height_m": 12.0, "kind": "Tower",

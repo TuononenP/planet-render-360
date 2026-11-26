@@ -307,6 +307,15 @@ func _run() -> void:
 			"%s: authored relief must replace interior DEM without cutting surrounding land" % type)
 		var g := GroundTruth.new(d)
 		_check(View360.eye_y(d,g,Vector2.ZERO) > LandmarkTerrain.ground_y(d,g,Vector2.ZERO), "%s: camera stays above its authored ground" % type)
+	# Quay landmark: a clearance corner that lands in carved water must not drag
+	# the dry site down to the harbour bed.
+	var quay := _data("notre_dame", 3.0, 1.0)
+	quay.land_polygons = [{"class": "water", "points": PackedVector2Array([
+		Vector2(10, -200), Vector2(200, -200), Vector2(200, 200), Vector2(10, 200)])}]
+	var qg := GroundTruth.new(quay)
+	var qy := TerrainBuilder.site_ground_y(quay, qg, 0.0, 0.0, 25.0)
+	_check(qy >= qg.height_at_world(0.0, 0.0) - 0.5,
+		"quay site_ground_y must ignore wet clearance corners, got %.2f vs centre %.2f" % [qy, qg.height_at_world(0.0, 0.0)])
 	if failures.is_empty():
 		print("LANDMARK PLACEMENT OK: %d sea sites, %d inland bridges, authored relief, absolute datums, candidates and aim" % [SEA_TYPES.size(), RIVER_TYPES.size()])
 		quit(0)

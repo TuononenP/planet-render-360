@@ -7,7 +7,7 @@ extends RefCounted
 static func entries() -> Array:
 	return [
 		{"type": "notre_dame", "skyline_priority": 9, "name": "Notre-Dame de Paris", "lat": 48.8530, "lon": 2.3499,
-			"radius_m": 6500.0, "wiki_title": "Notre-Dame de Paris", "height_m": 96.0, "clear_m": 90.0, "yaw_deg": 15.0,
+			"radius_m": 6500.0, "wiki_title": "Notre-Dame de Paris", "height_m": 96.0, "clear_m": 90.0, "base_half_m": 18.0, "yaw_deg": 15.0,
 			"kind": "Cathedral",
 			"aliases": ["notre-dame de paris", "notre dame de paris", "notre-dame cathedral", "cathédrale notre-dame"]},
 		{"type": "arc_de_triomphe", "skyline_priority": 9, "name": "Arc de Triomphe", "lat": 48.8738, "lon": 2.2950,

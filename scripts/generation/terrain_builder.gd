@@ -590,6 +590,8 @@ static func site_ground_y(data: LocationData, ground: GroundTruth,
 			Vector2(half, -half), Vector2(-half, -half)]:
 		var p := Vector2(x, z) + (o as Vector2)
 		if ground.is_inside(p.x, p.y) or data.far_heights.size() != data.far_grid_size * data.far_grid_size:
+			if o != Vector2.ZERO and ground.is_inside(p.x, p.y) and ground.water_at(p.x, p.y) > 0.0:
+				continue
 			lo = minf(lo, ground.height_at_world(p.x, p.y))
 		else:
 			if surf.is_empty():

@@ -32,7 +32,7 @@ const P = preload("res://scripts/generation/landmarks/finland_helsinki/landmark_
 
 const ENTRY := {"type": "olympia_terminal", "name": "Olympia Terminal", "lat": 60.160771, "lon": 24.958833,
 	"radius_m": 1500.0, "wiki_title": "Olympia Terminal", "height_m": 14.0, "clear_m": 46.0,
-	"yaw_deg": 53.3, "kind": "Ferry terminal", "aliases": ["olympia terminal", "olympiaterminaali", "olympiaterminalen"]}
+	"base_half_m": 10.0, "yaw_deg": 53.3, "kind": "Ferry terminal", "aliases": ["olympia terminal", "olympiaterminaali", "olympiaterminalen"]}
 
 const X0 := -42.1
 const X1 := 42.1

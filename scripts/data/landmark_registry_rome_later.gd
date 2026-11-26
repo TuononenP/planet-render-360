@@ -72,7 +72,7 @@ static func entries() -> Array:
 				"il gesù", "il gesu"]},
 		{"type": "sant_ivo_alla_sapienza", "name": "Sant'Ivo alla Sapienza", "lat": 41.89819, "lon": 12.47487,
 			"radius_m": 3500.0, "wiki_title": "Sant'Ivo alla Sapienza", "height_m": 58.0, "kind": "Church",
-			"clear_m": 78.0, "yaw_deg": 86.0,
+			"clear_m": 78.0, "base_at_m": [0.0, 0.0], "yaw_deg": 86.0,
 			"aliases": ["sant'ivo alla sapienza", "sant’ivo alla sapienza", "sant ivo alla sapienza",
 				"palazzo della sapienza", "church of saint ivo"]},
 		{"type": "sistine_chapel", "name": "Sistine Chapel", "lat": 41.90293, "lon": 12.45440,

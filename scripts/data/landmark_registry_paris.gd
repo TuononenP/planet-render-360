@@ -171,7 +171,7 @@ static func entries() -> Array:
 		{"type": "institut_de_france", "name": "Institut de France",
 			"lat": 48.8573, "lon": 2.3371, "radius_m": 5500.0,
 			"wiki_title": "Institut de France", "height_m": 40.0, "yaw_deg": 18.0,
-			"skyline_priority": 3, "clear_m": 46.0, "clear_rect_m": [0.0, 0.0, 108.0, 44.0],
+			"skyline_priority": 3, "clear_m": 46.0, "base_at_m": [0.0, 0.0], "clear_rect_m": [0.0, 0.0, 108.0, 44.0],
 			"model_rects_m": [[0.0, 0.0, 108.0, 44.0]], "kind": "Palace",
 			"aliases": ["institut de france", "académie française"]},
 		{"type": "saint_sulpice", "name": "Église Saint-Sulpice",

@@ -56,7 +56,7 @@ static func entries() -> Array:
 			"aliases": ["ara pacis", "ara pacis augustae", "museo dell'ara pacis", "altar of augustan peace"]},
 		{"type": "theatre_of_marcellus", "name": "Theatre of Marcellus", "lat": 41.89169, "lon": 12.47929,
 			"radius_m": 3500.0, "wiki_title": "Theatre of Marcellus", "height_m": 30.0, "kind": "Theatre",
-			"clear_m": 72.0, "yaw_deg": -136.0,
+			"clear_m": 72.0, "base_half_m": 16.0, "yaw_deg": -136.0,
 			"aliases": ["theatre of marcellus", "theater of marcellus", "teatro di marcello"]},
 		{"type": "trajans_market", "name": "Trajan's Markets", "lat": 41.89570, "lon": 12.48621,
 			"radius_m": 3500.0, "wiki_title": "Trajan's Market", "height_m": 42.4, "kind": "Market",
