@@ -58,6 +58,14 @@ static func run(preset: int) -> void:
 		FacadeTextures.prewarm(last.get("recipes", PackedStringArray()),
 			func(set_name: String, map_name: String) -> Image:
 				return PbrTextures._set_image(set_name, map_name, hi_res))
+	if RenderQuality.ultra_desktop(preset):
+		var car_kinds := CarSpecs.KINDS.keys()
+		var cg := WorkerThreadPool.add_group_task(func(i: int) -> void:
+			var k := str(car_kinds[i])
+			CarModel.mesh(k, false)
+			CarModel.mesh(k, true)
+			CarModel.glass_shadow_mesh(k), car_kinds.size(), -1, false, "CarModelPrewarm")
+		WorkerThreadPool.wait_for_group_task_completion(cg)
 
 ## Records what the build that just finished read, for the next launch.
 ## Not in headless runs (tests, tools), which keep no built world either.

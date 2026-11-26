@@ -317,12 +317,26 @@ static func bus_mesh(far: bool, kind: String = "bus") -> ArrayMesh:
 	return _bus_meshes[cache_key]
 
 ## Builds the trams and buses under `root`; returns how many trains stand.
-static func build(root: Node3D, data: LocationData, ground: GroundTruth) -> int:
+## Computes trains, buses, and combined parking-exclusion footprints once
+## so ParkedCars and TransitVehicles.build share the same plan.
+static func plan_all(data: LocationData, ground: GroundTruth, m2u: float) -> Dictionary:
+	if not enabled(data.quality_preset):
+		return {"trains": [], "buses": [], "footprints": []}
+	var trains := plan(data, ground, m2u) if not data.railways.is_empty() else []
+	var buses := plan_buses(data, ground, m2u, trains)
+	var fp: Array = []
+	for t: Dictionary in trains:
+		fp.append([t["a"], t["b"], float(t["half_w"]) + 1.0 * m2u])
+	for bus: Array in buses:
+		fp.append([bus[6], bus[7], (CarSpecs.width_m("bus") * 0.5 + 1.2) * m2u])
+	return {"trains": trains, "buses": buses, "footprints": fp}
+
+static func build(root: Node3D, data: LocationData, ground: GroundTruth, preplanned: Dictionary = {}) -> int:
 	if not enabled(data.quality_preset):
 		return 0
 	var m2u := WorldScale.metres_to_units()
-	var trains := plan(data, ground, m2u) if not data.railways.is_empty() else []
-	var buses := plan_buses(data, ground, m2u, trains)
+	var trains: Array = preplanned["trains"] if preplanned.has("trains") else (plan(data, ground, m2u) if not data.railways.is_empty() else [])
+	var buses: Array = preplanned["buses"] if preplanned.has("buses") else plan_buses(data, ground, m2u, trains)
 	if not buses.is_empty():
 		var depot := Node3D.new()
 		depot.name = "Buses"

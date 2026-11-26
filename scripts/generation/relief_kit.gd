@@ -145,6 +145,54 @@ func flush(root: Node3D, name: String) -> void:
 	mi.set_meta("lod_detail", true)
 	root.add_child(mi)
 
+## Merges multiple ReliefKit instances in order into one MeshInstance3D.
+static func flush_merged(root: Node3D, name: String, kits: Array) -> void:
+	var order: Array = []
+	var merged: Dictionary = {}
+	for k in kits:
+		var kit: ReliefKit = k
+		for mat in kit.surfaces:
+			var s: Array = kit.surfaces[mat].arrays() if _native else kit.surfaces[mat]
+			if (s[3] as PackedInt32Array).is_empty():
+				continue
+			if not merged.has(mat):
+				order.append(mat)
+				merged[mat] = [PackedVector3Array(), PackedVector3Array(),
+					PackedVector2Array(), PackedInt32Array(), PackedFloat32Array()]
+			var dst: Array = merged[mat]
+			var base := (dst[0] as PackedVector3Array).size()
+			(dst[0] as PackedVector3Array).append_array(s[0])
+			(dst[1] as PackedVector3Array).append_array(s[1])
+			(dst[2] as PackedVector2Array).append_array(s[2])
+			(dst[4] as PackedFloat32Array).append_array(s[4])
+			var src_i: PackedInt32Array = s[3]
+			var dst_i: PackedInt32Array = dst[3]
+			var old_n := dst_i.size()
+			var add_n := src_i.size()
+			dst_i.resize(old_n + add_n)
+			for j in add_n:
+				dst_i[old_n + j] = src_i[j] + base
+	if order.is_empty():
+		return
+	var mesh := ArrayMesh.new()
+	for mat in order:
+		var s: Array = merged[mat]
+		var arrays: Array = []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = s[0]
+		arrays[Mesh.ARRAY_NORMAL] = s[1]
+		arrays[Mesh.ARRAY_TEX_UV] = s[2]
+		arrays[Mesh.ARRAY_TANGENT] = s[4]
+		arrays[Mesh.ARRAY_INDEX] = s[3]
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		mesh.surface_set_material(mesh.get_surface_count() - 1, mat as Material)
+		MeshArrays.keep_surface(mesh, arrays)
+	var mi := MeshInstance3D.new()
+	mi.name = name
+	mi.mesh = mesh
+	mi.set_meta("lod_detail", true)
+	root.add_child(mi)
+
 ## Stone for slabs, string courses and sills: the wall's own finish (brick
 ## and timber fronts dress in stone), one material per finish so relief
 ## never multiplies the city's materials; `tint` is accepted for callers

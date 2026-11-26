@@ -15,21 +15,28 @@ const SLAT_M := 0.016
 
 static var _meshes := {}
 static var _materials := {}
+static var _mutex := Mutex.new()
 
 static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 	if kind == "tuk_tuk":
 		return TukTukModel.mesh(far)
 	var id := kind + ("_far" if far else "")
+	_mutex.lock()
 	if _meshes.has(id):
-		return _meshes[id]
+		var hit: ArrayMesh = _meshes[id]
+		_mutex.unlock()
+		return hit
+	_mutex.unlock()
 	var s := CarSpecs.spec(kind)
 	var lm := LandmarkMesh.new()
+	_mutex.lock()
 	lm.use("Paint", paint(kind, far))
 	# Near to, the glass shows the cabin behind it; far off it is dark.
 	lm.use("Glass", material("Glass" if not far and bool(s["cabin"]) else "GlassDark"))
 	for key in ["Trim", "Rubber", "Rim", "HeadLamp", "TailLamp", "Plate", "Sign", "Chrome", "Amber", "Board",
 			"Drl", "TailGlow", "Cabin", "Grille", "RimDark", "RimGun"]:
 		lm.use(key, material(key))
+	_mutex.unlock()
 	VehicleKit.body(lm, s, far)
 	var r := float(s["wheel_r"])
 	var tw := float(s["tyre_w"])
@@ -46,7 +53,13 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 		if bool(s["cabin"]):
 			CarDetails.interior(lm, s)
 	var out := lm.to_array_mesh(false)
+	_mutex.lock()
+	if _meshes.has(id):
+		var existing: ArrayMesh = _meshes[id]
+		_mutex.unlock()
+		return existing
 	_meshes[id] = out
+	_mutex.unlock()
 	return out
 
 ## The near body's glass alone, for a shadow-only batch: see-through
@@ -54,8 +67,12 @@ static func mesh(kind: String, far: bool = false) -> ArrayMesh:
 ## striped the road beside the car. Null when the kind has no glass.
 static func glass_shadow_mesh(kind: String) -> ArrayMesh:
 	var id := kind + "_glass_shadow"
+	_mutex.lock()
 	if _meshes.has(id):
-		return _meshes[id]
+		var hit: ArrayMesh = _meshes[id]
+		_mutex.unlock()
+		return hit
+	_mutex.unlock()
 	var src := mesh(kind)
 	var out: ArrayMesh = null
 	for si in src.get_surface_count():
@@ -63,8 +80,14 @@ static func glass_shadow_mesh(kind: String) -> ArrayMesh:
 			continue
 		out = ArrayMesh.new()
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(si))
-		out.surface_set_material(0, material("GlassDark"))
+		_mutex.lock()
+		var gd := material("GlassDark")
+		_mutex.unlock()
+		out.surface_set_material(0, gd)
+		break
+	_mutex.lock()
 	_meshes[id] = out
+	_mutex.unlock()
 	return out
 
 ## Mirrors, door handles, a cab's roof sign, the aerial, roof rails, wipers

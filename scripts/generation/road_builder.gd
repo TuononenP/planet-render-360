@@ -230,6 +230,8 @@ static func _pbr(set_name: String, hex: String) -> Material:
 const LANDING_WET_M := 8.0
 
 static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort: BuildAbort = null) -> void:
+	var sub := {}
+	var t0 := Time.get_ticks_msec()
 	_mats.clear()
 	var granite := FinnishGranite.applies(data)
 	_sett_hex = FinnishGranite.SETT_HEX if granite else FINISH_HEX["sett"]
@@ -299,6 +301,7 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 				if StepsGround.near_shore(s_pts, ground.shoreline, m2u, s_area) \
 						or StepsGround._near_wall(s_pts, wall_segs, StepsGround.WALL_STEP_MARGIN_M * m2u, s_area):
 					stairs[i] = true
+	t0 = StreetProps._lap(sub, "setup", t0)
 	var job := func(c: int) -> void:
 		var own := {}
 		for i in range(n * c / CHUNKS, n * (c + 1) / CHUNKS):
@@ -310,15 +313,22 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		parts[c] = own
 	var group := WorkerThreadPool.add_group_task(job, CHUNKS, -1, false, "Roads")
 	WorkerThreadPool.wait_for_group_task_completion(group)
+	t0 = StreetProps._lap(sub, "chunks", t0)
 	var batches := {}
 	for own in parts:
 		for finish in own:
 			_batch(batches, finish).join(own[finish])
+	t0 = StreetProps._lap(sub, "join", t0)
 	RoadTapers.lay(batches, data, surf, m2u)
+	t0 = StreetProps._lap(sub, "tapers", t0)
 	BridgeStructures.build(batches, surf, m2u)
+	t0 = StreetProps._lap(sub, "bridges", t0)
 	RoadMarkings.lay(plan, batches, surf, m2u, data)
+	t0 = StreetProps._lap(sub, "markings", t0)
 	RoadPaint.lay(batches, data, surf, plan, seeds, m2u)
+	t0 = StreetProps._lap(sub, "paint", t0)
 	RoadGlyphs.lay(batches, data, surf, m2u, plan)
+	t0 = StreetProps._lap(sub, "glyphs", t0)
 	for finish in batches:
 		var b: _Batch = batches[finish]
 		if b.indices.is_empty():
@@ -332,10 +342,13 @@ static func _roads(root: Node3D, data: LocationData, ground: GroundTruth, abort:
 		if not (str(finish) in ["bridge", "deck"]):
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(mi)
+	t0 = StreetProps._lap(sub, "commit", t0)
 	StairBuilder.lay(root, data, ground, surf, m2u)
 	BangkokCanalBridges.build(root, data, ground, surf, m2u)
 	AmsterdamCanalBridges.build(root, data, ground, surf, m2u)
+	t0 = StreetProps._lap(sub, "stairs", t0)
 	surf.release()
+	print("ROADS sub ms ", sub)
 
 ## Paths a pedestrian square paves over (not steps, crossings, bridges,
 ## tunnels or a piece already clipped).
@@ -369,15 +382,17 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 	if marking.is_empty() and _in_square_class(line) and not surf.squares.is_empty():
 		# A footway mapped across a pedestrian square is its walking route:
 		# the square's own paving shows there, the ribbon only outside it.
-		var outside := RoadCrossingClip._runs(r["points"], m2u, func(p: Vector2) -> bool:
-			return not surf.in_square(p))
-		if outside.size() != 1 or (outside[0] as PackedVector2Array).size() != (r["points"] as PackedVector2Array).size():
-			for piece: PackedVector2Array in outside:
-				var part: Dictionary = (line as Dictionary).duplicate()
-				part["points"] = piece
-				part["square_clipped"] = true
-				_road(batches, part, step, m2u, surf, ground, junc, spans, abort, {}, wear_seed)
-			return
+		var rpts: PackedVector2Array = r["points"]
+		if rpts.size() >= 2 and surf.intersects_square(RingGeometry.aabb(rpts)):
+			var outside := RoadCrossingClip._runs(rpts, m2u, func(p: Vector2) -> bool:
+				return not surf.in_square(p))
+			if outside.size() != 1 or (outside[0] as PackedVector2Array).size() != rpts.size():
+				for piece: PackedVector2Array in outside:
+					var part: Dictionary = (line as Dictionary).duplicate()
+					part["points"] = piece
+					part["square_clipped"] = true
+					_road(batches, part, step, m2u, surf, ground, junc, spans, abort, {}, wear_seed)
+				return
 	if not marking.is_empty():
 		r["finish"] = marking["finish"]
 		r["width_u"] = float(marking["width_m"]) * m2u
@@ -432,7 +447,7 @@ static func _road(batches: Dictionary, line: Variant, step: int, m2u: float, sur
 			break
 		var pieces: Array = [run]
 		if int(r["rank"]) == 0 and not finish.begins_with("crossing") and not surf.aprons.is_empty():
-			pieces = RoadCrossingClip.on_road_runs(run, {}, surf.aprons, m2u, false)
+			pieces = RoadCrossingClip.off_apron_runs(run, surf.aprons, m2u)
 		for piece: PackedVector2Array in pieces:
 			_ribbon(_batch(batches, finish), band_rows(piece, m2u) if finish.begins_with("crossing") \
 				else _straighten(piece, surf.step), float(r["width_u"]), surf, lift, attr, junc, layer)

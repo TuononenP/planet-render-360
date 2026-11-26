@@ -30,6 +30,38 @@ static func on_road_runs(pts: PackedVector2Array, grid: Dictionary, aprons: Dict
 	return _runs(pts, m, func(p: Vector2) -> bool:
 		return _on_road(p, grid, aprons, m, skip_service) == keep_on)
 
+## Fast path for clipping a footway against junction aprons only (no road grid):
+## skips resampling entirely when no apron cell overlaps `pts`'s AABB.
+static func off_apron_runs(pts: PackedVector2Array, aprons: Dictionary, m: float) -> Array:
+	if aprons.is_empty() or pts.size() < 2:
+		return [pts]
+	var cell := RoadMarkings.CELL_M * m
+	var min_x := pts[0].x
+	var max_x := min_x
+	var min_y := pts[0].y
+	var max_y := min_y
+	for i in range(1, pts.size()):
+		var p := pts[i]
+		if p.x < min_x: min_x = p.x
+		elif p.x > max_x: max_x = p.x
+		if p.y < min_y: min_y = p.y
+		elif p.y > max_y: max_y = p.y
+	var hit := false
+	for cx in range(floori(min_x / cell), floori(max_x / cell) + 1):
+		for cy in range(floori(min_y / cell), floori(max_y / cell) + 1):
+			if aprons.has(Vector2i(cx, cy)):
+				hit = true
+				break
+		if hit:
+			break
+	if not hit:
+		return [pts]
+	return _runs(pts, m, func(p: Vector2) -> bool:
+		for ring: PackedVector2Array in aprons.get(RoadMarkings._cell(p, cell), []):
+			if Geometry2D.is_point_in_polygon(p, ring):
+				return false
+		return true)
+
 ## True when `p` is over a road of `grid` or inside an apron.
 static func _on_road(p: Vector2, grid: Dictionary, aprons: Dictionary, m: float, skip_service: bool = false) -> bool:
 	for seg: Array in RoadMarkings._grid_near(grid, p, RoadMarkings.ON_ROAD_REACH_M * m, m):

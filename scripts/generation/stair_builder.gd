@@ -63,25 +63,113 @@ static func covers(p: Vector2, footprints: Array) -> bool:
 			return true
 	return false
 
+static var _native_stairs := ClassDB.class_exists("PropKernels")
+
 ## Adds one "Stairs" mesh (a surface per material) to `root`.
 static func lay(root: Node3D, data: LocationData, ground: GroundTruth, surf: RoadBuilder._Surface,
 		m2u: float) -> void:
 	if ground.steps.is_empty():
 		return
-	var kit := ReliefKit.new()
 	var cheek: Material = QuayBuilder.stone_material(data)
-	for f: Dictionary in ground.steps:
+	var tread_mats := {}
+	var riser_mats := {}
+	for fin in FINISHES:
+		var tm := RoadBuilder._material(fin)
+		tread_mats[fin] = tm
+		riser_mats[fin] = _riser_material(fin, tm)
+	if _native_stairs:
+		var flights: Array = []
+		var areas: Array = []
+		for f: Dictionary in ground.steps:
+			var idx := int(f["road"])
+			var finish := RoadBuilder.finish_of(data.roads[idx], surf, m2u) if idx < data.roads.size() else "paving"
+			var fi := FINISHES.find(finish)
+			if fi < 0:
+				fi = 0
+			if bool(f["area"]):
+				areas.append([f, FINISHES[fi]])
+			else:
+				flights.append([f["points"], int(f["n"]), float(f["y_top"]), float(f["y_bot"]),
+					float(f["width"]), bool(f["handrail"]), fi])
+		var shore_ready: bool = ground.shoreline != null and ground.shoreline.ready and ground.shoreline.sampler != null
+		var params := {
+			"flights": flights, "m2u": m2u,
+			"shore_sampler": ground.shoreline.sampler if shore_ready else null,
+			"shore_domains": ground.shoreline.domains.native if shore_ready and ground.shoreline.domains != null else null,
+			"shore_bounds": ground.shoreline.bounds if shore_ready else Rect2(),
+			"shore_empty": ground.shoreline != null and ground.shoreline.empty(),
+			"body_levels": ParkedCars._shore_body_levels(ground),
+			"surface": ground._surface, "level": ground._level,
+			"grid_size": ground._size, "step_units": ground._step_units,
+			"half_units": ground._half_units, "water_level_m": ground.water_level_m,
+		}
+		var res: Dictionary = ClassDB.class_call_static("PropKernels", "stairs_build", params)
+		var surfs: Array = res.get("surfaces", [])
+		var mat_list: Array[Material] = [
+			tread_mats["paving"], tread_mats["sett"], tread_mats["gravel"],
+			riser_mats["paving"], riser_mats["sett"], riser_mats["gravel"],
+			cheek, ReliefKit.new().iron(),
+		]
+		var mesh := ArrayMesh.new()
+		for k in mini(surfs.size(), mat_list.size()):
+			var s: Array = surfs[k]
+			if s.is_empty():
+				continue
+			var arrays: Array = []
+			arrays.resize(Mesh.ARRAY_MAX)
+			arrays[Mesh.ARRAY_VERTEX] = s[0]
+			arrays[Mesh.ARRAY_NORMAL] = s[1]
+			arrays[Mesh.ARRAY_TEX_UV] = s[2]
+			arrays[Mesh.ARRAY_INDEX] = s[3]
+			arrays[Mesh.ARRAY_TANGENT] = s[4]
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			mesh.surface_set_material(mesh.get_surface_count() - 1, mat_list[k])
+			MeshArrays.keep_surface(mesh, arrays)
+		if not areas.is_empty():
+			var akit := ReliefKit.new()
+			for entry: Array in areas:
+				var f: Dictionary = entry[0]
+				var fin: String = entry[1]
+				_area(akit, ground, f, tread_mats[fin], riser_mats[fin], m2u)
+			for mat in akit.surfaces:
+				var s: Array = akit.surfaces[mat].arrays() if ReliefKit._native else akit.surfaces[mat]
+				if (s[3] as PackedInt32Array).is_empty():
+					continue
+				var arrays: Array = []
+				arrays.resize(Mesh.ARRAY_MAX)
+				arrays[Mesh.ARRAY_VERTEX] = s[0]
+				arrays[Mesh.ARRAY_NORMAL] = s[1]
+				arrays[Mesh.ARRAY_TEX_UV] = s[2]
+				arrays[Mesh.ARRAY_INDEX] = s[3]
+				arrays[Mesh.ARRAY_TANGENT] = s[4]
+				mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+				mesh.surface_set_material(mesh.get_surface_count() - 1, mat as Material)
+				MeshArrays.keep_surface(mesh, arrays)
+		if mesh.get_surface_count() > 0:
+			var mi := MeshInstance3D.new()
+			mi.name = "Stairs"
+			mi.mesh = mesh
+			mi.set_meta("lod_detail", true)
+			root.add_child(mi)
+		return
+	var kit := ReliefKit.new()
+	_lay_range(kit, data, ground, surf, tread_mats, riser_mats, cheek, m2u, 0, ground.steps.size())
+	kit.flush(root, "Stairs")
+
+static func _lay_range(kit: ReliefKit, data: LocationData, ground: GroundTruth, surf: RoadBuilder._Surface,
+		tread_mats: Dictionary, riser_mats: Dictionary, cheek: Material, m2u: float, start: int, stop: int) -> void:
+	for i in range(start, stop):
+		var f: Dictionary = ground.steps[i]
 		var idx := int(f["road"])
 		var finish := RoadBuilder.finish_of(data.roads[idx], surf, m2u) if idx < data.roads.size() else "paving"
 		if not finish in FINISHES:
 			finish = "paving"
-		var tread := RoadBuilder._material(finish)
-		var riser := _riser_material(finish, tread)
+		var tread: Material = tread_mats[finish]
+		var riser: Material = riser_mats[finish]
 		if bool(f["area"]):
 			_area(kit, ground, f, tread, riser, m2u)
 		else:
 			_way(kit, ground, f, tread, riser, cheek, m2u)
-	kit.flush(root, "Stairs")
 
 ## `finish`'s material a few percent darker, for risers and flanks. Kept
 ## with RoadBuilder's own materials, which it rebuilds for each place.

@@ -2,6 +2,8 @@
 #include "earcut_kernels.h"
 #include "far_kernels.h"
 #include "ground_kernels.h"
+#include "ground_cover_kernels.h"
+#include "prop_kernels.h"
 #include "image_kernels.h"
 #include "landmark_kernels.h"
 #include "mass_kernels.h"
@@ -44,6 +46,8 @@ static void initialize(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(EarcutKernels);
 	GDREGISTER_CLASS(FarKernels);
 	GDREGISTER_CLASS(GroundKernels);
+	GDREGISTER_CLASS(GroundCoverKernels);
+	GDREGISTER_CLASS(PropKernels);
 	GDREGISTER_CLASS(ImageKernels);
 	GDREGISTER_CLASS(LandmarkKernels);
 	GDREGISTER_CLASS(MassKernels);

@@ -53,6 +53,9 @@ static var _lamp_meshes: Dictionary = {}
 static var _fence_tex: Texture2D
 static var _chainlink_tex: Texture2D
 static var _mats: Dictionary = {}
+static var _native_props := ClassDB.class_exists("PropKernels")
+
+const BARRIER_CHUNKS := 2
 
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, ctx: Dictionary) -> Dictionary:
@@ -68,52 +71,94 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 	ctx = ctx.duplicate()
 	ctx["pole_grid"] = UtilityPoles.pole_grid(pole_plan)
 	ctx["marking_plan"] = marking_plan
+	# Pre-warm shared shaders/materials before fanning out across workers.
+	StreetGlow.set_place_for(data)
+	CarPaint.shader()
+	CarPaint.shadow_material()
+	StreetSnow.material(StandardMaterial3D.new())
 	t = _lap(timings, "pole_plan", t)
-	var lamps := _lampposts(root, data, ground, mask, ctx)
-	t = _lap(timings, "lamps", t)
 	if abort != null and abort.requested:
 		return {}
-	var bar := _barriers(root, data, ground, ctx)
-	t = _lap(timings, "barriers", t)
-	ShoreRailings.build(root, data, ground)
-	t = _lap(timings, "shore_railings", t)
-	var furniture := StreetFurniture.build(root, data, ground, mask, float(ctx["m2u"]), marking_plan)
-	t = _lap(timings, "furniture", t)
-	var plazas := PlazaLife.build(root, data, ground, mask, ctx)
-	plazas += BangkokStreetLife.build(root, data, ground, mask, float(ctx["m2u"]))
-	plazas += AmsterdamStreetLife.build(root, data, ground, mask, float(ctx["m2u"]))
-	t = _lap(timings, "plazas", t)
+	# 12 ordered holders preserve exact AC-12 child order, executed in 4 balanced
+	# worker lanes so StreetProps does not oversubscribe WorkerThreadPool beside
+	# Buildings and Roads.
+	const SLOTS := 12
+	var holders: Array[Node3D] = []
+	holders.resize(SLOTS)
+	for s in SLOTS:
+		holders[s] = Node3D.new()
+	var counts: Array = []
+	counts.resize(SLOTS)
+	var slot_ms: Array[int] = []
+	slot_ms.resize(SLOTS)
+	var m2u := float(ctx["m2u"])
+	var transit_plan := TransitVehicles.plan_all(data, ground, m2u)
+	var run_slot := func(slot: int) -> void:
+		if abort != null and abort.requested:
+			return
+		var ts := Time.get_ticks_msec()
+		var h: Node3D = holders[slot]
+		match slot:
+			0: counts[0] = _lampposts(h, data, ground, mask, ctx)
+			1: counts[1] = _barriers(h, data, ground, ctx)
+			2:
+				ShoreRailings.build(h, data, ground)
+				counts[2] = 0
+			3: counts[3] = StreetFurniture.build(h, data, ground, mask, m2u, marking_plan)
+			4:
+				var p := PlazaLife.build(h, data, ground, mask, ctx)
+				p += BangkokStreetLife.build(h, data, ground, mask, m2u)
+				p += AmsterdamStreetLife.build(h, data, ground, mask, m2u)
+				counts[4] = p
+			5:
+				var b := MarinaBuilder.build(h, data, ground, mask)
+				b += HarbourFerries.build(h, data, ground, mask)
+				WaterWakes.build_mapped_collars(h, data, ground)
+				counts[5] = b
+			6: counts[6] = QuayDetails.build(h, data, ground, mask)
+			7: counts[7] = ParkedCars.build(h, data, ground, marking_plan.junctions, transit_plan["footprints"])
+			8: counts[8] = TransitVehicles.build(h, data, ground, transit_plan)
+			9: counts[9] = StationTrains.build(h, data, ground)
+			10: counts[10] = AirportPlanes.build(h, data, ground)
+			11:
+				var w := OverheadWires.build(h, data, ground, mask, marking_plan)
+				var u := UtilityPoles.build(h, data, ground, pole_plan)
+				var sn := Snowbanks.build(h, data, ground)
+				var be := BeachDressing.build(h, data, ground, mask)
+				counts[11] = [w, u, sn, be]
+		slot_ms[slot] = Time.get_ticks_msec() - ts
+	var lanes: Array = [[1, 7, 10, 11], [0, 2, 3, 4, 5, 6, 8, 9]]
+	var lane_job := func(lane: int) -> void:
+		for slot: int in lanes[lane]:
+			run_slot.call(slot)
+	var group := WorkerThreadPool.add_group_task(lane_job, lanes.size(), -1, false, "StreetProps")
+	WorkerThreadPool.wait_for_group_task_completion(group)
 	if abort != null and abort.requested:
+		for h in holders:
+			h.free()
 		return {}
-	var boats := MarinaBuilder.build(root, data, ground, mask)
-	t = _lap(timings, "marina", t)
-	boats += HarbourFerries.build(root, data, ground, mask)
-	WaterWakes.build_mapped_collars(root, data, ground)
-	t = _lap(timings, "ferries", t)
-	var quay_bollards := QuayDetails.build(root, data, ground, mask)
-	t = _lap(timings, "quay", t)
-	if abort != null and abort.requested:
-		return {}
-	var cars := ParkedCars.build(root, data, ground)
-	t = _lap(timings, "cars", t)
-	var trams := TransitVehicles.build(root, data, ground)
-	t = _lap(timings, "trams", t)
-	var trains := StationTrains.build(root, data, ground)
-	t = _lap(timings, "trains", t)
-	var aircraft := AirportPlanes.build(root, data, ground)
-	t = _lap(timings, "aircraft", t)
-	if abort != null and abort.requested:
-		return {}
-	var wires := OverheadWires.build(root, data, ground, mask, marking_plan)
-	t = _lap(timings, "wires", t)
-	var poles := UtilityPoles.build(root, data, ground, pole_plan)
-	t = _lap(timings, "utility_poles", t)
-	var snowbanks := Snowbanks.build(root, data, ground)
-	t = _lap(timings, "snowbanks", t)
-	var beach := BeachDressing.build(root, data, ground, mask)
-	t = _lap(timings, "beach", t)
+	# Attach children in exact original slot order for AC-12 determinism.
+	for h in holders:
+		for ch in h.get_children():
+			h.remove_child(ch)
+			root.add_child(ch)
+		h.free()
+	var names := ["lamps", "barriers", "shore_railings", "furniture", "plazas",
+		"marina_ferries", "quay", "cars", "trams", "trains", "aircraft", "wires_rest"]
+	for s in SLOTS:
+		timings[names[s]] = slot_ms[s]
+	timings["wall_ms"] = Time.get_ticks_msec() - t
 	print("PROPS timings ms ", timings)
-	return {"lamps": lamps, "barrier_m": bar, "furniture": furniture, "plazas": plazas, "boats": boats, "quay_bollards": quay_bollards, "cars": cars, "trams": trams, "trains": trains, "aircraft": aircraft, "wires": wires, "utility_poles": poles, "snowbanks": snowbanks, "beach": beach}
+	var rest: Array = counts[11] if counts[11] is Array else [0, 0, 0, 0]
+	return {
+		"lamps": counts[0], "barrier_m": counts[1],
+		"furniture": counts[3], "plazas": counts[4],
+		"boats": counts[5], "quay_bollards": counts[6],
+		"cars": counts[7], "trams": counts[8],
+		"trains": counts[9], "aircraft": counts[10],
+		"wires": rest[0], "utility_poles": rest[1],
+		"snowbanks": rest[2], "beach": rest[3],
+	}
 
 ## Records the ms since `t` under `key`; returns the time now.
 static func _lap(timings: Dictionary, key: String, t: int) -> int:
@@ -458,24 +503,15 @@ static func _box(b: TreeMeshLibrary.Buf, c: Vector3, size: Vector3) -> void:
 
 # --- Barriers ------------------------------------------------------------
 
-static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
-		ctx: Dictionary) -> float:
-	if data.barriers.is_empty():
-		return 0.0
-	var m2u: float = ctx["m2u"]
+static func _barrier_chunk(barriers: Array, start: int, stop: int, ground: GroundTruth,
+		m2u: float, piece: float, roads: Dictionary, decks: Array, shore: ShorelineModel,
+		has_quays: bool, models: Array, stairs: Array, statues: PackedVector2Array) -> Array:
 	var bufs := {"wall": TreeMeshLibrary.Buf.new(), "fence": TreeMeshLibrary.Buf.new(),
 		"chain_link": TreeMeshLibrary.Buf.new(), "wood_fence": TreeMeshLibrary.Buf.new(),
 		"hedge": TreeMeshLibrary.Buf.new(), "hedge_core": TreeMeshLibrary.Buf.new()}
 	var total_m := 0.0
-	var piece := 3.0 * m2u
-	var roads := _road_grid(data, m2u)
-	var decks := BridgeStructures.barrier_rings(data, m2u)
-	var shore: ShorelineModel = ground.shoreline if ground.shoreline is ShorelineModel and (ground.shoreline as ShorelineModel).ready else null
-	var has_quays := shore != null and not shore.quays.is_empty()
-	var models := LandmarkSites.model_rect_sites(data)
-	var stairs := StairBuilder.footprints(ground, m2u)
-	var statues := _statue_centres(data)
-	for br in data.barriers:
+	for bi in range(start, stop):
+		var br: Variant = barriers[bi]
 		if not (br is Dictionary):
 			continue
 		if bool(br.get("fortress_wall", false)):
@@ -496,8 +532,6 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 		var hgt := (tagged_height if is_finite(tagged_height) and tagged_height >= 0.1 and tagged_height <= 30.0 else float(row[1])) * m2u
 		var thick := float(row[2]) * m2u
 		var pts: PackedVector2Array = (br as Dictionary).get("points", PackedVector2Array())
-		# A fence ring round a statue's pedestal is its railing, not a
-		# picket panel taller than the people standing at it.
 		if cls == "fence" and kind == "fence" and not is_finite(tagged_height) and _rings_statue(pts, statues):
 			hgt = float(BARRIERS["railing"][1]) * m2u
 		for i in pts.size() - 1:
@@ -511,28 +545,17 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 				if not ground.is_inside(p0.x, p0.y) or ground.water_at(p0.x, p0.y) > 0.0 \
 						or ground.water_at(p1.x, p1.y) > 0.0:
 					continue
-				# A wall mapped across a road runs under its bridge or stops at
-				# its edge: drawn on the terrain it stood across the lanes.
-				if _on_road((p0 + p1) * 0.5, roads, m2u) or StairBuilder.covers((p0 + p1) * 0.5, stairs):
+				var mid := (p0 + p1) * 0.5
+				if _on_road(mid, roads, m2u) or StairBuilder.covers(mid, stairs):
 					continue
-				# A landmark model that builds its own walls (model_rects_m)
-				# stands where the mapped ones would cross it.
-				if LandmarkSites.in_model_rects((p0 + p1) * 0.5, models):
+				if LandmarkSites.in_model_rects(mid, models):
 					continue
-				# A wall or rail along the bank ends at the bridge's abutment:
-				# between its carriageways it stood as a stub on the deck.
 				if BridgeStructures.in_rings(p0, decks) or BridgeStructures.in_rings(p1, decks):
 					continue
-				# A low quay's upper wall and its parapet are ShoreBankMesh's:
-				# drawn on the drop it stands on, the mapped wall zigzagged
-				# between the walk and the street.
-				if has_quays and shore.near_quay_wall((p0 + p1) * 0.5, QUAY_WALL_REACH_M * m2u):
+				if has_quays and shore.near_quay_wall(mid, QUAY_WALL_REACH_M * m2u):
 					continue
-				# A mapped retaining_wall on a hard shoreline is already built
-				# flush with the bank by ShoreBankMesh; drawing a free-standing
-				# 1.2 m barrier on top of the water's edge leaves broken walls.
 				if cls == "retaining_wall" and shore != null:
-					var near_hard := shore.nearest((p0 + p1) * 0.5, 1)
+					var near_hard := shore.nearest(mid, 1)
 					if not near_hard.is_empty() and float(near_hard["distance"]) <= 3.0 * m2u:
 						continue
 				var y0 := ground.height_at_world(p0.x, p0.y)
@@ -543,8 +566,6 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 					y1 = edge.y
 				var h1 := -1.0
 				if cls == "retaining_wall" and not is_finite(tagged_height):
-					# A retaining wall holds back the drop across it: from the
-					# lower side up to the higher, with its coping.
 					var rise := _retained(ground, p0, p1, m2u)
 					if not rise.is_empty():
 						y0 = rise[0]
@@ -562,6 +583,175 @@ static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
 					"hedge":
 						_wall_piece(bufs["hedge_core"], p0, p1, y0, y1, hgt * 0.9, thick * 0.8, 0.1 * m2u, m2u)
 						_wall_piece(bufs["hedge"], p0, p1, y0, y1, hgt, thick, 0.1 * m2u, m2u)
+	return [bufs, total_m]
+
+static func _join_buf(dst: TreeMeshLibrary.Buf, src: TreeMeshLibrary.Buf) -> void:
+	if src.idx.is_empty():
+		return
+	var base := dst.verts.size()
+	dst.verts.append_array(src.verts)
+	dst.normals.append_array(src.normals)
+	dst.uvs.append_array(src.uvs)
+	dst.colors.append_array(src.colors)
+	var old_n := dst.idx.size()
+	var add_n := src.idx.size()
+	dst.idx.resize(old_n + add_n)
+	for i in add_n:
+		dst.idx[old_n + i] = src.idx[i] + base
+
+static func _barriers_native(root: Node3D, data: LocationData, ground: GroundTruth,
+		ctx: Dictionary, m2u: float) -> float:
+	var statues := _statue_centres(data)
+	const KIND_ID := {"wall": 0, "fence": 1, "chain_link": 2, "wood_fence": 3, "hedge": 4}
+	const KIND_NAMES := ["wall", "fence", "chain_link", "wood_fence", "hedge", "hedge_core"]
+	var barr_in: Array = []
+	for br in data.barriers:
+		if not (br is Dictionary) or bool(br.get("fortress_wall", false)):
+			continue
+		var cls := str((br as Dictionary).get("class", ""))
+		var row: Array = BARRIERS.get(cls, [])
+		if row.is_empty():
+			continue
+		var kind: String = row[0]
+		if kind == "fence":
+			var material := str((br as Dictionary).get("material", "")).to_lower()
+			var fence_type := str((br as Dictionary).get("fence_type", "")).to_lower()
+			if fence_type in ["chain_link", "chainlink", "wire"]:
+				kind = "chain_link"
+			elif material in ["wood", "timber"] and fence_type in ["", "board", "boards", "close_board", "panel"]:
+				kind = "wood_fence"
+		var tagged_height := float((br as Dictionary).get("height_m", NAN))
+		var hgt := (tagged_height if is_finite(tagged_height) and tagged_height >= 0.1 and tagged_height <= 30.0 else float(row[1])) * m2u
+		var thick := float(row[2]) * m2u
+		var pts: PackedVector2Array = (br as Dictionary).get("points", PackedVector2Array())
+		if pts.size() < 2:
+			continue
+		if cls == "fence" and kind == "fence" and not is_finite(tagged_height) and _rings_statue(pts, statues):
+			hgt = float(BARRIERS["railing"][1]) * m2u
+		barr_in.append([pts, int(KIND_ID[kind]), hgt, thick, cls == "retaining_wall", is_finite(tagged_height)])
+	if barr_in.is_empty():
+		return 0.0
+	var road_segs := PackedFloat32Array()
+	for w: Variant in data.roads:
+		if not (w is Dictionary):
+			continue
+		var d: Dictionary = w
+		if bool(d.get("area", false)) or bool(d.get("tunnel", false)):
+			continue
+		var rpts: PackedVector2Array = d.get("points", PackedVector2Array())
+		var half := float(d.get("width_m", 4.0)) * 0.5 * m2u
+		for j in range(1, rpts.size()):
+			road_segs.push_back(rpts[j - 1].x); road_segs.push_back(rpts[j - 1].y)
+			road_segs.push_back(rpts[j].x); road_segs.push_back(rpts[j].y); road_segs.push_back(half)
+	var stair_rings: Array = []
+	for fp: Array in StairBuilder.footprints(ground, m2u):
+		stair_rings.append(fp[0])
+	var deck_rings: Array = []
+	for dr: Array in BridgeStructures.barrier_rings(data, m2u):
+		deck_rings.append(dr[0])
+	var mrects := PackedFloat32Array()
+	for site: Array in LandmarkSites.model_rect_sites(data):
+		var at: Vector2 = site[0]
+		var entry: Dictionary = site[1]
+		var a := LandmarkSites.axis(entry)
+		var cr := Vector2(-a.y, a.x)
+		for raw in entry.get("model_rects_m", []):
+			if raw is Array and (raw as Array).size() >= 4:
+				var c := at + (a * float(raw[0]) + cr * float(raw[1])) * m2u
+				mrects.push_back(c.x); mrects.push_back(c.y); mrects.push_back(a.x); mrects.push_back(a.y)
+				mrects.push_back(float(raw[2]) * m2u); mrects.push_back(float(raw[3]) * m2u)
+	var shore: ShorelineModel = ground.shoreline if ground.shoreline is ShorelineModel and (ground.shoreline as ShorelineModel).ready else null
+	var quay_segs := PackedFloat32Array()
+	if shore != null:
+		for q: Dictionary in shore.quays:
+			var wall: PackedVector2Array = q["wall"]
+			for i in wall.size() - 1:
+				quay_segs.push_back(wall[i].x); quay_segs.push_back(wall[i].y)
+				quay_segs.push_back(wall[i + 1].x); quay_segs.push_back(wall[i + 1].y)
+	var shore_ready: bool = shore != null and shore.sampler != null
+	var params := {
+		"barriers": barr_in, "road_segs": road_segs,
+		"stair_rings": stair_rings, "deck_rings": deck_rings,
+		"model_rects": mrects, "quay_segs": quay_segs, "m2u": m2u,
+		"shore_sampler": shore.sampler if shore_ready else null,
+		"shore_domains": shore.domains.native if shore_ready and shore.domains != null else null,
+		"shore_bounds": shore.bounds if shore_ready else Rect2(),
+		"shore_empty": ground.shoreline != null and ground.shoreline.empty(),
+		"body_levels": ParkedCars._shore_body_levels(ground),
+		"surface": ground._surface, "level": ground._level,
+		"grid_size": ground._size, "step_units": ground._step_units,
+		"half_units": ground._half_units, "water_level_m": ground.water_level_m,
+	}
+	var res: Dictionary = ClassDB.class_call_static("PropKernels", "barriers_build", params)
+	var season: int = ctx["season"]
+	var mats := {
+		"wall": StreetSnow.material(MaterialLibrary.pbr_material("limestone", MaterialLibrary._calib_tint(
+			(MaterialLibrary.PBR_SETS["limestone"] as Dictionary)["mean"], WALL_STONE), 1.0) as StandardMaterial3D, 0.25),
+		"fence": _fence_material(),
+		"chain_link": _chainlink_material(),
+		"wood_fence": StreetSnow.material(MaterialLibrary.pbr_material("wood", Color.WHITE, 1.0) as StandardMaterial3D, 0.25),
+		"hedge": TreeMeshLibrary.leaf_material("broad", TreeSpecies.tint("oak", mini(season, 2)) * 0.85, 0.0, 0.0, true),
+		"hedge_core": _core_material(),
+	}
+	var meshes: Array = res.get("meshes", [])
+	for k in mini(meshes.size(), KIND_NAMES.size()):
+		var arr: Array = meshes[k]
+		if arr.is_empty():
+			continue
+		var a: Array = []
+		a.resize(Mesh.ARRAY_MAX)
+		a[Mesh.ARRAY_VERTEX] = arr[0]
+		a[Mesh.ARRAY_NORMAL] = arr[1]
+		a[Mesh.ARRAY_TEX_UV] = arr[2]
+		a[Mesh.ARRAY_COLOR] = arr[3]
+		a[Mesh.ARRAY_INDEX] = arr[4]
+		var m := ArrayMesh.new()
+		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, a)
+		var mi := MeshInstance3D.new()
+		mi.mesh = m
+		mi.material_override = mats[KIND_NAMES[k]]
+		mi.name = "Prop_barrier_%s" % KIND_NAMES[k]
+		root.add_child(mi)
+	return float(res.get("total_m", 0.0))
+
+static func _barriers(root: Node3D, data: LocationData, ground: GroundTruth,
+		ctx: Dictionary) -> float:
+	if data.barriers.is_empty():
+		return 0.0
+	var m2u: float = ctx["m2u"]
+	if _native_props:
+		return _barriers_native(root, data, ground, ctx, m2u)
+	var piece := 3.0 * m2u
+	var roads := _road_grid(data, m2u)
+	var decks := BridgeStructures.barrier_rings(data, m2u)
+	var shore: ShorelineModel = ground.shoreline if ground.shoreline is ShorelineModel and (ground.shoreline as ShorelineModel).ready else null
+	var has_quays := shore != null and not shore.quays.is_empty()
+	var models := LandmarkSites.model_rect_sites(data)
+	var stairs := StairBuilder.footprints(ground, m2u)
+	var statues := _statue_centres(data)
+	var n := data.barriers.size()
+	var bufs: Dictionary
+	var total_m := 0.0
+	if n >= 64:
+		var parts: Array = []
+		parts.resize(BARRIER_CHUNKS)
+		var cjob := func(c: int) -> void:
+			parts[c] = _barrier_chunk(data.barriers, n * c / BARRIER_CHUNKS, n * (c + 1) / BARRIER_CHUNKS,
+				ground, m2u, piece, roads, decks, shore, has_quays, models, stairs, statues)
+		var g := WorkerThreadPool.add_group_task(cjob, BARRIER_CHUNKS, -1, false, "Barriers")
+		WorkerThreadPool.wait_for_group_task_completion(g)
+		bufs = parts[0][0]
+		total_m = float(parts[0][1])
+		for c in range(1, BARRIER_CHUNKS):
+			var pbufs: Dictionary = parts[c][0]
+			total_m += float(parts[c][1])
+			for kind in bufs:
+				_join_buf(bufs[kind], pbufs[kind])
+	else:
+		var single := _barrier_chunk(data.barriers, 0, n, ground, m2u, piece, roads, decks,
+			shore, has_quays, models, stairs, statues)
+		bufs = single[0]
+		total_m = float(single[1])
 	var season: int = ctx["season"]
 	var mats := {
 		# Limestone calibrated to weathered masonry: the "stone" set is an

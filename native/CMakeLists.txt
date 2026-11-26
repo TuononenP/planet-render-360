@@ -22,6 +22,10 @@ add_library(planet_render SHARED
 	src/far_sampling.h
 	src/ground_kernels.cpp
 	src/ground_kernels.h
+	src/ground_cover_kernels.cpp
+	src/ground_cover_kernels.h
+	src/prop_kernels.cpp
+	src/prop_kernels.h
 	src/image_kernels.cpp
 	src/image_kernels.h
 	src/landmark_kernels.cpp

@@ -56,6 +56,12 @@ var aprons: Dictionary = {}
 var apron_rings: Array = []
 var skipped_bridges: Dictionary = {}
 
+func intersects_square(box: Rect2) -> bool:
+	for sq: Array in squares:
+		if (sq[1] as Rect2).intersects(box, true):
+			return true
+	return false
+
 func in_square(p: Vector2) -> bool:
 	for sq: Array in squares:
 		if not (sq[1] as Rect2).has_point(p) or not Geometry2D.is_point_in_polygon(p, sq[0]):

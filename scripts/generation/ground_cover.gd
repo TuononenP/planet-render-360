@@ -122,14 +122,77 @@ void fragment() {
 const TUFT_VALUE := 0.8
 const TURF_GREY := 0.18
 static var _mats: Dictionary = {}
+static var _native_cover := ClassDB.class_exists("GroundCoverKernels")
 
 ## Adds the cover MultiMeshes to `root` in chunks; returns the instance count.
 ## `abort` stops it between rows and kinds; a stopped result is dropped.
 static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 		mask: VegetationMask, abort: BuildAbort = null) -> int:
 	var p := RenderSettings.clamp_preset(data.quality_preset)
-	var radius := float(RADIUS_M[p]) * WorldScale.metres_to_units()
-	var chunk := CHUNK_M * WorldScale.metres_to_units()
+	var m := WorldScale.metres_to_units()
+	var radius := float(RADIUS_M[p]) * m
+	if radius <= 0.0:
+		return 0
+	var chunk := CHUNK_M * m
+	var desktop := _desktop()
+	var photo_cover := desktop and p >= RenderSettings.Preset.HIGH and data.satellite_image != null
+	if mask.green.is_empty() and not photo_cover:
+		return 0
+	if _native_cover and mask._native != null and (not photo_cover or ClassDB.class_exists("PhotoSampler")):
+		var extra := float(WALK_EXTRA_M[p]) * m if desktop else 0.0
+		var reach := radius + extra
+		var gcls := PackedByteArray()
+		var gwild := PackedByteArray()
+		gcls.resize(mask.green.size())
+		gwild.resize(mask.green.size())
+		const CLS_ID := {"grass": 1, "cemetery": 2, "orchard": 3, "forest": 4, "wetland": 5}
+		for gi in mask.green.size():
+			var gp: Dictionary = mask.green[gi]
+			var c := str(gp.get("class", ""))
+			gcls[gi] = int(CLS_ID.get(c, 0))
+			var sw := str(gp.get("sward", ""))
+			if sw == "":
+				sw = VegetationMask.sward_of(c)
+			gwild[gi] = 1 if sw == "wild" else 0
+		var lurb := PackedByteArray()
+		lurb.resize(ground._land.size())
+		for li in ground._land.size():
+			lurb[li] = 1 if str((ground._land[li] as Dictionary).get("class", "")) == "urban" else 0
+		var shore_ready: bool = ground.shoreline != null and ground.shoreline.ready and ground.shoreline.sampler != null
+		var params := {
+			"mask": mask._native,
+			"sampler": _photo_sampler(data) if photo_cover else null,
+			"shore_sampler": ground.shoreline.sampler if shore_ready else null,
+			"shore_bounds": ground.shoreline.bounds if shore_ready else Rect2(),
+			"surface": ground._surface,
+			"grid_size": ground._size,
+			"step_units": ground._step_units,
+			"water_level_m": ground.water_level_m,
+			"land_index": ground._land_native,
+			"land_urban": lurb,
+			"half_units": ground._half_units,
+			"green_cls": gcls,
+			"green_wild": gwild,
+			"centre": View360.spawn_xz(data),
+			"grass": _grass_colour(data),
+			"m2u": m,
+			"reach": reach,
+			"full_reach": extra > 0.0,
+			"sp": float(SPACING_M[p]) * m,
+			"photo_cover": photo_cover,
+			"seeds": data.season == LocationData.Season.SUMMER or data.season == LocationData.Season.AUTUMN,
+			"chunk_u": chunk,
+		}
+		var res: Dictionary = ClassDB.class_call_static("GroundCoverKernels", "build_chunks", params)
+		var dry := _dry(data)
+		for row: Array in res.get("chunks", []):
+			var kind: String = KINDS[int(row[0])]
+			var cell := Vector2i(int(row[1]), int(row[2]))
+			var oy := float(row[3])
+			var buf: PackedFloat32Array = row[4]
+			var fade := fade_for(kind, radius)
+			root.add_child(_chunk_from_buffer(kind, buf, cell, oy, chunk, data.season, fade, dry))
+		return int(res.get("total", 0))
 	var per := plan(data, ground, mask, abort)
 	var total := 0
 	for kind: String in KINDS:
@@ -148,6 +211,26 @@ static func build(root: Node3D, data: LocationData, ground: GroundTruth,
 			root.add_child(_chunk(kind, cells[c], c, chunk, data.season, fade, _dry(data)))
 		total += list.size()
 	return total
+
+static func _chunk_from_buffer(kind: String, buf: PackedFloat32Array, cell: Vector2i, oy: float,
+		chunk: float, season: int, fade: float, dry: bool) -> MultiMeshInstance3D:
+	var origin := Vector3((float(cell.x) + 0.5) * chunk, oy, (float(cell.y) + 0.5) * chunk)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = GrassCards.card(kind)
+	mm.instance_count = buf.size() / 16
+	mm.buffer = buf
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = "GroundCover_%s_%d_%d" % [kind, cell.x, cell.y]
+	mmi.position = origin
+	mmi.multimesh = mm
+	mmi.material_override = _material(kind, season, fade, dry)
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mmi.visibility_range_end = fade + chunk
+	mmi.set_meta("lod_layer", "GroundCover")
+	mmi.set_meta("cover_end", fade + chunk)
+	return mmi
 
 ## How far (m) the eye may move from where cover was laid before the
 ## view runs short of it: the walking reach laid beyond the view radius.
@@ -180,13 +263,25 @@ static func _chunk(kind: String, list: Array, cell: Vector2i, chunk: float, seas
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
 	mm.mesh = GrassCards.card(kind)
-	mm.instance_count = list.size()
-	for n in list.size():
+	var count := list.size()
+	mm.instance_count = count
+	# Direct MultiMesh.buffer upload (stride 16: 3x4 transform + RGBA color).
+	var buf := PackedFloat32Array()
+	buf.resize(count * 16)
+	for n in count:
 		var e: Array = list[n]
 		var s := float(e[1])
-		var b := Basis(Vector3.UP, float(e[2])).scaled(Vector3(s, s * float(e[4]), s))
-		mm.set_instance_transform(n, Transform3D(b, (e[0] as Vector3) - origin))
-		mm.set_instance_color(n, e[3])
+		var yaw := float(e[2])
+		var cs := cos(yaw)
+		var sn := sin(yaw)
+		var pos: Vector3 = (e[0] as Vector3) - origin
+		var col: Color = e[3]
+		var idx := n * 16
+		buf[idx] = cs * s;      buf[idx + 1] = 0.0;              buf[idx + 2] = sn * s;  buf[idx + 3] = pos.x
+		buf[idx + 4] = 0.0;     buf[idx + 5] = s * float(e[4]);  buf[idx + 6] = 0.0;     buf[idx + 7] = pos.y
+		buf[idx + 8] = -sn * s; buf[idx + 9] = 0.0;              buf[idx + 10] = cs * s; buf[idx + 11] = pos.z
+		buf[idx + 12] = col.r;  buf[idx + 13] = col.g;           buf[idx + 14] = col.b;  buf[idx + 15] = col.a
+	mm.buffer = buf
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "GroundCover_%s_%d_%d" % [kind, cell.x, cell.y]
 	mmi.position = origin
@@ -293,35 +388,81 @@ static func plan(data: LocationData, ground: GroundTruth, mask: VegetationMask,
 	_scatter(per, data, ground, mask, reach, extra > 0.0, float(SPACING_M[p]) * m, photo_cover, abort)
 	return per
 
-## One jittered grid of placements out to `reach`.
+const SCATTER_STRIPS := 4
+
+## One jittered grid of placements out to `reach`, partitioned across deterministic row strips.
 static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, mask: VegetationMask, reach: float,
 		full_reach: bool, sp: float, photo_cover: bool, abort: BuildAbort = null) -> void:
 	var centre := View360.spawn_xz(data)
 	var grass := _grass_colour(data)
-	var u2m := 1.0 / WorldScale.metres_to_units()
+	var m := WorldScale.metres_to_units()
+	var u2m := 1.0 / m
+	var edge_clear := EDGE_CLEAR_M * m
+	var photo_road_clear := PHOTO_ROAD_CLEAR_M * m
 	var seeds := data.season == LocationData.Season.SUMMER or data.season == LocationData.Season.AUTUMN
 	var steps := int(ceil(reach / sp))
 	var sampler := _photo_sampler(data) if photo_cover else null
-	for j in range(-steps, steps + 1):
+	var total_rows := 2 * steps + 1
+	var strips := mini(SCATTER_STRIPS, total_rows)
+	if strips <= 1:
+		_scatter_rows(per, -steps, steps + 1, steps, centre, grass, u2m, edge_clear, photo_road_clear,
+			seeds, reach, full_reach, sp, photo_cover, sampler, data, ground, mask, abort)
+		return
+	var parts: Array = []
+	parts.resize(strips)
+	var job := func(s: int) -> void:
+		var local := {}
+		for k in KINDS:
+			local[k] = []
+		var j0 := -steps + (total_rows * s) / strips
+		var j1 := -steps + (total_rows * (s + 1)) / strips
+		_scatter_rows(local, j0, j1, steps, centre, grass, u2m, edge_clear, photo_road_clear,
+			seeds, reach, full_reach, sp, photo_cover, sampler, data, ground, mask, abort)
+		parts[s] = local
+	var g := WorkerThreadPool.add_group_task(job, strips, -1, false, "GroundCover")
+	WorkerThreadPool.wait_for_group_task_completion(g)
+	for s in strips:
+		var local: Dictionary = parts[s]
+		for k in KINDS:
+			(per[k] as Array).append_array(local[k])
+
+static func _scatter_rows(per: Dictionary, j0: int, j1: int, steps: int, centre: Vector2,
+		grass: Color, u2m: float, edge_clear: float, photo_road_clear: float, seeds: bool,
+		reach: float, full_reach: bool, sp: float, photo_cover: bool, sampler: Object,
+		data: LocationData, ground: GroundTruth, mask: VegetationMask, abort: BuildAbort) -> void:
+	var has_green := not mask.green.is_empty()
+	var reach2 := reach * reach
+	for j in range(j0, j1):
 		if abort != null and abort.requested:
 			return
+		var fj := float(j)
 		for i in range(-steps, steps + 1):
-			var h1 := _hash(float(i), float(j), 1.0)
-			var h2 := _hash(float(i), float(j), 2.0)
-			var x := centre.x + (float(i) + h1 - 0.5) * sp
-			var z := centre.y + (float(j) + h2 - 0.5) * sp
-			var d := Vector2(x - centre.x, z - centre.y).length()
-			if d > reach:
+			var fi := float(i)
+			var h1 := _hash(fi, fj, 1.0)
+			var h2 := _hash(fi, fj, 2.0)
+			var dx := (fi + h1 - 0.5) * sp
+			var dz := (fj + h2 - 0.5) * sp
+			var d2 := dx * dx + dz * dz
+			if d2 > reach2:
 				continue
-			var id := mask.cover_at(x, z) if not mask.green.is_empty() else -1
+			var x := centre.x + dx
+			var z := centre.y + dz
+			var id := mask.cover_at(x, z) if has_green else -1
 			var cls := "grass"
 			var sward := ""
 			var photo := Color(0, 0, 0, 0)
 			if id >= 0:
-				cls = str((mask.green[id] as Dictionary).get("class", ""))
-				sward = str((mask.green[id] as Dictionary).get("sward", ""))
+				var gpoly: Dictionary = mask.green[id]
+				cls = str(gpoly.get("class", ""))
+				if not CLASSES.has(cls) or mask.blocked(x, z, HARD_BITS, edge_clear):
+					continue
+				sward = str(gpoly.get("sward", ""))
 			else:
 				if not photo_cover:
+					continue
+				# Fast-reject hard surfaces and road edges before expensive photo/land_class sampling.
+				if mask.blocked(x, z, HARD_BITS, edge_clear) \
+						or mask.blocked(x, z, VegetationMask.ROAD_EDGE, photo_road_clear):
 					continue
 				photo = _photo(sampler, data, x, z)
 				if not photo_green(photo) or ground.land_class_at(x, z) == "urban" \
@@ -329,22 +470,19 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 					continue
 				# Unmapped green among houses is a garden; out of town, a meadow.
 				sward = "mown" if mask.built_fraction(x, z) > 0.04 else "wild"
-			if not CLASSES.has(cls) or mask.blocked(x, z, HARD_BITS, EDGE_CLEAR_M * WorldScale.metres_to_units()):
-				continue
-			if id < 0 and mask.blocked(x, z, VegetationMask.ROAD_EDGE, PHOTO_ROAD_CLEAR_M * WorldScale.metres_to_units()):
-				continue
 			if sward == "":
 				sward = VegetationMask.sward_of(cls)
 			var wild := sward == "wild"
 			var w: Array = CLASSES[cls]
-			var h3 := _hash(float(i), float(j), 3.0)
+			var h3 := _hash(fi, fj, 3.0)
 			var kind := "tuft"
 			if h3 > float(w[0]) + float(w[1]):
 				kind = "shrub"
 			elif h3 > float(w[0]):
 				kind = "flower"
-			elif wild and seeds and _hash(float(i), float(j), 9.0) < SEEDHEAD_SHARE:
+			elif wild and seeds and _hash(fi, fj, 9.0) < SEEDHEAD_SHARE:
 				kind = "seedhead"
+			var d := sqrt(d2)
 			# With no walking reach, tufts stop halfway: past that they are specks.
 			var short := kind == "tuft" or kind == "seedhead"
 			var r_kind := reach * (0.5 if short and not full_reach else 1.0)
@@ -355,10 +493,10 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 				+ _vnoise(x * u2m / 19.0 + 7.0, z * u2m / 19.0) * 0.4
 			var keep := (1.0 - smoothstep(r_kind * 0.85, r_kind, d)) \
 				* (0.75 + 0.5 * clump if wild else 0.35 + 0.8 * clump)
-			if _hash(float(i), float(j), 4.0) > keep \
-					or (kind == "shrub" and _hash(float(i), float(j), 5.0) > 0.5):
+			if _hash(fi, fj, 4.0) > keep \
+					or (kind == "shrub" and _hash(fi, fj, 5.0) > 0.5):
 				continue
-			var s := 0.7 + 0.6 * _hash(float(i), float(j), 6.0)
+			var s := 0.7 + 0.6 * _hash(fi, fj, 6.0)
 			var hr := MOWN_H
 			if wild:
 				hr = WILD_H
@@ -367,8 +505,8 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 				hr = EDGE_H
 			var hs := 1.0
 			if short:
-				hs = lerpf(hr.x, hr.y, clampf(clump * 0.7 + _hash(float(i), float(j), 10.0) * 0.5, 0.0, 1.0))
-			var v := 0.88 + 0.24 * _hash(float(i), float(j), 7.0)
+				hs = lerpf(hr.x, hr.y, clampf(clump * 0.7 + _hash(fi, fj, 10.0) * 0.5, 0.0, 1.0))
+			var v := 0.88 + 0.24 * _hash(fi, fj, 7.0)
 			if photo.a <= 0.0 and photo_cover:
 				photo = _photo(sampler, data, x, z)
 			var root := rooted(grass, photo)
@@ -381,21 +519,20 @@ static func _scatter(per: Dictionary, data: LocationData, ground: GroundTruth, m
 			elif kind == "shrub":
 				col = Color(root.r * v * 0.7, root.g * v * 0.8, root.b * v * 0.6)
 			(per[kind] as Array).append([Vector3(x, ground.height_at_world(x, z), z),
-				s, _hash(float(i), float(j), 8.0) * TAU, col, hs])
+				s, _hash(fi, fj, 8.0) * TAU, col, hs])
 			# A meadow stands thick: two more tufts in the cell carry the
 			# blade carpet's standing grass on past its rim.
 			if wild and short:
 				for k in WILD_EXTRA:
-					var ex := x + (_hash(float(i), float(j), 20.0 + k) - 0.5) * sp
-					var ez := z + (_hash(float(i), float(j), 30.0 + k) - 0.5) * sp
-					if mask.blocked(ex, ez, HARD_BITS, EDGE_CLEAR_M * WorldScale.metres_to_units()):
+					var ex := x + (_hash(fi, fj, 20.0 + k) - 0.5) * sp
+					var ez := z + (_hash(fi, fj, 30.0 + k) - 0.5) * sp
+					if mask.blocked(ex, ez, HARD_BITS, edge_clear):
 						continue
-					if id < 0 and mask.blocked(ex, ez, VegetationMask.ROAD_EDGE,
-							PHOTO_ROAD_CLEAR_M * WorldScale.metres_to_units()):
+					if id < 0 and mask.blocked(ex, ez, VegetationMask.ROAD_EDGE, photo_road_clear):
 						continue
-					var eh := lerpf(hr.x, hr.y, _hash(float(i), float(j), 40.0 + k))
+					var eh := lerpf(hr.x, hr.y, _hash(fi, fj, 40.0 + k))
 					(per[kind] as Array).append([Vector3(ex, ground.height_at_world(ex, ez), ez),
-						s * (0.8 + 0.4 * _hash(float(i), float(j), 50.0 + k)), _hash(float(i), float(j), 60.0 + k) * TAU, col, eh])
+						s * (0.8 + 0.4 * _hash(fi, fj, 50.0 + k)), _hash(fi, fj, 60.0 + k) * TAU, col, eh])
 
 static func _grass_colour(data: LocationData) -> Color:
 	var dry := ClimateModel.grass_tint(data, data.season)
