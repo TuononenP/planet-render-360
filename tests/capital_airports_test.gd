@@ -3,13 +3,14 @@ extends SceneTree
 ## Capital airports test: godot --headless --script tests/capital_airports_test.gd
 ## Offline. Each capital whose airport stands close to its centre has a
 ## hand-built airfield (LandmarkRegistryCapitalAirports): a named capital of
-## CapitalCatalog, within AIRPORT_REACH_M of it, a secondary "Airport" (never
-## displaces a capital's icon), a clear_rect_m that covers the whole model,
-## and a model that reaches its height_m. The parked-aircraft kit builds
-## each type at about its real length.
+## CapitalCatalog, within AIRPORT_REACH_M of it (a farther principal field
+## carries its own reach_m, like Helsinki-Vantaa), a secondary "Airport"
+## (never displaces a capital's icon), a clear_rect_m that covers the whole
+## model, and a model that reaches its height_m. The parked-aircraft kit
+## builds each type at about its real length.
 
 const AIRPORT_REACH_M := 8000.0
-const MIN_AIRPORTS := 13
+const MIN_AIRPORTS := 14
 const REAL_LENGTH_M := {"narrow": 37.6, "wide": 58.8, "turboprop": 32.8, "light": 8.3}
 
 func _init() -> void:
@@ -37,7 +38,8 @@ func _init() -> void:
 			for p in capitals[cc]:
 				near = minf(near, LocationData.distance_m((p as Vector2).x, (p as Vector2).y,
 					float(e["lat"]), float(e["lon"])))
-			if near > AIRPORT_REACH_M:
+			var reach := float(e.get("reach_m", AIRPORT_REACH_M))
+			if near > reach:
 				failures.append("%s stands %.0f m from its capital" % [t, near])
 		if str(e.get("kind", "")) != "Airport" or not bool(e.get("secondary", false)):
 			failures.append("%s should be a secondary Airport" % t)

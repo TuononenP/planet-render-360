@@ -1,7 +1,9 @@
 class_name LandmarkRegistryCapitalAirports
 extends RefCounted
 
-## The airports that stand close to a capital's centre, each a hand-built
+## The airports that stand close to a capital's centre (or the farther
+## principal field where that lies outside the 8 km ring, carrying its own
+## reach_m, like Helsinki-Vantaa), each a hand-built
 ## airfield (LandmarkSetCapitalAirports, scripts/generation/landmarks/
 ## capital_airports). The model frame: +X along the longest runway, +Z to its
 ## right, origin at the terminal's centre; lat/lon is that origin and
@@ -78,4 +80,13 @@ static func entries() -> Array:
 			"secondary": true, "capital": "MZ", "yaw_deg": -61.0, "clear_m": 30.0, "base_half_m": 150.0,
 			"clear_rect_m": [1698.0, -280.0, 2828.0, 869.0],
 			"aliases": ["maputo international airport", "maputo airport"]},
+		# Helsinki's field stands 16 km north of the centre in Vantaa, so its
+		# radius covers the city (city-wide search, skyline extra) and it
+		# carries its own reach_m: the batch's 8 km ring is for the close-in
+		# fields above (capital_airports_test).
+		{"type": "helsinki_vantaa_airport", "name": "Helsinki-Vantaa Airport", "lat": 60.316297, "lon": 24.964702,
+			"radius_m": 20000.0, "wiki_title": "Helsinki Airport", "height_m": 50.0, "kind": "Airport",
+			"secondary": true, "capital": "FI", "yaw_deg": -42.3, "clear_m": 30.0, "base_half_m": 150.0,
+			"clear_rect_m": [-537.0, -252.0, 2230.0, 1997.0], "reach_m": 20000.0,
+			"aliases": ["helsinki-vantaa airport", "helsinki airport", "vantaa airport", "helsinki-vantaan lentoasema"]},
 	]

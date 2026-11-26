@@ -802,11 +802,13 @@ The public Overpass instances were at capacity for the batch, so the OSM API
 was used. Attribution: © OpenStreetMap contributors (ODbL), as for every
 OSM-derived layer.
 
-## Capital airports (2026-11-16)
+## Capital airports (2026-11-16, Helsinki-Vantaa 2026-11-25)
 
 Capitals whose airport stands within about 8 km of the centre have it as a
 hand-built airfield landmark (`LandmarkRegistryCapitalAirports`, models in
-`scripts/generation/landmarks/capital_airports`). `tools/capital_airports.tsv`
+`scripts/generation/landmarks/capital_airports`). A farther principal field
+carries its own `reach_m` instead (Helsinki-Vantaa, 16 km north of the centre
+in Vantaa, `reach_m` 20000). `tools/capital_airports.tsv`
 lists each airport's ICAO code and rough point. `tools/capital_airports.py`
 asks an Overpass instance for the aerodrome found by that code (`aeroway=*`
 features and the buildings inside it; a box round the point when the code
@@ -828,6 +830,24 @@ origin at the terminal's centre).
 - Parked aircraft are our own low-poly models in the airlines' tail colours,
   put on the mapped stands, or on a grid inside the aprons where the stands
   are not mapped.
+
+Attribution: © OpenStreetMap contributors (ODbL), as for every OSM-derived
+layer.
+
+## Ship terminals (2026-11-25)
+
+The principal passenger terminals — the ferry terminals of the Nordic/Baltic
+capitals (Tallinn D-Terminal, Riga, Copenhagen, Oslo) and the cruise terminals
+of the major USA ports with big liners (Port Canaveral, Port Everglades,
+Galveston, Manhattan, Los Angeles, Seattle) — are secondary landmark entries
+(`LandmarkRegistryShipTerminals`, one shared kit builder in
+`scripts/generation/landmarks/ship_terminals`), so each has a map pin and
+answers its names in search. Footprints are the OSM way outlines (per-entry
+way IDs in the registry comments), fetched from Overpass with the same
+identifying User-Agent, pauses and retries as the airport tooling. Heights are
+mapped where OSM tags them, estimated from the terminal type where not
+(marked EST in the registry). Liners show at the new cruise ports through the
+`CRUISE_PORT_BOXES` berth boxes in `scripts/generation/quay_moorings.gd`.
 
 Attribution: © OpenStreetMap contributors (ODbL), as for every OSM-derived
 layer.

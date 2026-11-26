@@ -384,7 +384,9 @@ static func _poly(pts: Array) -> PackedVector2Array:
 
 ## Drapes the flat paved ground surfaces (Runway, Apron, MarkW, MarkY) of a
 ## capital airport landmark onto `ground` per vertex so long runways never
-## hover above sloping coastal terrain or expose raised slab walls.
+## hover above sloping coastal terrain or expose raised slab walls. Parked
+## aircraft ("Ac*") drape with the same transform, so a stand on ground
+## higher than the terminal datum does not bury the plane up to its belly.
 static func conform(root: Node3D, ground: GroundTruth) -> void:
 	var model := root.get_node_or_null("Model") as Node3D
 	if model == null or ground == null:
@@ -393,7 +395,8 @@ static func conform(root: Node3D, ground: GroundTruth) -> void:
 	var m2u := WorldScale.metres_to_units()
 	var base_y := root.position.y
 	for part in LandmarkBuilder.parts(root):
-		if str(part.name) not in ["Runway", "Apron", "MarkW", "MarkY"]:
+		var pname := str(part.name)
+		if pname not in ["Runway", "Apron", "MarkW", "MarkY"] and not pname.begins_with("Ac"):
 			continue
 		if part.mesh == null or part.mesh.get_surface_count() < 1:
 			continue

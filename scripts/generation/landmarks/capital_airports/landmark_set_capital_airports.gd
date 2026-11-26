@@ -20,6 +20,7 @@ static func build(model: Node3D, type: String) -> bool:
 		"kathmandu_airport": LandmarkCaFar.kathmandu(model)
 		"wattay_airport": LandmarkCaFar.wattay(model)
 		"maputo_airport": LandmarkCaFar.maputo(model)
+		"helsinki_vantaa_airport": LandmarkCaNorth.vantaa(model)
 		_:
 			return false
 	return true

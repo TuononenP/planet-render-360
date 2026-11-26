@@ -24,10 +24,19 @@ const LINER_MAX_M := 300.0
 const LINER_RADIUS_M := 1200.0
 const LINER_SPACING_M := 400.0
 const LINER_DEPTH_M := 2.0
-## PortMiami (Dodge Island's north cruise berths): [lat0, lat1, lon0, lon1];
-## liners there show out to CRUISE_REACH_M, line up CRUISE_SPACING_M apart,
-## up to CRUISE_MAX_LINERS, bows east-south-east toward Government Cut.
-const CRUISE_PORT_BOX := [25.768, 25.785, -80.185, -80.148]
+## Cruise-berth boxes [lat0, lat1, lon0, lon1]: PortMiami's Dodge Island
+## north berths first, then the other major cruise ports. Liners inside a
+## box show out to CRUISE_REACH_M, line up CRUISE_SPACING_M apart, up to
+## CRUISE_MAX_LINERS. Miami's bows point east-south-east toward Government Cut.
+const CRUISE_PORT_BOXES := [
+	[25.768, 25.785, -80.185, -80.148],  # PortMiami (Dodge Island north berths)
+	[28.398, 28.422, -80.635, -80.595],  # Port Canaveral cruise basin
+	[26.075, 26.105, -80.140, -80.105],  # Port Everglades cruise terminals
+	[29.298, 29.318, -94.815, -94.780],  # Port of Galveston cruise terminals
+	[40.750, 40.780, -74.020, -73.990],  # Manhattan Cruise Terminal (Hudson piers)
+	[33.730, 33.755, -118.290, -118.265],  # Los Angeles World Cruise Center
+	[47.615, 47.640, -122.395, -122.365],  # Seattle Smith Cove (Elliott Bay)
+]
 const CRUISE_REACH_M := 3600.0
 const CRUISE_SPACING_M := 310.0
 const CRUISE_MAX_LINERS := 4
@@ -286,7 +295,8 @@ static func _large_ships(data: LocationData, ground: GroundTruth, taken: Diction
 		return out
 	var eye := View360.spawn_xz(data)
 	var bridge_list := bridges(data, m)
-	var cap := CRUISE_MAX_LINERS if WaterSurface.miami_water(data.latitude, data.longitude) else MAX_LINERS
+	var cap := CRUISE_MAX_LINERS if WaterSurface.miami_water(data.latitude, data.longitude) \
+		or cruise_box_at(data.latitude, data.longitude) else MAX_LINERS
 	var runs: Array = []
 	for points in _quay_lines(data, m):
 		runs.append_array(_straight_runs(points, m))
@@ -575,13 +585,22 @@ static func _near_eye(c: Vector2, dir: Vector2, length: float, beam: float, eye:
 	return maxf(along - length * 0.5 * m, 0.0) < LINER_EYE_CLEAR_M * m \
 		and maxf(across - beam * 0.5 * m, 0.0) < LINER_EYE_CLEAR_M * m
 
-## Whether world point `at` lies inside PortMiami's cruise-berth box.
+## Whether world point `at` lies inside a cruise-berth box (and the eye
+## with it): the major cruise ports, PortMiami first.
 static func cruise_port_at(data: LocationData, at: Vector2, m: float) -> bool:
-	if not WaterSurface.miami_water(data.latitude, data.longitude):
+	if not WaterSurface.miami_water(data.latitude, data.longitude) \
+			and not cruise_box_at(data.latitude, data.longitude):
 		return false
 	var ll := WorldScale.latlon_from_xz(at.x / m, at.y / m, data.latitude, data.longitude)
-	return ll.x >= CRUISE_PORT_BOX[0] and ll.x <= CRUISE_PORT_BOX[1] \
-		and ll.y >= CRUISE_PORT_BOX[2] and ll.y <= CRUISE_PORT_BOX[3]
+	return cruise_box_at(ll.x, ll.y)
+
+## Whether `lat, lon` lies inside one of the cruise-berth boxes.
+static func cruise_box_at(lat: float, lon: float) -> bool:
+	for b: Array in CRUISE_PORT_BOXES:
+		if lat >= float(b[0]) and lat <= float(b[1]) \
+				and lon >= float(b[2]) and lon <= float(b[3]):
+			return true
+	return false
 
 static func _spaced(out: Array, c: Vector2, m: float, spacing: float = LINER_SPACING_M) -> bool:
 	for l in out:

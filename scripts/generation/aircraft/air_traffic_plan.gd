@@ -203,6 +203,7 @@ static func _layout_for_capital(t: String) -> Dictionary:
 		"kathmandu_airport": return CaLayoutKathmandu.DATA
 		"wattay_airport": return CaLayoutVientiane.DATA
 		"maputo_airport": return CaLayoutMaputo.DATA
+		"helsinki_vantaa_airport": return CaLayoutVantaa.DATA
 	return {}
 
 ## Walks a connected taxiway chain of 150-550 m ending near `anchor` (for
