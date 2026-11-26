@@ -67,19 +67,22 @@ static func build(data: LocationData, ground: GroundTruth, ctx: Dictionary,
 			if SuomenlinnaSite.fortress(m["b_eff"]):
 				continue
 			pw.add_mass(m, ground, float(ctx.get("sea_y", -INF)))
-	for r in data.roads:
-		var pts: Variant = r.get("points", null) if r is Dictionary else r
-		if not (pts is PackedVector2Array):
-			continue
-		if r is Dictionary and bool((r as Dictionary).get("tunnel", false)):
-			continue
-		var hw := float((r as Dictionary).get("width_m", 8.0)) * 0.5 if r is Dictionary else 4.0
-		var p := pts as PackedVector2Array
-		for i in p.size() - 1:
-			if pw._idx != null:
-				pw._idx.add_road(p[i], p[i + 1], hw * WorldScale.metres_to_units())
-			else:
-				pw._insert(pw._roads, p[i], p[i + 1], [p[i], p[i + 1], hw * WorldScale.metres_to_units()])
+	if pw._idx != null and pw._idx.has_method("add_roads"):
+		pw._idx.add_roads(data.roads, WorldScale.metres_to_units())
+	else:
+		for r in data.roads:
+			var pts: Variant = r.get("points", null) if r is Dictionary else r
+			if not (pts is PackedVector2Array):
+				continue
+			if r is Dictionary and bool((r as Dictionary).get("tunnel", false)):
+				continue
+			var hw := float((r as Dictionary).get("width_m", 8.0)) * 0.5 if r is Dictionary else 4.0
+			var p := pts as PackedVector2Array
+			for i in p.size() - 1:
+				if pw._idx != null:
+					pw._idx.add_road(p[i], p[i + 1], hw * WorldScale.metres_to_units())
+				else:
+					pw._insert(pw._roads, p[i], p[i + 1], [p[i], p[i + 1], hw * WorldScale.metres_to_units()])
 	return pw
 
 ## Registers one planned mass: its outer edges face out, its courtyard

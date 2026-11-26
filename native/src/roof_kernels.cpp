@@ -1425,6 +1425,297 @@ Array RoofKernels::trim_arrays(const PackedVector2Array &ring, double top, int t
 	return out;
 }
 
+namespace {
+
+struct WallBuf {
+	std::vector<Vector3> verts, normals;
+	std::vector<Vector2> uvs;
+	std::vector<float> tangents;
+	std::vector<int32_t> indices;
+
+	void quad(const Vector2 &a, const Vector2 &b, real_t y0, real_t y1,
+			const Vector2 &n, const Vector2 &uv, real_t u0, bool use_tangents) {
+		const Vector2 e = b - a;
+		const Vector3 n3(n.x, 0.0f, n.y);
+		const int32_t k = (int32_t)verts.size();
+		verts.push_back(Vector3(a.x, y0, a.y));
+		verts.push_back(Vector3(b.x, y0, b.y));
+		verts.push_back(Vector3(b.x, y1, b.y));
+		verts.push_back(Vector3(a.x, y1, a.y));
+		Vector3 t3(0, 0, 0);
+		float w = 1.0f;
+		if (use_tangents) {
+			t3 = Vector3(e.x, 0.0f, e.y).normalized();
+			w = n3.cross(t3).y > 0.0f ? 1.0f : -1.0f;
+		}
+		for (int j = 0; j < 4; ++j) {
+			normals.push_back(n3);
+			if (use_tangents) {
+				tangents.push_back(t3.x);
+				tangents.push_back(t3.y);
+				tangents.push_back(t3.z);
+				tangents.push_back(w);
+			}
+		}
+		uvs.push_back(Vector2(u0, uv.y));
+		uvs.push_back(Vector2(uv.x, uv.y));
+		uvs.push_back(Vector2(uv.x, 0.0f));
+		uvs.push_back(Vector2(u0, 0.0f));
+		const real_t s = e.x * n.y - e.y * n.x;
+		if (s > 0.0f) {
+			indices.push_back(k); indices.push_back(k + 2); indices.push_back(k + 1);
+			indices.push_back(k); indices.push_back(k + 3); indices.push_back(k + 2);
+		} else {
+			indices.push_back(k); indices.push_back(k + 1); indices.push_back(k + 2);
+			indices.push_back(k); indices.push_back(k + 2); indices.push_back(k + 3);
+		}
+	}
+
+	Array to_array() const {
+		Array a;
+		if (indices.empty()) {
+			return a;
+		}
+		a.resize(5);
+		a[0] = packed<PackedVector3Array>(verts);
+		a[1] = packed<PackedVector3Array>(normals);
+		a[2] = packed<PackedVector2Array>(uvs);
+		a[3] = packed<PackedFloat32Array>(tangents);
+		a[4] = packed<PackedInt32Array>(indices);
+		return a;
+	}
+};
+
+} // namespace
+
+Array RoofKernels::walls_arrays(const PackedVector2Array &ring, double base, double top,
+		const Vector3 &uvp, double bay_scale, double v_repeat, const Array &cover,
+		bool has_fire, bool is_glass, bool invert, bool use_tangents, double m2u) {
+	const int64_t n = ring.size();
+	Array res;
+	res.resize(2);
+	if (n < 3) {
+		res[0] = Array();
+		res[1] = Array();
+		return res;
+	}
+	const Vector2 *rp = ring.ptr();
+	const bool ccw = signed_area(ring) > 0.0;
+	const double bay = (double)uvp.x * bay_scale;
+	const int64_t cov_n = cover.size();
+
+	// Inline BuildingWalls.curve_bays
+	std::vector<uint8_t> has_curve((size_t)n, 0);
+	std::vector<Vector2> curve_uv((size_t)n);
+	if (bay > 0.0 && n >= 3) {
+		std::vector<uint8_t> ok((size_t)n, 0);
+		for (int64_t i = 0; i < n; ++i) {
+			const double len_m = (double)rp[i].distance_to(rp[(i + 1) % n]) / m2u;
+			bool open_one = true;
+			if (i < cov_n) {
+				const Array pieces = cover[i];
+				if (pieces.size() != 1) {
+					open_one = false;
+				} else {
+					const Array pc0 = pieces[0];
+					if (!std::isinf((double)pc0[2])) {
+						open_one = false;
+					}
+				}
+			}
+			ok[i] = (len_m > 0.001 && len_m < bay * 1.5 && open_one) ? 1 : 0;
+		}
+		std::vector<uint8_t> link((size_t)n, 0);
+		const double cos_max = std::cos(25.0 * Math::PI / 180.0);
+		for (int64_t i = 0; i < n; ++i) {
+			const int64_t j = (i + 1) % n;
+			if (ok[i] && ok[j]) {
+				const Vector2 d0 = (rp[j] - rp[i]).normalized();
+				const Vector2 d1 = (rp[(j + 1) % n] - rp[j]).normalized();
+				link[i] = (double)d0.dot(d1) > cos_max ? 1 : 0;
+			}
+		}
+		int64_t start = 0;
+		for (int64_t i = 0; i < n; ++i) {
+			if (!link[(i - 1 + n) % n]) {
+				start = i;
+				break;
+			}
+		}
+		std::vector<int64_t> run;
+		auto spread = [&]() {
+			if (run.size() < 3) {
+				return;
+			}
+			double total = 0.0;
+			for (int64_t idx : run) {
+				total += (double)rp[idx].distance_to(rp[(idx + 1) % n]) / m2u;
+			}
+			const int bays_c = total < bay * 0.5 ? 0 : std::max(1, (int)std::llround(total / bay));
+			if (bays_c == 0) {
+				return;
+			}
+			double s = 0.0;
+			for (int64_t idx : run) {
+				const double lm = (double)rp[idx].distance_to(rp[(idx + 1) % n]) / m2u;
+				has_curve[idx] = 1;
+				curve_uv[idx] = Vector2((real_t)((double)bays_c * s / total), (real_t)((double)bays_c * (s + lm) / total));
+				s += lm;
+			}
+		};
+		for (int64_t k = 0; k <= n; ++k) {
+			const int64_t i = (start + k) % n;
+			if (k < n && ok[i] && (run.empty() || link[run.back()])) {
+				run.push_back(i);
+				continue;
+			}
+			spread();
+			run.clear();
+			if (k < n && ok[i]) {
+				run.push_back(i);
+			}
+		}
+	}
+
+	WallBuf face, blank;
+	face.verts.reserve((size_t)n * 4);
+	face.normals.reserve((size_t)n * 4);
+	face.uvs.reserve((size_t)n * 4);
+	face.indices.reserve((size_t)n * 6);
+	if (use_tangents) {
+		face.tangents.reserve((size_t)n * 16);
+	}
+	const bool no_band = !has_fire || is_glass;
+	const double fire_band = 9.0 * m2u;
+
+	for (int64_t i = 0; i < n; ++i) {
+		const Vector2 ea = rp[i];
+		const Vector2 eb = rp[(i + 1) % n];
+		const Vector2 ed = eb - ea;
+		if ((double)ed.length() < 0.001) {
+			continue;
+		}
+		Vector2 nrm = ccw ? Vector2(ed.y, -ed.x).normalized() : Vector2(-ed.y, ed.x).normalized();
+		if (invert) {
+			nrm = -nrm;
+		}
+		auto emit_piece = [&](double t0, double t1, double nb_top) {
+			const Vector2 a = ea.lerp(eb, (real_t)t0);
+			const Vector2 b = ea.lerp(eb, (real_t)t1);
+			if (std::isinf(nb_top) || nb_top <= base) {
+				double u0 = 0.0;
+				double u1 = 1.0;
+				double v0 = 1.0;
+				if ((double)uvp.x > 0.0) {
+					const double len_m = (double)(b - a).length() / m2u;
+					u1 = len_m < bay * 0.5 ? 0.03 : std::max(1.0, std::round(len_m / bay)) / (double)uvp.y;
+					if (has_curve[i]) {
+						u0 = (double)curve_uv[i].x / (double)uvp.y;
+						u1 = (double)curve_uv[i].y / (double)uvp.y;
+					}
+					if ((double)uvp.z > 0.0) {
+						v0 = v_repeat;
+					}
+				}
+				face.quad(a, b, (real_t)base, (real_t)top, nrm, Vector2((real_t)u1, (real_t)v0), (real_t)u0, use_tangents);
+			} else if (nb_top < top - 0.3 * m2u) {
+				const double y0 = std::max(base, nb_top);
+				WallBuf &arr = has_fire ? blank : face;
+				double y1 = top;
+				if (no_band || top - y0 > fire_band * 1.5) {
+					y1 = no_band ? y0 : y0 + fire_band;
+					const double len_m = (double)(b - a).length() / m2u;
+					double u1 = 1.0;
+					if ((double)uvp.x > 0.0) {
+						u1 = len_m < bay * 0.5 ? 0.03 : std::max(1.0, std::round(len_m / bay)) / (double)uvp.y;
+					}
+					const double v_up = ((double)uvp.z > 0.0 ? v_repeat : 1.0) * (top - y1) / std::max(top - base, 1e-4);
+					face.quad(a, b, (real_t)y1, (real_t)top, nrm, Vector2((real_t)u1, (real_t)v_up), 0.0f, use_tangents);
+				}
+				if (y1 > y0) {
+					arr.quad(a, b, (real_t)y0, (real_t)y1, nrm,
+							Vector2((real_t)((double)(b - a).length() / m2u / 4.0), (real_t)((y1 - y0) / m2u / 4.0)),
+							0.0f, use_tangents);
+				}
+			}
+		};
+		if (i < cov_n) {
+			const Array pieces = cover[i];
+			const int64_t pn = pieces.size();
+			for (int64_t p = 0; p < pn; ++p) {
+				const Array pc = pieces[p];
+				emit_piece((double)pc[0], (double)pc[1], (double)pc[2]);
+			}
+		} else {
+			emit_piece(0.0, 1.0, -INFINITY);
+		}
+	}
+	res[0] = face.to_array();
+	res[1] = has_fire ? blank.to_array() : Array();
+	return res;
+}
+
+Array RoofKernels::roof_cap_arrays(const PackedVector2Array &ring, const PackedInt32Array &idx,
+		double top, bool use_tangents) {
+	const int64_t rn = ring.size();
+	const int64_t in = idx.size();
+	const Vector2 *rp = ring.ptr();
+	const int32_t *ip = idx.ptr();
+	bool flip = false;
+	if (in >= 3) {
+		const Vector2 p0 = rp[ip[0]];
+		const Vector2 p1 = rp[ip[1]];
+		const Vector2 p2 = rp[ip[2]];
+		flip = ((double)(p1.x - p0.x) * (double)(p2.y - p0.y) - (double)(p1.y - p0.y) * (double)(p2.x - p0.x)) < 0.0;
+	}
+	PackedVector3Array verts, normals;
+	PackedVector2Array uvs;
+	verts.resize(rn);
+	normals.resize(rn);
+	uvs.resize(rn);
+	Vector3 *vw = verts.ptrw();
+	Vector3 *nw = normals.ptrw();
+	Vector2 *uw = uvs.ptrw();
+	const real_t topf = (real_t)top;
+	for (int64_t i = 0; i < rn; ++i) {
+		vw[i] = Vector3(rp[i].x, topf, rp[i].y);
+		nw[i] = Vector3(0.0f, 1.0f, 0.0f);
+		uw[i] = rp[i] * 0.05f;
+	}
+	PackedInt32Array indices;
+	indices.resize((in / 3) * 3);
+	int32_t *iw = indices.ptrw();
+	for (int64_t t = 0; t + 2 < in; t += 3) {
+		iw[t] = ip[t];
+		if (flip) {
+			iw[t + 1] = ip[t + 2];
+			iw[t + 2] = ip[t + 1];
+		} else {
+			iw[t + 1] = ip[t + 1];
+			iw[t + 2] = ip[t + 2];
+		}
+	}
+	PackedFloat32Array tangents;
+	if (use_tangents) {
+		tangents.resize(rn * 4);
+		float *tw = tangents.ptrw();
+		for (int64_t i = 0; i < rn; ++i) {
+			tw[i * 4 + 0] = 1.0f;
+			tw[i * 4 + 1] = 0.0f;
+			tw[i * 4 + 2] = 0.0f;
+			tw[i * 4 + 3] = 1.0f;
+		}
+	}
+	Array out;
+	out.resize(5);
+	out[0] = verts;
+	out[1] = normals;
+	out[2] = uvs;
+	out[3] = tangents;
+	out[4] = indices;
+	return out;
+}
+
 void RoofKernels::_bind_methods() {
 	ClassDB::bind_static_method("RoofKernels",
 			D_METHOD("form", "ring", "top", "rh", "shape", "party", "gable_front", "holes"),
@@ -1436,6 +1727,12 @@ void RoofKernels::_bind_methods() {
 	ClassDB::bind_static_method("RoofKernels",
 			D_METHOD("trim_arrays", "ring", "top", "trim", "party", "m2u"),
 			&RoofKernels::trim_arrays);
+	ClassDB::bind_static_method("RoofKernels",
+			D_METHOD("walls_arrays", "ring", "base", "top", "uvp", "bay_scale", "v_repeat", "cover", "has_fire", "is_glass", "invert", "use_tangents", "m2u"),
+			&RoofKernels::walls_arrays);
+	ClassDB::bind_static_method("RoofKernels",
+			D_METHOD("roof_cap_arrays", "ring", "idx", "top", "use_tangents"),
+			&RoofKernels::roof_cap_arrays);
 }
 
 } // namespace godot

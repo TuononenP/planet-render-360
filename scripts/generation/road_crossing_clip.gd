@@ -62,16 +62,40 @@ static func off_apron_runs(pts: PackedVector2Array, aprons: Dictionary, m: float
 				return false
 		return true)
 
+## Squared distance from point `p` to segment `a`..`b`.
+static func _seg_dist_sq(p: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab := b - a
+	var l2 := ab.length_squared()
+	if l2 <= 1e-12:
+		return p.distance_squared_to(a)
+	var t := clampf((p - a).dot(ab) / l2, 0.0, 1.0)
+	return p.distance_squared_to(a + ab * t)
+
 ## True when `p` is over a road of `grid` or inside an apron.
 static func _on_road(p: Vector2, grid: Dictionary, aprons: Dictionary, m: float, skip_service: bool = false) -> bool:
-	for seg: Array in RoadMarkings._grid_near(grid, p, RoadMarkings.ON_ROAD_REACH_M * m, m):
-		if skip_service and seg.size() > 3 and bool(seg[3]):
-			continue
-		if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= float(seg[2]):
-			return true
-	for ring: PackedVector2Array in aprons.get(RoadMarkings._cell(p, RoadMarkings.CELL_M * m), []):
-		if Geometry2D.is_point_in_polygon(p, ring):
-			return true
+	var cell := RoadMarkings.CELL_M * m
+	var reach := RoadMarkings.ON_ROAD_REACH_M * m
+	var cx0 := floori((p.x - reach) / cell)
+	var cx1 := floori((p.x + reach) / cell)
+	var cy0 := floori((p.y - reach) / cell)
+	var cy1 := floori((p.y + reach) / cell)
+	for x in range(cx0, cx1 + 1):
+		for z in range(cy0, cy1 + 1):
+			var bucket: Variant = grid.get(Vector2i(x, z))
+			if bucket == null:
+				continue
+			for seg: Array in (bucket as Array):
+				if skip_service and seg.size() > 3 and bool(seg[3]):
+					continue
+				var hw := float(seg[2])
+				if _seg_dist_sq(p, seg[0], seg[1]) <= hw * hw:
+					return true
+	if not aprons.is_empty():
+		var ab: Variant = aprons.get(RoadMarkings._cell(p, cell))
+		if ab != null:
+			for ring: PackedVector2Array in (ab as Array):
+				if Geometry2D.is_point_in_polygon(p, ring):
+					return true
 	return false
 
 ## The runs of `pts` where `keep` holds, each end placed on the boundary.

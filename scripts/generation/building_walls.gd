@@ -141,10 +141,24 @@ static func upper_walls(root: Node3D, ring: PackedVector2Array, y0: float, top: 
 	if rest > 0:
 		_walls(root, ring, y, y_top, facade, float(rest), cover, fire, false, {}, bay_scale)
 
+static var _native := ClassDB.class_exists("RoofKernels")
+
 static func _walls(root: Node3D, ring: PackedVector2Array, base: float,
 		top: float, mat: Material, v_repeat: float = 1.0, cover: Array = [],
 		fire: Material = null, invert: bool = false, edge_materials: Dictionary = {},
 		bay_scale: float = 1.0) -> void:
+	if _native and edge_materials.is_empty():
+		var m2u := WorldScale.metres_to_units()
+		var uvp := FacadeMaterials.facade_uv(mat)
+		var is_glass := mat != null and str(mat.get_meta("facade_set", "")) == "glass"
+		var res: Array = ClassDB.class_call_static("RoofKernels", "walls_arrays",
+			ring, base, top, uvp, bay_scale, v_repeat, cover, fire != null, is_glass,
+			invert, BuildingBuilder._batch == null, m2u)
+		if not (res[0] as Array).is_empty():
+			_emit(root, res[0] as Array, mat)
+		if fire != null and not (res[1] as Array).is_empty():
+			_emit(root, res[1] as Array, fire)
+		return
 	var ccw := RingGeometry.signed_area(ring) > 0.0
 	# Style facades map UVs in real window bays (and, for tiled patterns,
 	# real storeys) so windows keep their size on any wall; legacy
@@ -366,6 +380,21 @@ static func _roof_cap(root: Node3D, ring: PackedVector2Array,
 	top = BuildingTrim.deck(top, trim)
 	if not cap.is_empty():
 		ring = cap
+	if _native:
+		var use_t := BuildingBuilder._batch == null
+		var cap_arr: Array = ClassDB.class_call_static("RoofKernels", "roof_cap_arrays", ring, idx, top, use_t)
+		if BuildingBuilder._batch != null:
+			BuildingBuilder._batch.add(BuildingBuilder._batch_key, mat, cap_arr[0], cap_arr[1], cap_arr[2], cap_arr[4])
+			return
+		var arrays: Array = []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = cap_arr[0]
+		arrays[Mesh.ARRAY_NORMAL] = cap_arr[1]
+		arrays[Mesh.ARRAY_TEX_UV] = cap_arr[2]
+		arrays[Mesh.ARRAY_TANGENT] = cap_arr[3]
+		arrays[Mesh.ARRAY_INDEX] = cap_arr[4]
+		TerrainBuilder._add(root, MeshArrays.mesh(arrays), mat)
+		return
 	# triangulate_polygon normalizes its output winding (a CW input
 	# still yields CCW triplets), so the flip is read off the first
 	# emitted triangle, not the ring: front.y equals its 2D cross.

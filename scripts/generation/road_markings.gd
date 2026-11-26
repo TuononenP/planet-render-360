@@ -323,15 +323,31 @@ static func _stubs(chains: Array, m: float) -> Dictionary:
 static func _on_road_share(pts: PackedVector2Array, grid: Dictionary, m: float) -> float:
 	var total := 0
 	var hits := 0
+	var cell := CELL_M * m
+	var reach := ON_ROAD_REACH_M * m
+	var pad := ON_ROAD_PAD_M * m
 	for j in pts.size() - 1:
 		var n := maxi(1, ceili(pts[j].distance_to(pts[j + 1]) / (ON_ROAD_STEP_M * m)))
 		for k in n:
 			var p := pts[j].lerp(pts[j + 1], (float(k) + 0.5) / float(n))
 			total += 1
-			for seg: Array in _grid_near(grid, p, ON_ROAD_REACH_M * m, m):
-				if Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1]).distance_to(p) <= float(seg[2]) + ON_ROAD_PAD_M * m:
-					hits += 1
+			var hit := false
+			for x in range(floori((p.x - reach) / cell), floori((p.x + reach) / cell) + 1):
+				for z in range(floori((p.y - reach) / cell), floori((p.y + reach) / cell) + 1):
+					var bucket: Variant = grid.get(Vector2i(x, z))
+					if bucket == null:
+						continue
+					for seg: Array in (bucket as Array):
+						var lim := float(seg[2]) + pad
+						if RoadCrossingClip._seg_dist_sq(p, seg[0], seg[1]) <= lim * lim:
+							hit = true
+							break
+					if hit:
+						break
+				if hit:
 					break
+			if hit:
+				hits += 1
 	return float(hits) / float(maxi(total, 1))
 
 ## Crossing ways joined where they share an end and run on in line:

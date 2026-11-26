@@ -34,6 +34,13 @@ public:
 	// BuildingTrim.add mesh arrays in native code: [verts, normals, uvs, tangents, idx].
 	static Array trim_arrays(const PackedVector2Array &ring, double top, int trim,
 			const PackedByteArray &party, double m2u);
+	// BuildingWalls._walls (when edge_materials is empty): returns [face_arr, blank_arr].
+	static Array walls_arrays(const PackedVector2Array &ring, double base, double top,
+			const Vector3 &uvp, double bay_scale, double v_repeat, const Array &cover,
+			bool has_fire, bool is_glass, bool invert, bool use_tangents, double m2u);
+	// BuildingWalls._roof_cap: returns [verts, normals, uvs, tangents, idx].
+	static Array roof_cap_arrays(const PackedVector2Array &ring, const PackedInt32Array &idx,
+			double top, bool use_tangents);
 };
 
 } // namespace godot

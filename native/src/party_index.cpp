@@ -254,7 +254,13 @@ bool PartyIndex::faces_street(const Vector2 &a, const Vector2 &b, const Vector2 
 			}
 			for (int rid : it->second) {
 				const Road &r = roads[rid];
-				Vector2 q = g->get_closest_point_to_segment(p, r.a, r.b);
+				const Vector2 ab = r.b - r.a;
+				const double l2 = D(ab.x) * D(ab.x) + D(ab.y) * D(ab.y);
+				Vector2 q = r.a;
+				if (l2 > 1e-12) {
+					const double t = Math::clamp((D(p.x - r.a.x) * D(ab.x) + D(p.y - r.a.y) * D(ab.y)) / l2, 0.0, 1.0);
+					q = r.a + ab * (real_t)t;
+				}
 				if (D(q.distance_to(p)) < reach + r.hw && D((q - p).dot(n)) > -1.0 * 1.0) {
 					return true;
 				}
@@ -264,9 +270,44 @@ bool PartyIndex::faces_street(const Vector2 &a, const Vector2 &b, const Vector2 
 	return false;
 }
 
+void PartyIndex::add_roads(const Array &data_roads, double m2u) {
+	const int64_t rn = data_roads.size();
+	for (int64_t ri = 0; ri < rn; ++ri) {
+		const Variant &item = data_roads[ri];
+		PackedVector2Array pts;
+		double hw = 4.0;
+		if (item.get_type() == Variant::DICTIONARY) {
+			const Dictionary d = item;
+			if ((bool)d.get("tunnel", false)) {
+				continue;
+			}
+			const Variant pv = d.get("points", Variant());
+			if (pv.get_type() != Variant::PACKED_VECTOR2_ARRAY) {
+				continue;
+			}
+			pts = pv;
+			hw = (double)d.get("width_m", 8.0) * 0.5;
+		} else if (item.get_type() == Variant::PACKED_VECTOR2_ARRAY) {
+			pts = item;
+		} else {
+			continue;
+		}
+		const int64_t pn = pts.size();
+		if (pn < 2) {
+			continue;
+		}
+		const Vector2 *pp = pts.ptr();
+		const double hw_u = hw * m2u;
+		for (int64_t i = 0; i < pn - 1; ++i) {
+			add_road(pp[i], pp[i + 1], hw_u);
+		}
+	}
+}
+
 void PartyIndex::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_ring", "ring", "key", "top", "hole"), &PartyIndex::add_ring);
 	ClassDB::bind_method(D_METHOD("add_road", "a", "b", "hw"), &PartyIndex::add_road);
+	ClassDB::bind_method(D_METHOD("add_roads", "data_roads", "m2u"), &PartyIndex::add_roads);
 	ClassDB::bind_method(D_METHOD("ring_cover", "ring", "key", "hole"), &PartyIndex::ring_cover);
 	ClassDB::bind_method(D_METHOD("faces_street", "a", "b", "n"), &PartyIndex::faces_street);
 }

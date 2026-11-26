@@ -47,6 +47,8 @@ public:
 	void add_ring(const PackedVector2Array &ring, const String &key, double top, bool hole);
 	// PartyWalls.build's road segments (hw already in units).
 	void add_road(const Vector2 &a, const Vector2 &b, double hw);
+	// Batch PartyWalls.build road ingestion (one call for all data.roads).
+	void add_roads(const Array &data_roads, double m2u);
 	// PartyWalls.ring_cover
 	Array ring_cover(const PackedVector2Array &ring, const String &key, bool hole);
 	// PartyWalls.faces_street
