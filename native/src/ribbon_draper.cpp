@@ -467,38 +467,50 @@ bool RibbonDraper::inside(const Vector2 &p) const {
 }
 
 double RibbonDraper::water_at(double x, double z) const {
-	if (shore_domains.is_valid() && shore_bounds.has_point(Vector2((real_t)x, (real_t)z))) {
-		const int id = shore_domains->at(Vector2((real_t)x, (real_t)z));
-		if (id == 0) {
-			return -1.0;
-		}
-		if (id > 0 && id < (int)body_levels.size()) {
-			return (double)body_levels[id] - ground_height(x, z);
-		}
-	} else if (shore_empty) {
-		return -1.0;
+	if (shore_empty) {
+		return 0.0;
 	}
+	const Vector2 p((real_t)x, (real_t)z);
+	if (shore_domains.is_valid() && shore_bounds.has_point(p)) {
+		const int id = shore_domains->at(p);
+		const int body_count = (int)(body_levels.size() / 6);
+		if (id < 0 || id >= body_count) {
+			return 0.0;
+		}
+		const double *bl = body_levels.data() + id * 6;
+		double lvl = bl[0];
+		if (!std::isnan(bl[1])) {
+			const Vector2 a0((real_t)bl[2], (real_t)bl[3]);
+			const Vector2 a1((real_t)bl[4], (real_t)bl[5]);
+			const Vector2 d = a1 - a0;
+			const real_t t = std::clamp((p - a0).dot(d) / std::max(d.length_squared(), (real_t)0.0001), (real_t)0.0, (real_t)1.0);
+			lvl = lerpd(bl[0], bl[1], (double)t);
+		}
+		return std::max(0.0, lvl - ground_height(x, z));
+	}
+	double wl = water_level;
 	if ((int)water_level_grid.size() == g_size * g_size && g_size >= 2) {
-		const double fx = clampd((x + half_units) / g_step, 0.0, (double)(g_size - 1));
-		const double fz = clampd((z + half_units) / g_step, 0.0, (double)(g_size - 1));
+		const double fx = clampd(x / g_step + (double)g_size * 0.5, 0.0, (double)(g_size - 1));
+		const double fz = clampd(z / g_step + (double)g_size * 0.5, 0.0, (double)(g_size - 1));
 		const int x0 = std::min((int)fx, g_size - 2);
 		const int z0 = std::min((int)fz, g_size - 2);
 		const double tx = fx - (double)x0;
 		const double tz = fz - (double)z0;
-		const double a = (double)water_level_grid[z0 * g_size + x0];
-		const double b = (double)water_level_grid[z0 * g_size + x0 + 1];
-		const double c = (double)water_level_grid[(z0 + 1) * g_size + x0];
-		const double d = (double)water_level_grid[(z0 + 1) * g_size + x0 + 1];
-		if (a <= -9000.0 && b <= -9000.0 && c <= -9000.0 && d <= -9000.0) {
-			return -1.0;
+		const double ws[4] = { (1.0 - tx) * (1.0 - tz), tx * (1.0 - tz), (1.0 - tx) * tz, tx * tz };
+		const int idxs[4] = { z0 * g_size + x0, z0 * g_size + x0 + 1, (z0 + 1) * g_size + x0, (z0 + 1) * g_size + x0 + 1 };
+		double num = 0.0, den = 0.0;
+		for (int k = 0; k < 4; ++k) {
+			const float lv = water_level_grid[idxs[k]];
+			if (!std::isinf(lv)) {
+				num += (double)lv * ws[k];
+				den += ws[k];
+			}
 		}
-		const double wl = lerpd(lerpd(a, b, tx), lerpd(c, d, tx), tz);
-		if (wl <= -9000.0) {
-			return -1.0;
+		if (den > 0.0) {
+			wl = num / den;
 		}
-		return wl - ground_height(x, z);
 	}
-	return water_level - ground_height(x, z);
+	return std::max(0.0, wl - ground_height(x, z));
 }
 
 double RibbonDraper::junction_frac_at(const Vector2 &p) const {
